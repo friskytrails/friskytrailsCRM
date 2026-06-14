@@ -170,6 +170,59 @@ async function updateDates(id, dates) {
   return formatDoc(result);
 }
 
+async function updateStatus(id, status) {
+  const validStatuses = ['New', 'Contacted', 'Follow Up', 'Interested', 'Booked', 'Rejected', 'Closed'];
+  if (!validStatuses.includes(status)) {
+    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+  const result = await Lead.updateLead(id, { status });
+  if (!result) {
+    throw new Error("Lead not found");
+  }
+  return formatDoc(result);
+}
+
+async function updateBooking(id, bookingData) {
+  const updateFields = {};
+  if (bookingData.totalDial !== undefined) {
+    updateFields['booking.totalDial'] = Number(bookingData.totalDial) || 0;
+  }
+  if (bookingData.connected !== undefined) {
+    updateFields['booking.connected'] = Number(bookingData.connected) || 0;
+  }
+  if (bookingData.talkTime !== undefined) {
+    updateFields['booking.talkTime'] = bookingData.talkTime || '0:0';
+  }
+  if (bookingData.firstCall !== undefined) {
+    if (bookingData.firstCall) {
+      const d = new Date(bookingData.firstCall);
+      if (isNaN(d.getTime())) throw new Error("Invalid firstCall date");
+      updateFields['booking.firstCall'] = d;
+    } else {
+      updateFields['booking.firstCall'] = null;
+    }
+  }
+  if (bookingData.lastCall !== undefined) {
+    if (bookingData.lastCall) {
+      const d = new Date(bookingData.lastCall);
+      if (isNaN(d.getTime())) throw new Error("Invalid lastCall date");
+      updateFields['booking.lastCall'] = d;
+    } else {
+      updateFields['booking.lastCall'] = null;
+    }
+  }
+
+  if (Object.keys(updateFields).length === 0) {
+    throw new Error("No booking fields provided to update");
+  }
+
+  const result = await Lead.updateLead(id, updateFields);
+  if (!result) {
+    throw new Error("Lead not found");
+  }
+  return formatDoc(result);
+}
+
 module.exports = {
   getLeads,
   createLead,
@@ -179,5 +232,7 @@ module.exports = {
   deleteNote,
   getLeadById,
   updateLabels,
-  updateDates
+  updateDates,
+  updateStatus,
+  updateBooking
 };

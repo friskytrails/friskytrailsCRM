@@ -22,7 +22,17 @@ const getNoteDisplayDate = (note) => {
   return note.timestamp;
 };
 
-export default function MyLeads({ leads, addNote, deleteNote, user, loading }) {
+const STATUS_OPTIONS = [
+  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300' },
+  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300' },
+  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
+  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300' },
+  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300' },
+  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400' },
+];
+
+export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, updateLeadBooking, user, loading }) {
   const [viewMode, setViewMode] = useState('card');
   const [noteInputs, setNoteInputs] = useState({});
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -289,6 +299,33 @@ export default function MyLeads({ leads, addNote, deleteNote, user, loading }) {
                         <span className="text-sm font-medium text-gray-800">{lead.destination}</span>
                       </div>
                     </div>
+
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}>
+                        {lead.status || 'New'}
+                      </span>
+                    </div>
+
+                    {/* Compact Booking Info */}
+                    <div className="grid grid-cols-4 gap-1.5">
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Dial</span>
+                        <span className="text-sm font-bold text-gray-800">{lead.booking?.totalDial || 0}</span>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Connected</span>
+                        <span className="text-sm font-bold text-gray-800">{lead.booking?.connected || 0}</span>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Talk</span>
+                        <span className="text-sm font-bold text-gray-800">{lead.booking?.talkTime || '0:0'}</span>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Age</span>
+                        <span className="text-sm font-bold text-gray-800">{lead.createdAt ? `${Math.floor((new Date() - new Date(lead.createdAt)) / (1000*60*60*24))}d` : '—'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -469,6 +506,16 @@ export default function MyLeads({ leads, addNote, deleteNote, user, loading }) {
                       <span className="block text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Destination</span>
                       <span className="text-xs font-medium text-gray-800">{lead.destination}</span>
                     </div>
+                  </div>
+
+                  {/* Status + Compact Booking in list view */}
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}>
+                      {lead.status || 'New'}
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      Dial: {lead.booking?.totalDial || 0} · Conn: {lead.booking?.connected || 0} · Talk: {lead.booking?.talkTime || '0:0'}
+                    </span>
                   </div>
 
                   <div className="flex items-center space-x-2 sm:min-w-[240px] justify-end">

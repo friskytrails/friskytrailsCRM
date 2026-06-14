@@ -207,6 +207,52 @@ function App() {
     }
   };
 
+  const updateLeadStatus = async (leadId, status) => {
+    try {
+      const response = await fetch(`${API_URL}/leads/${leadId}/status`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      if (response.ok) {
+        const updatedLead = await response.json();
+        setLeads((prev) => prev.map(lead => lead.id === leadId ? updatedLead : lead));
+        toast.success("Status updated successfully.");
+        return updatedLead;
+      } else {
+        toast.error("Failed to update status.");
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
+  const updateLeadBooking = async (leadId, bookingData) => {
+    try {
+      const response = await fetch(`${API_URL}/leads/${leadId}/booking`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(bookingData),
+      });
+      if (response.ok) {
+        const updatedLead = await response.json();
+        setLeads((prev) => prev.map(lead => lead.id === leadId ? updatedLead : lead));
+        toast.success("Booking info updated.");
+        return updatedLead;
+      } else {
+        toast.error("Failed to update booking info.");
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   // If not logged in, intercept and show Login Page
   if (!token) {
     return (
@@ -234,11 +280,11 @@ function App() {
           <Routes>
             <Route
               path="/"
-              element={<Dashboard leads={leads} agents={agents} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} user={user} loading={loadingData} />}
+              element={<Dashboard leads={leads} agents={agents} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
             />
             <Route
               path="/my-leads"
-              element={!user.isAdmin ? <MyLeads leads={leads} addNote={addNote} deleteNote={deleteNote} user={user} loading={loadingData} /> : <Navigate to="/" replace />}
+              element={!user.isAdmin ? <MyLeads leads={leads} addNote={addNote} deleteNote={deleteNote} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/add-lead"
@@ -250,7 +296,7 @@ function App() {
             />
             <Route
               path="/leads/:id"
-              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} agents={agents} />} />
+              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} />} />
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} />} />

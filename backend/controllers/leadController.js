@@ -115,6 +115,28 @@ async function updateDates(req, res) {
   }
 }
 
+async function updateStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const result = await leadService.updateStatus(id, status);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+async function updateBooking(req, res) {
+  try {
+    const { id } = req.params;
+    const { totalDial, connected, talkTime, firstCall, lastCall } = req.body;
+    const result = await leadService.updateBooking(id, { totalDial, connected, talkTime, firstCall, lastCall });
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getLeads,
   createLead,
@@ -124,5 +146,7 @@ module.exports = {
   deleteNote,
   getLead,
   updateLabels,
-  updateDates
+  updateDates,
+  updateStatus,
+  updateBooking
 };
