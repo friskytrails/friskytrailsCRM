@@ -243,7 +243,8 @@ function App() {
         toast.success("Booking info updated.");
         return updatedLead;
       } else {
-        toast.error("Failed to update booking info.");
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update booking info: ${errData.error || response.statusText}`);
         return null;
       }
     } catch (error) {

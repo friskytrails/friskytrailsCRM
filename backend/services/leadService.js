@@ -183,40 +183,61 @@ async function updateStatus(id, status) {
 }
 
 async function updateBooking(id, bookingData) {
-  const updateFields = {};
-  if (bookingData.totalDial !== undefined) {
-    updateFields['booking.totalDial'] = Number(bookingData.totalDial) || 0;
+  const lead = await Lead.findById(id);
+  if (!lead) {
+    throw new Error("Lead not found");
   }
-  if (bookingData.connected !== undefined) {
-    updateFields['booking.connected'] = Number(bookingData.connected) || 0;
-  }
-  if (bookingData.talkTime !== undefined) {
-    updateFields['booking.talkTime'] = bookingData.talkTime || '0:0';
-  }
+
+  const currentBooking = lead.booking || {};
+
+  const totalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : (currentBooking.totalDial || 0);
+  const connected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : (currentBooking.connected || 0);
+  const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
+
+  let firstCall = currentBooking.firstCall || null;
   if (bookingData.firstCall !== undefined) {
     if (bookingData.firstCall) {
       const d = new Date(bookingData.firstCall);
       if (isNaN(d.getTime())) throw new Error("Invalid firstCall date");
-      updateFields['booking.firstCall'] = d;
+      firstCall = d;
     } else {
-      updateFields['booking.firstCall'] = null;
+      firstCall = null;
     }
   }
+
+  let lastCall = currentBooking.lastCall || null;
   if (bookingData.lastCall !== undefined) {
     if (bookingData.lastCall) {
       const d = new Date(bookingData.lastCall);
       if (isNaN(d.getTime())) throw new Error("Invalid lastCall date");
-      updateFields['booking.lastCall'] = d;
+      lastCall = d;
     } else {
-      updateFields['booking.lastCall'] = null;
+      lastCall = null;
     }
   }
 
-  if (Object.keys(updateFields).length === 0) {
-    throw new Error("No booking fields provided to update");
+  // Check if any changes were actually made. If not, bypass the update.
+  const hasChanges =
+    totalDial !== (currentBooking.totalDial || 0) ||
+    connected !== (currentBooking.connected || 0) ||
+    talkTime !== (currentBooking.talkTime || '0:0') ||
+    (firstCall ? new Date(firstCall).getTime() : null) !== (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) ||
+    (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
+
+  if (!hasChanges) {
+    return formatDoc(lead);
   }
 
-  const result = await Lead.updateLead(id, updateFields);
+  const result = await Lead.updateLead(id, {
+    booking: {
+      totalDial,
+      connected,
+      talkTime,
+      firstCall,
+      lastCall
+    }
+  });
+
   if (!result) {
     throw new Error("Lead not found");
   }

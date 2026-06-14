@@ -23,13 +23,13 @@ const getNoteDisplayDate = (note) => {
 };
 
 const STATUS_OPTIONS = [
-  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300' },
-  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300' },
-  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300' },
-  { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300' },
-  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300' },
-  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400' },
+  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600' },
+  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/60 dark:text-blue-300 dark:border-blue-700' },
+  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/60 dark:text-yellow-300 dark:border-yellow-700' },
+  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/60 dark:text-purple-300 dark:border-purple-700' },
+  { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
+  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
+  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
 ];
 
 export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, updateLeadBooking, user, loading }) {

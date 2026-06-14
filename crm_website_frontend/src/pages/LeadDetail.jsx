@@ -13,13 +13,13 @@ const PREDEFINED_LABELS = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300' },
-  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300' },
-  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300' },
-  { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300' },
-  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300' },
-  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400' },
+  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600' },
+  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/60 dark:text-blue-300 dark:border-blue-700' },
+  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/60 dark:text-yellow-300 dark:border-yellow-700' },
+  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/60 dark:text-purple-300 dark:border-purple-700' },
+  { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
+  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
+  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
 ];
 
 export default function LeadDetail({ API_URL, token, user, setLeads, agents, updateLeadStatus, updateLeadBooking }) {
@@ -416,12 +416,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
       </div>
 
       {/* Booking Status & Info Block */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-start gap-6">
           {/* Status Block */}
           <div className="flex flex-col items-start gap-3 min-w-[200px]">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center">
-              <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
+              <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Lead Status
             </h2>
             <select
@@ -438,8 +438,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
           {/* Booking Info Block */}
           <div className="flex-1">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center">
-                <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+              <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
+                <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 Booking Info
               </h2>
               <button
@@ -452,56 +452,56 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
 
             {editingBooking ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Total Dial</label>
-                  <input type="number" min="0" value={bookingForm.totalDial} onChange={(e) => setBookingForm(prev => ({ ...prev, totalDial: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Total Dial</label>
+                  <input type="number" min="0" value={bookingForm.totalDial} onChange={(e) => setBookingForm(prev => ({ ...prev, totalDial: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Connected</label>
-                  <input type="number" min="0" value={bookingForm.connected} onChange={(e) => setBookingForm(prev => ({ ...prev, connected: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Connected</label>
+                  <input type="number" min="0" value={bookingForm.connected} onChange={(e) => setBookingForm(prev => ({ ...prev, connected: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Talk Time</label>
-                  <input type="text" value={bookingForm.talkTime} onChange={(e) => setBookingForm(prev => ({ ...prev, talkTime: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 bg-white border border-gray-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="0:0" />
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Talk Time</label>
+                  <input type="text" value={bookingForm.talkTime} onChange={(e) => setBookingForm(prev => ({ ...prev, talkTime: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="0:0" />
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1">Age</label>
-                  <span className="text-sm font-semibold text-gray-800">{computeAge()}</span>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Age</label>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{computeAge()}</span>
                 </div>
-                <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 col-span-2 sm:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 font-semibold mb-1">First Call</label>
-                  <input type="date" value={bookingForm.firstCall} onChange={(e) => setBookingForm(prev => ({ ...prev, firstCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 bg-white border border-amber-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
+                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-200 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold mb-1">First Call</label>
+                  <input type="date" value={bookingForm.firstCall} onChange={(e) => setBookingForm(prev => ({ ...prev, firstCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
                 </div>
-                <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 col-span-2 sm:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 font-semibold mb-1">Last Call</label>
-                  <input type="date" value={bookingForm.lastCall} onChange={(e) => setBookingForm(prev => ({ ...prev, lastCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 bg-white border border-amber-200 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
+                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-200 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold mb-1">Last Call</label>
+                  <input type="date" value={bookingForm.lastCall} onChange={(e) => setBookingForm(prev => ({ ...prev, lastCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
                 </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Total Dial</span>
-                  <span className="text-lg font-bold text-gray-800">{lead.booking?.totalDial || 0}</span>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Connected</span>
-                  <span className="text-lg font-bold text-gray-800">{lead.booking?.connected || 0}</span>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Talk Time</span>
-                  <span className="text-lg font-bold text-gray-800">{lead.booking?.talkTime || '0:0'}</span>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Age</span>
-                  <span className="text-lg font-bold text-gray-800">{computeAge()}</span>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
                 </div>
-                <div className="bg-amber-50/60 rounded-lg p-3 border border-amber-100 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 font-semibold">First Call</span>
-                  <span className="text-sm font-semibold text-gray-700">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
+                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
                 </div>
-                <div className="bg-amber-50/60 rounded-lg p-3 border border-amber-100 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 font-semibold">Last Call</span>
-                  <span className="text-sm font-semibold text-gray-700">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
+                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
                 </div>
               </div>
             )}
