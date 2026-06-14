@@ -220,7 +220,12 @@ function App() {
         toast.success("Status updated successfully.");
         return updatedLead;
       } else {
-        toast.error("Failed to update status.");
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          toast.error("Failed to update status: Route not found. Please make sure your backend server is updated to the latest code and has been restarted.");
+        } else {
+          toast.error(`Failed to update status: ${errData.error || response.statusText}`);
+        }
         return null;
       }
     } catch (error) {
