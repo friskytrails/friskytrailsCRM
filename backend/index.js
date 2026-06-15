@@ -6,7 +6,31 @@ const apiRoutes = require('./routes');
 
 const app = express();
 
-app.use(cors());
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, or postman)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      "https://friskytrails-crm.vercel.app",
+      "http://localhost:5173"
+    ];
+
+    // Check if origin matches hardcoded list or is a Vercel preview URL for your project
+    const isAllowed = allowedOrigins.includes(origin) ||
+      (origin.startsWith("https://friskytrails-crm-") && origin.endsWith(".vercel.app"));
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(null, false); // Block CORS header injection without crashing Express
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
 // Ensure database is connected before handling API routes
