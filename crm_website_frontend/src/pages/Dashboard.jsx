@@ -35,6 +35,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
     origin: '',
     destination: '',
     leadSource: '',
+    product: '',
     mailId: ''
   });
 
@@ -50,6 +51,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
         origin: editingLead.origin || '',
         destination: editingLead.destination || '',
         leadSource: editingLead.leadSource || '',
+        product: editingLead.product || '',
         mailId: editingLead.mailId || ''
       });
     }
@@ -175,10 +177,10 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const filteredLeads = leads.filter((lead) => {
     const agentName = agents.find((a) => a.id === lead.agentId)?.name || '';
     const matchesSearch =
-      lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.phone.includes(searchQuery) ||
-      lead.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.phone || '').includes(searchQuery) ||
+      (lead.origin || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       agentName.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesAgent =
@@ -197,18 +199,18 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const sortedLeads = [...filteredLeads].sort((a, b) => {
     switch (sortBy) {
       case 'oldest':
-        return a.id.localeCompare(b.id);
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
       case 'name-asc':
-        return a.name.localeCompare(b.name);
+        return (a.name || '').localeCompare(b.name || '');
       case 'name-desc':
-        return b.name.localeCompare(a.name);
+        return (b.name || '').localeCompare(a.name || '');
       case 'age-asc':
         return Number(a.age) - Number(b.age);
       case 'age-desc':
         return Number(b.age) - Number(a.age);
       case 'newest':
       default:
-        return b.id.localeCompare(a.id);
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     }
   });
 
@@ -407,6 +409,11 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                         {lead.leadSource && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-100/30">
                             Source: {lead.leadSource}
+                          </span>
+                        )}
+                        {lead.product && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-100/30">
+                            Product: {lead.product}
                           </span>
                         )}
                         {assignedAgent ? (
@@ -652,6 +659,12 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             <span className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100/30">Source: {lead.leadSource}</span>
                           </>
                         )}
+                        {lead.product && (
+                          <>
+                            <span>•</span>
+                            <span className="text-[10px] bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-100/30">Product: {lead.product}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -860,12 +873,19 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Lead Source</label>
-                  <input
-                    type="text"
+                  <select
                     value={modalData.leadSource}
                     onChange={(e) => setModalData({ ...modalData, leadSource: e.target.value })}
-                    className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
-                  />
+                    className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100 cursor-pointer"
+                  >
+                    <option value="">Select a source...</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="AdCampaign">AdCampaign</option>
+                    <option value="Referral">Referral</option>
+                    <option value="Website">Website</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Origin City</label>
@@ -878,14 +898,31 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Destination</label>
-                <input
-                  type="text"
-                  value={modalData.destination}
-                  onChange={(e) => setModalData({ ...modalData, destination: e.target.value })}
-                  className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Product</label>
+                  <select
+                    value={modalData.product}
+                    onChange={(e) => setModalData({ ...modalData, product: e.target.value })}
+                    className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100 cursor-pointer"
+                  >
+                    <option value="">Select a product...</option>
+                    <option value="Meghalaya Package">Meghalaya Package</option>
+                    <option value="Hampta Pass Trek">Hampta Pass Trek</option>
+                    <option value="Rishikesh Activities">Rishikesh Activities</option>
+                    <option value="Spiti Package">Spiti Package</option>
+                    <option value="Ladakh Package">Ladakh Package</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Destination</label>
+                  <input
+                    type="text"
+                    value={modalData.destination}
+                    onChange={(e) => setModalData({ ...modalData, destination: e.target.value })}
+                    className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
+                  />
+                </div>
               </div>
 
               <div className="pt-4 flex justify-end space-x-2">

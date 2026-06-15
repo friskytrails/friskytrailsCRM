@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 
 export default function AddLead({ addLead }) {
   const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -11,6 +12,7 @@ export default function AddLead({ addLead }) {
     origin: '',
     destination: '',
     leadSource: '',
+    product: '',
     mailId: ''
   });
 
@@ -36,9 +38,14 @@ export default function AddLead({ addLead }) {
       return;
     }
 
-    const success = await addLead(formData);
-    if (success) {
-      navigate('/');
+    setSubmitting(true);
+    try {
+      const success = await addLead(formData);
+      if (success) {
+        navigate('/');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -128,15 +135,21 @@ export default function AddLead({ addLead }) {
               <div>
                 <label htmlFor="leadSource" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Lead Source</label>
                 <div className="mt-1">
-                  <input
-                    type="text"
+                  <select
                     name="leadSource"
                     id="leadSource"
                     value={formData.leadSource}
                     onChange={handleChange}
-                    className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border"
-                    placeholder="Instagram, Referral, Web, etc."
-                  />
+                    className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border cursor-pointer focus:outline-none"
+                  >
+                    <option value="">Select a source...</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Facebook">Facebook</option>
+                    <option value="AdCampaign">AdCampaign</option>
+                    <option value="Referral">Referral</option>
+                    <option value="Website">Website</option>
+                    <option value="Other">Other</option>
+                  </select>
                 </div>
               </div>
 
@@ -156,28 +169,57 @@ export default function AddLead({ addLead }) {
               </div>
             </div>
 
-            {/* Row 4: Destination of Interest */}
-            <div>
-              <label htmlFor="destination" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Destination of Interest</label>
-              <div className="mt-1">
-                <input
-                  type="text"
-                  name="destination"
-                  id="destination"
-                  value={formData.destination}
-                  onChange={handleChange}
-                  className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border"
-                  placeholder="Paris, France"
-                />
+            {/* Row 4: Product & Destination of Interest */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="product" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Product</label>
+                <div className="mt-1">
+                  <select
+                    name="product"
+                    id="product"
+                    value={formData.product}
+                    onChange={handleChange}
+                    className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border cursor-pointer focus:outline-none"
+                  >
+                    <option value="">Select a product...</option>
+                    <option value="Meghalaya Package">Meghalaya Package</option>
+                    <option value="Hampta Pass Trek">Hampta Pass Trek</option>
+                    <option value="Rishikesh Activities">Rishikesh Activities</option>
+                    <option value="Spiti Package">Spiti Package</option>
+                    <option value="Ladakh Package">Ladakh Package</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="destination" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Destination of Interest</label>
+                <div className="mt-1">
+                  <input
+                    type="text"
+                    name="destination"
+                    id="destination"
+                    value={formData.destination}
+                    onChange={handleChange}
+                    className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border"
+                    placeholder="Paris, France"
+                  />
+                </div>
               </div>
             </div>
 
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors cursor-pointer"
+                disabled={submitting}
+                className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Add Client Lead
+                {submitting && (
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {submitting ? 'Adding Lead...' : 'Add Client Lead'}
               </button>
             </div>
           </form>

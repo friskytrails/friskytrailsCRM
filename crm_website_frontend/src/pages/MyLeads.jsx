@@ -275,6 +275,11 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
                             Source: {lead.leadSource}
                           </span>
                         )}
+                        {lead.product && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-100/30">
+                            Product: {lead.product}
+                          </span>
+                        )}
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100/30">
                           👤 Assigned to You
                         </span>
@@ -490,6 +495,12 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
                           <>
                             <span>•</span>
                             <span className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100/30">Source: {lead.leadSource}</span>
+                          </>
+                        )}
+                        {lead.product && (
+                          <>
+                            <span>•</span>
+                            <span className="text-[10px] bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-100/30">Product: {lead.product}</span>
                           </>
                         )}
                       </div>
