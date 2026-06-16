@@ -8,7 +8,7 @@ async function getLeads() {
   return leads.map(formatDoc);
 }
 
-async function createLead(name, phone, age, origin, destination, leadSource, mailId) {
+async function createLead(name, phone, age, origin, destination, leadSource, mailId, product) {
   if (!phone) {
     throw new Error("Phone number is required");
   }
@@ -26,6 +26,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
     destination: destination || '',
     leadSource: leadSource || '',
     mailId: mailId || '',
+    product: product || '',
     agentId: null,
     notes: []
   };
@@ -35,7 +36,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   return formatDoc(newLead);
 }
 
-async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId) {
+async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product) {
   if (!phone) {
     throw new Error("Phone number is required");
   }
@@ -52,7 +53,8 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     origin: origin || '',
     destination: destination || '',
     leadSource: leadSource || '',
-    mailId: mailId || ''
+    mailId: mailId || '',
+    product: product || ''
   });
 
   if (!result) {

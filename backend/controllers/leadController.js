@@ -14,8 +14,8 @@ async function createLead(req, res) {
     if (!req.user.isAdmin) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
-    const { name, phone, age, origin, destination, leadSource, mailId } = req.body;
-    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId);
+    const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
+    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -28,8 +28,8 @@ async function updateLead(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const { id } = req.params;
-    const { name, phone, age, origin, destination, leadSource, mailId } = req.body;
-    const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId);
+    const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
+    const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });

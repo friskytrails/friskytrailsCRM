@@ -4,12 +4,12 @@ import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 
 const PREDEFINED_LABELS = [
-  { name: 'Hot Lead', color: 'bg-red-500', text: 'text-white', border: 'border-red-400', light: 'bg-red-50 text-red-700 border-red-200' },
-  { name: 'VIP', color: 'bg-purple-500', text: 'text-white', border: 'border-purple-400', light: 'bg-purple-50 text-purple-700 border-purple-200' },
-  { name: 'Follow Up', color: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-400', light: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-  { name: 'Confirmed', color: 'bg-green-500', text: 'text-white', border: 'border-green-400', light: 'bg-green-50 text-green-700 border-green-200' },
-  { name: 'Pending', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { name: 'Cancelled', color: 'bg-gray-500', text: 'text-white', border: 'border-gray-400', light: 'bg-gray-100 text-gray-700 border-gray-300' },
+  { name: 'Hot Lead', color: 'bg-red-500', text: 'text-white', border: 'border-red-400', light: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/50' },
+  { name: 'VIP', color: 'bg-purple-500', text: 'text-white', border: 'border-purple-400', light: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
+  { name: 'Follow Up', color: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-400', light: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900/50' },
+  { name: 'Confirmed', color: 'bg-green-500', text: 'text-white', border: 'border-green-400', light: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900/50' },
+  { name: 'Pending', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
+  { name: 'Cancelled', color: 'bg-gray-500', text: 'text-white', border: 'border-gray-400', light: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-slate-700/60 dark:text-slate-300 dark:border-slate-650' },
 ];
 
 const STATUS_OPTIONS = [
@@ -401,6 +401,11 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
           {lead.leadSource && (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100/30">
               Source: {lead.leadSource}
+            </span>
+          )}
+          {lead.product && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-100/30">
+              Product: {lead.product}
             </span>
           )}
           {assignedAgent ? (

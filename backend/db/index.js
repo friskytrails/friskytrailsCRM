@@ -3,6 +3,7 @@ const config = require('../config');
 
 let cachedConnection = null;
 
+
 async function connectDB() {
   const uri = config.MONGODB_URI;
   if (!uri) {
@@ -26,6 +27,8 @@ async function connectDB() {
     });
     cachedConnection = conn;
     console.log("Connected to MongoDB successfully via Mongoose (crm_website)!");
+    
+
     return cachedConnection;
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);
