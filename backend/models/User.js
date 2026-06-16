@@ -35,6 +35,10 @@ const UserSchema = new mongoose.Schema({
   otpExpiresAt: {
     type: Date,
     required: false
+  },
+  otpAttempts: {
+    type: Number,
+    default: 0
   }
 });
 

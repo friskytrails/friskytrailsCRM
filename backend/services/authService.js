@@ -2,7 +2,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config');
-const { Resend } = require('resend');
+const { sendOTPEmail } = require('../utils/sendEmail');
+const { generateOTP, hashOTP } = require('../utils/otp');
+
+const MAX_OTP_ATTEMPTS = 5;
 
 async function register(name, email, password) {
   if (!name || !email || !password) {
@@ -17,7 +20,8 @@ async function register(name, email, password) {
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = generateOTP();
+  const hashedOtp = hashOTP(otp);
   const otpExpiresAt = new Date(Date.now() + 10 * 60000); // 10 mins
 
   const newUser = {
@@ -27,23 +31,17 @@ async function register(name, email, password) {
     isAdmin: false,
     createdAt: new Date(),
     isVerified: false,
-    verificationOtp: otp,
-    otpExpiresAt
+    verificationOtp: hashedOtp,
+    otpExpiresAt,
+    otpAttempts: 0
   };
 
   const result = await User.insertUser(newUser);
 
   try {
-    const resend = new Resend(config.RESEND_API_KEY);
-    
-    await resend.emails.send({
-      from: 'onboarding@resend.dev',
-      to: email.toLowerCase(),
-      subject: 'FriskyTrails CRM - Verification Code',
-      html: `<p>Hello ${name},</p><p>Your verification code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p>`
-    });
+    await sendOTPEmail(email.toLowerCase(), otp, name);
   } catch (error) {
-    console.error("Failed to send OTP email via Resend", error);
+    console.error("Failed to send OTP email via Nodemailer", error);
   }
 
   return {
@@ -83,7 +81,8 @@ async function login(email, password) {
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      isAdmin: !!user.isAdmin
+      isAdmin: !!user.isAdmin,
+      isVerified: user.isVerified
     }
   };
 }
@@ -98,7 +97,8 @@ async function getProfile(userId) {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
-    isAdmin: !!user.isAdmin
+    isAdmin: !!user.isAdmin,
+    isVerified: user.isVerified
   };
 }
 
@@ -148,7 +148,8 @@ async function updateProfile(userId, name, email) {
     id: user._id.toString(),
     name: user.name,
     email: user.email,
-    isAdmin: !!user.isAdmin
+    isAdmin: !!user.isAdmin,
+    isVerified: user.isVerified
   };
 }
 
@@ -159,17 +160,29 @@ async function verifyEmail(email, otp) {
   if (!user) throw new Error("User not found");
   if (user.isVerified) throw new Error("User is already verified");
   
-  if (user.verificationOtp !== otp) {
+  if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+    throw new Error("Too many failed attempts. Please request a new OTP.");
+  }
+  
+  const hashedInputOtp = hashOTP(otp);
+  if (user.verificationOtp !== hashedInputOtp) {
+    user.otpAttempts += 1;
+    await user.save();
     throw new Error("Invalid OTP");
   }
   
   if (user.otpExpiresAt < new Date()) {
+    user.verificationOtp = undefined;
+    user.otpExpiresAt = undefined;
+    user.otpAttempts = 0;
+    await user.save();
     throw new Error("OTP has expired");
   }
 
   user.isVerified = true;
   user.verificationOtp = undefined;
   user.otpExpiresAt = undefined;
+  user.otpAttempts = 0;
   await user.save();
 
   const token = jwt.sign(
@@ -184,7 +197,8 @@ async function verifyEmail(email, otp) {
       id: user._id.toString(),
       name: user.name,
       email: user.email,
-      isAdmin: !!user.isAdmin
+      isAdmin: !!user.isAdmin,
+      isVerified: user.isVerified
     }
   };
 }
@@ -195,26 +209,24 @@ async function resendOtp(email) {
   const user = await User.findByEmail(email);
   if (!user) throw new Error("User not found");
   if (user.isVerified) throw new Error("User is already verified");
+  
+  if (user.otpExpiresAt && user.otpExpiresAt > new Date()) {
+    throw new Error("An OTP has already been sent recently. Please wait before requesting another.");
+  }
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = generateOTP();
+  const hashedOtp = hashOTP(otp);
   const otpExpiresAt = new Date(Date.now() + 10 * 60000); // 10 mins
 
-  user.verificationOtp = otp;
+  user.verificationOtp = hashedOtp;
   user.otpExpiresAt = otpExpiresAt;
+  user.otpAttempts = 0;
   await user.save();
 
   try {
-    const { Resend } = require('resend');
-    const resend = new Resend(config.RESEND_API_KEY);
-    
-    await resend.emails.send({
-      from: 'onboarding@resend.dev',
-      to: email.toLowerCase(),
-      subject: 'FriskyTrails CRM - New Verification Code',
-      html: `<p>Hello ${user.name},</p><p>Your new verification code is: <strong>${otp}</strong></p><p>This code will expire in 10 minutes.</p>`
-    });
+    await sendOTPEmail(email.toLowerCase(), otp, user.name);
   } catch (error) {
-    console.error("Failed to resend OTP email via Resend", error);
+    console.error("Failed to resend OTP email via Nodemailer", error);
   }
 
   return { message: "A new OTP has been sent to your email" };
