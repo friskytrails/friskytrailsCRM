@@ -38,15 +38,18 @@ async function register(name, email, password) {
 
   const result = await User.insertUser(newUser);
 
+  let emailFailed = false;
   try {
     await sendOTPEmail(email.toLowerCase(), otp, name);
   } catch (error) {
     console.error("Failed to send OTP email via Nodemailer", error);
+    emailFailed = true;
   }
 
   return {
-    message: "OTP sent successfully. Please verify your email.",
-    userId: result.insertedId.toString()
+    message: emailFailed ? "Account created but failed to send OTP email." : "OTP sent successfully. Please verify your email.",
+    userId: result.insertedId.toString(),
+    emailFailed
   };
 }
 
@@ -160,6 +163,14 @@ async function verifyEmail(email, otp) {
   if (!user) throw new Error("User not found");
   if (user.isVerified) throw new Error("User is already verified");
   
+  if (user.otpExpiresAt < new Date()) {
+    user.verificationOtp = undefined;
+    user.otpExpiresAt = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+    throw new Error("OTP has expired");
+  }
+
   if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
     throw new Error("Too many failed attempts. Please request a new OTP.");
   }
@@ -169,14 +180,6 @@ async function verifyEmail(email, otp) {
     user.otpAttempts += 1;
     await user.save();
     throw new Error("Invalid OTP");
-  }
-  
-  if (user.otpExpiresAt < new Date()) {
-    user.verificationOtp = undefined;
-    user.otpExpiresAt = undefined;
-    user.otpAttempts = 0;
-    await user.save();
-    throw new Error("OTP has expired");
   }
 
   user.isVerified = true;
@@ -210,7 +213,7 @@ async function resendOtp(email) {
   if (!user) throw new Error("User not found");
   if (user.isVerified) throw new Error("User is already verified");
   
-  if (user.otpExpiresAt && user.otpExpiresAt > new Date()) {
+  if (user.otpExpiresAt && user.otpExpiresAt > new Date() && user.otpAttempts < MAX_OTP_ATTEMPTS) {
     throw new Error("An OTP has already been sent recently. Please wait before requesting another.");
   }
 
@@ -223,13 +226,18 @@ async function resendOtp(email) {
   user.otpAttempts = 0;
   await user.save();
 
+  let emailFailed = false;
   try {
     await sendOTPEmail(email.toLowerCase(), otp, user.name);
   } catch (error) {
     console.error("Failed to resend OTP email via Nodemailer", error);
+    emailFailed = true;
   }
 
-  return { message: "A new OTP has been sent to your email" };
+  return { 
+    message: emailFailed ? "Failed to resend OTP email." : "A new OTP has been sent to your email",
+    emailFailed
+  };
 }
 
 module.exports = {

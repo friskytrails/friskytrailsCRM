@@ -31,13 +31,14 @@ export default function Register({ setToken, setUser, API_URL }) {
           }
         } catch (error) {
           console.error('Failed to auto-resend OTP', error);
+          toast.error('Failed to auto-resend OTP');
         }
       };
 
       autoResend();
 
       // Clear state to prevent loop if user refreshes
-      window.history.replaceState({}, document.title);
+      navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, API_URL]);
 

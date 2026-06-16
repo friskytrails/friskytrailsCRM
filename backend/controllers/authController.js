@@ -55,7 +55,8 @@ async function verifyEmail(req, res) {
     const result = await authService.verifyEmail(email, otp);
     res.json(result);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error("verifyEmail error:", error.message);
+    res.status(400).json({ error: "Invalid request" });
   }
 }
 
@@ -65,7 +66,8 @@ async function resendOtp(req, res) {
     const result = await authService.resendOtp(email);
     res.json(result);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error("resendOtp error:", error.message);
+    res.status(400).json({ error: "Invalid request" });
   }
 }
 
