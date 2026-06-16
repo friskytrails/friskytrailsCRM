@@ -170,6 +170,80 @@ async function updateDates(id, dates) {
   return formatDoc(result);
 }
 
+async function updateStatus(id, status) {
+  const validStatuses = ['New', 'Contacted', 'Follow Up', 'Interested', 'Booked', 'Rejected', 'Closed'];
+  if (!validStatuses.includes(status)) {
+    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+  const result = await Lead.updateLead(id, { status });
+  if (!result) {
+    throw new Error("Lead not found");
+  }
+  return formatDoc(result);
+}
+
+async function updateBooking(id, bookingData) {
+  const lead = await Lead.findById(id);
+  if (!lead) {
+    throw new Error("Lead not found");
+  }
+
+  const currentBooking = lead.booking || {};
+
+  const totalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : (currentBooking.totalDial || 0);
+  const connected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : (currentBooking.connected || 0);
+  const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
+
+  let firstCall = currentBooking.firstCall || null;
+  if (bookingData.firstCall !== undefined) {
+    if (bookingData.firstCall) {
+      const d = new Date(bookingData.firstCall);
+      if (isNaN(d.getTime())) throw new Error("Invalid firstCall date");
+      firstCall = d;
+    } else {
+      firstCall = null;
+    }
+  }
+
+  let lastCall = currentBooking.lastCall || null;
+  if (bookingData.lastCall !== undefined) {
+    if (bookingData.lastCall) {
+      const d = new Date(bookingData.lastCall);
+      if (isNaN(d.getTime())) throw new Error("Invalid lastCall date");
+      lastCall = d;
+    } else {
+      lastCall = null;
+    }
+  }
+
+  // Check if any changes were actually made. If not, bypass the update.
+  const hasChanges =
+    totalDial !== (currentBooking.totalDial || 0) ||
+    connected !== (currentBooking.connected || 0) ||
+    talkTime !== (currentBooking.talkTime || '0:0') ||
+    (firstCall ? new Date(firstCall).getTime() : null) !== (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) ||
+    (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
+
+  if (!hasChanges) {
+    return formatDoc(lead);
+  }
+
+  const result = await Lead.updateLead(id, {
+    booking: {
+      totalDial,
+      connected,
+      talkTime,
+      firstCall,
+      lastCall
+    }
+  });
+
+  if (!result) {
+    throw new Error("Lead not found");
+  }
+  return formatDoc(result);
+}
+
 module.exports = {
   getLeads,
   createLead,
@@ -179,5 +253,7 @@ module.exports = {
   deleteNote,
   getLeadById,
   updateLabels,
-  updateDates
+  updateDates,
+  updateStatus,
+  updateBooking
 };

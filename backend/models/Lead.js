@@ -76,6 +76,18 @@ const LeadSchema = new mongoose.Schema({
   notes: {
     type: [NoteSchema],
     default: []
+  },
+  status: {
+    type: String,
+    enum: ['New', 'Contacted', 'Follow Up', 'Interested', 'Booked', 'Rejected', 'Closed'],
+    default: 'New'
+  },
+  booking: {
+    totalDial: { type: Number, default: 0 },
+    connected: { type: Number, default: 0 },
+    talkTime: { type: String, default: '0:0' },
+    firstCall: { type: Date, default: null },
+    lastCall: { type: Date, default: null }
   }
 }, { timestamps: true });
 
