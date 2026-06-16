@@ -49,10 +49,32 @@ async function updateProfile(req, res) {
   }
 }
 
+async function verifyEmail(req, res) {
+  try {
+    const { email, otp } = req.body;
+    const result = await authService.verifyEmail(email, otp);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+async function resendOtp(req, res) {
+  try {
+    const { email } = req.body;
+    const result = await authService.resendOtp(email);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   register,
   login,
   getProfile,
   updatePassword,
-  updateProfile
+  updateProfile,
+  verifyEmail,
+  resendOtp
 };
