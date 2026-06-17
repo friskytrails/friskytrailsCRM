@@ -6,7 +6,27 @@ async function getAgents() {
   return agents.map(formatDoc);
 }
 
+async function updateAgentStatus(id, status) {
+  const validStatuses = ['Active', 'Inactive', 'Former Employee'];
+  if (!validStatuses.includes(status)) {
+    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  const user = await User.findById(id);
+  if (!user) {
+    throw new Error("Agent not found");
+  }
+
+  if (user.isAdmin) {
+    throw new Error("Cannot update status of an admin user");
+  }
+
+  user.status = status;
+  await user.save();
+  return formatDoc(user);
+}
 
 module.exports = {
-  getAgents
+  getAgents,
+  updateAgentStatus
 };

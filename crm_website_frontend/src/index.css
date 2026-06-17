@@ -13,13 +13,14 @@
 body, html {
   margin: 0;
   padding: 0;
-  background-color: rgb(247, 241, 231); /* Frisky Trails background color */
+  background-color: rgb(248, 246, 243); /* Slightly warmer, softer background */
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  scroll-behavior: smooth;
 }
 
 html.dark body, html.dark {
-  background-color: rgb(15, 23, 42);
+  background-color: rgb(11, 15, 25); /* Deeper, sleeker dark mode background */
 }
 
 /* Global scrollbar styling */
@@ -80,6 +81,14 @@ html.dark .bg-gray-50,
 html.dark .bg-gray-50\/50,
 html.dark .bg-gray-50\/60 {
   background-color: rgb(15, 23, 42) !important; /* slate-900 */
+}
+
+/* Base custom utility for smooth shadow on hover */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hover-lift:hover {
+  transform: translateY(-2px) scale(1.005);
 }
 
 html.dark input,

@@ -1,9 +1,10 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
+const User = require('../models/User');
 
 const JWT_SECRET = config.JWT_SECRET;
 
-module.exports = function (req, res, next) {
+module.exports = async function (req, res, next) {
   const authHeader = req.header('Authorization');
   if (!authHeader) {
     return res.status(401).json({ error: "No token, authorization denied" });
@@ -18,7 +19,23 @@ module.exports = function (req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Set user information from token payload
+    
+    // Dynamic Role Check
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!user.isAdmin && user.status !== 'Active') {
+       return res.status(403).json({ error: "Account is not active. Please contact administrator." });
+    }
+
+    req.user = {
+      ...decoded,
+      isAdmin: !!user.isAdmin,
+      status: user.status
+    };
+    
     next();
   } catch (err) {
     res.status(401).json({ error: "Token is not valid" });

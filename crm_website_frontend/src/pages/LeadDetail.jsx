@@ -4,12 +4,11 @@ import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 
 const PREDEFINED_LABELS = [
-  { name: 'Hot Lead', color: 'bg-red-500', text: 'text-white', border: 'border-red-400', light: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/50' },
-  { name: 'VIP', color: 'bg-purple-500', text: 'text-white', border: 'border-purple-400', light: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
-  { name: 'Follow Up', color: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-400', light: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900/50' },
-  { name: 'Confirmed', color: 'bg-green-500', text: 'text-white', border: 'border-green-400', light: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900/50' },
-  { name: 'Pending', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
-  { name: 'Cancelled', color: 'bg-gray-500', text: 'text-white', border: 'border-gray-400', light: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-slate-700/60 dark:text-slate-300 dark:border-slate-650' },
+  { name: 'Fresh Lead', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
+  { name: 'Interested Lead', color: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-400', light: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900/50' },
+  { name: 'Pre Prospect Lead', color: 'bg-purple-500', text: 'text-white', border: 'border-purple-400', light: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
+  { name: 'Prospect Lead', color: 'bg-orange-500', text: 'text-white', border: 'border-orange-400', light: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/50' },
+  { name: 'Booked', color: 'bg-green-500', text: 'text-white', border: 'border-green-400', light: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900/50' },
 ];
 
 const STATUS_OPTIONS = [
@@ -343,26 +342,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-[250px]">
             <h1 className="text-2xl font-bold text-gray-900">{lead.name || 'Unnamed Lead'}</h1>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-gray-500">
-              <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                {lead.phone}
-              </span>
-              {lead.mailId && (
-                <span className="flex items-center">
-                  <svg className="w-4 h-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                  {lead.mailId}
-                </span>
-              )}
-              {lead.age && <span>Age: {lead.age}</span>}
-            </div>
+
             {/* Active Labels */}
             {activeLabels.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-3">
                 {activeLabels.map(labelName => {
                   const labelDef = PREDEFINED_LABELS.find(l => l.name === labelName);
                   return (
-                    <span key={labelName} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-0.5 rounded-full text-xs font-semibold border ${labelDef ? labelDef.light : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'}`}>
+                    <span key={labelName} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border ${labelDef ? labelDef.light : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'}`}>
                       {labelName}
                       {user?.isAdmin && (
                         <button
@@ -370,7 +357,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                             e.stopPropagation();
                             handleToggleLabel(labelName);
                           }}
-                          className="w-3.5 h-3.5 rounded-full flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-current font-normal text-[10px] cursor-pointer"
+                          className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-current font-bold text-xs cursor-pointer"
                           title={`Remove ${labelName}`}
                         >
                           &times;
@@ -395,25 +382,38 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
               </div>
             </div>
           </div>
-          <div className="hidden sm:block flex-1"></div>
+          <div className="flex-1 flex flex-col sm:items-end justify-center gap-1.5 mt-4 sm:mt-0">
+            <span className="flex items-center text-sm font-semibold text-gray-600 dark:text-gray-300">
+              <svg className="w-4 h-4 mr-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+              {lead.phone}
+            </span>
+            {lead.mailId && (
+              <span className="flex items-center text-sm font-semibold text-gray-600 dark:text-gray-300">
+                <svg className="w-4 h-4 mr-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                {lead.mailId}
+              </span>
+            )}
+            {lead.age && <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Age: {lead.age}</span>}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-wrap gap-3 mt-5">
           {lead.leadSource && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100/30">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100/50">
               Source: {lead.leadSource}
             </span>
           )}
           {lead.product && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-100/30">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-100/50">
               Product: {lead.product}
             </span>
           )}
           {assignedAgent ? (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[12px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100/30">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-bold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100/50 shadow-sm">
               👤 Assigned to: {assignedAgent.name}
+              {assignedAgent.status && assignedAgent.status !== 'Active' ? ` (${assignedAgent.status})` : ''}
             </span>
           ) : (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-gray-100 text-gray-500 dark:bg-slate-800 dark:text-slate-400 border border-transparent">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-gray-100 text-gray-500 dark:bg-slate-800 dark:text-slate-400 border border-transparent">
               👤 Unassigned
             </span>
           )}
@@ -432,6 +432,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
             <select
               value={lead.status || 'New'}
               onChange={(e) => handleStatusChange(e.target.value)}
+              disabled={!(user?.isAdmin || lead.agentId === user?.id)}
               className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'New').color}`}
             >
               {STATUS_OPTIONS.map(opt => (
@@ -447,12 +448,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 Booking Info
               </h2>
-              <button
-                onClick={editingBooking ? handleBookingSave : handleBookingEdit}
-                className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
-              >
-                {editingBooking ? '✓ Save' : '✎ Edit'}
-              </button>
+              {(user?.isAdmin || lead.agentId === user?.id) && (
+                <button
+                  onClick={editingBooking ? handleBookingSave : handleBookingEdit}
+                  className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
+                >
+                  {editingBooking ? '✓ Save' : '✎ Edit'}
+                </button>
+              )}
             </div>
 
             {editingBooking ? (
@@ -525,7 +528,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
                 Labels
               </h2>
-              {user?.isAdmin && (
+              {(user?.isAdmin || lead.agentId === user?.id) && (
                 <button
                   onClick={() => setShowLabelPicker(!showLabelPicker)}
                   className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
@@ -604,7 +607,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
 
             {!showLabelPicker && activeLabels.length === 0 && (
               <p className="text-xs text-gray-400 italic">
-                {user?.isAdmin ? 'No labels assigned. Click Edit to add.' : 'No labels assigned.'}
+                {(user?.isAdmin || lead.agentId === user?.id) ? 'No labels assigned. Click Edit to add.' : 'No labels assigned.'}
               </p>
             )}
 
@@ -646,12 +649,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <div className="flex items-center space-x-3">
                   <input
                     type="date"
-                    disabled={!user?.isAdmin}
+                    disabled={!(user?.isAdmin || lead.agentId === user?.id)}
                     value={formatDate(lead.dates?.startDate)}
                     onChange={(e) => handleUpdateDate('startDate', e.target.value)}
                     className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
-                  {user?.isAdmin && lead.dates?.startDate && (
+                  {(user?.isAdmin || lead.agentId === user?.id) && lead.dates?.startDate && (
                     <button
                       onClick={() => handleUpdateDate('startDate', null)}
                       className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"
@@ -667,12 +670,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <div className="flex items-center space-x-3">
                   <input
                     type="date"
-                    disabled={!user?.isAdmin}
+                    disabled={!(user?.isAdmin || lead.agentId === user?.id)}
                     value={formatDate(lead.dates?.dueDate)}
                     onChange={(e) => handleUpdateDate('dueDate', e.target.value)}
                     className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
-                  {user?.isAdmin && lead.dates?.dueDate && (
+                  {(user?.isAdmin || lead.agentId === user?.id) && lead.dates?.dueDate && (
                     <button
                       onClick={() => handleUpdateDate('dueDate', null)}
                       className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"

@@ -20,6 +20,11 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  status: {
+    type: String,
+    enum: ['Active', 'Inactive', 'Former Employee'],
+    default: 'Active'
+  },
   createdAt: {
     type: Date,
     default: Date.now
