@@ -18,6 +18,7 @@ async function migrateUsersStatus() {
     console.log(`Migration completed successfully. Modified ${result.nModified || result.modifiedCount} documents.`);
   } catch (error) {
     console.error('Migration failed:', error);
+    process.exit(1);
   } finally {
     await mongoose.disconnect();
     console.log('Disconnected from MongoDB');
@@ -25,7 +26,10 @@ async function migrateUsersStatus() {
 }
 
 if (require.main === module) {
-  migrateUsersStatus();
+  migrateUsersStatus().catch(err => {
+    console.error('Unhandled rejection:', err);
+    process.exit(1);
+  });
 }
 
 module.exports = migrateUsersStatus;
