@@ -338,10 +338,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
       </button>
 
       {/* Header */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-[250px]">
-            <h1 className="text-2xl font-bold text-gray-900">{lead.name || 'Unnamed Lead'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{lead.name || 'Unnamed Lead'}</h1>
 
             {/* Active Labels */}
             {activeLabels.length > 0 && (

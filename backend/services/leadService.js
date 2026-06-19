@@ -36,7 +36,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   return formatDoc(newLead);
 }
 
-async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product) {
+async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition) {
   if (!phone) {
     throw new Error("Phone number is required");
   }
@@ -55,10 +55,10 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     leadSource: leadSource || '',
     mailId: mailId || '',
     product: product || ''
-  });
+  }, agentIdCondition);
 
   if (!result) {
-    throw new Error("Lead not found");
+    throw new Error("Lead not found or unauthorized");
   }
 
   return formatDoc(result);
@@ -133,15 +133,15 @@ async function getLeadById(id) {
   return formatDoc(lead);
 }
 
-async function updateLabels(id, labels) {
-  const result = await Lead.updateLead(id, { labels: labels || [] });
+async function updateLabels(id, labels, agentIdCondition) {
+  const result = await Lead.updateLead(id, { labels: labels || [] }, agentIdCondition);
   if (!result) {
-    throw new Error("Lead not found");
+    throw new Error("Lead not found or unauthorized");
   }
   return formatDoc(result);
 }
 
-async function updateDates(id, dates) {
+async function updateDates(id, dates, agentIdCondition) {
   const updateData = {};
   if (dates.startDate !== undefined) {
     if (dates.startDate) {
@@ -165,26 +165,26 @@ async function updateDates(id, dates) {
       updateData['dates.dueDate'] = null;
     }
   }
-  const result = await Lead.updateLead(id, updateData);
+  const result = await Lead.updateLead(id, updateData, agentIdCondition);
   if (!result) {
-    throw new Error("Lead not found");
+    throw new Error("Lead not found or unauthorized");
   }
   return formatDoc(result);
 }
 
-async function updateStatus(id, status) {
+async function updateStatus(id, status, agentIdCondition) {
   const validStatuses = ['New', 'Contacted', 'Follow Up', 'Interested', 'Booked', 'Rejected', 'Closed'];
   if (!validStatuses.includes(status)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
-  const result = await Lead.updateLead(id, { status });
+  const result = await Lead.updateLead(id, { status }, agentIdCondition);
   if (!result) {
-    throw new Error("Lead not found");
+    throw new Error("Lead not found or unauthorized");
   }
   return formatDoc(result);
 }
 
-async function updateBooking(id, bookingData) {
+async function updateBooking(id, bookingData, agentIdCondition) {
   const lead = await Lead.findById(id);
   if (!lead) {
     throw new Error("Lead not found");
@@ -227,6 +227,10 @@ async function updateBooking(id, bookingData) {
     (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
 
   if (!hasChanges) {
+    // If agentIdCondition is set, we must also ensure the current agent is still the owner
+    if (agentIdCondition !== undefined && lead.agentId !== agentIdCondition) {
+      throw new Error("Lead not found or unauthorized");
+    }
     return formatDoc(lead);
   }
 
@@ -238,10 +242,10 @@ async function updateBooking(id, bookingData) {
       firstCall,
       lastCall
     }
-  });
+  }, agentIdCondition);
 
   if (!result) {
-    throw new Error("Lead not found");
+    throw new Error("Lead not found or unauthorized");
   }
   return formatDoc(result);
 }

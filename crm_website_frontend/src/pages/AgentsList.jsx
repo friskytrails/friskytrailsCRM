@@ -1,6 +1,8 @@
 
+import { useState } from 'react';
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus }) {
+  const [pendingAgents, setPendingAgents] = useState({});
   // Precompute a map of agentId -> count
   const agentLeadCounts = leads.reduce((acc, lead) => {
     if (lead.agentId) {
@@ -9,9 +11,14 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus 
     return acc;
   }, {});
 
-  const handleStatusChange = (agentId, newStatus) => {
+  const handleStatusChange = async (agentId, newStatus) => {
     if (updateAgentStatus) {
-      updateAgentStatus(agentId, newStatus);
+      setPendingAgents(prev => ({ ...prev, [agentId]: true }));
+      try {
+        await updateAgentStatus(agentId, newStatus);
+      } finally {
+        setPendingAgents(prev => ({ ...prev, [agentId]: false }));
+      }
     }
   };
 
@@ -64,11 +71,13 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus 
                     </span>
 
                     <div className="flex items-center space-x-2 border-l pl-4 border-gray-200 dark:border-slate-700">
-                      <span className="text-[10px] uppercase font-bold text-gray-400">Status:</span>
+                      <label htmlFor={`status-${agent.id}`} className="text-[10px] uppercase font-bold text-gray-400">Status:</label>
                       <select
+                        id={`status-${agent.id}`}
                         value={status}
+                        disabled={pendingAgents[agent.id]}
                         onChange={(e) => handleStatusChange(agent.id, e.target.value)}
-                        className="text-xs font-semibold bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer"
+                        className="text-xs font-semibold bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer disabled:opacity-50"
                       >
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>

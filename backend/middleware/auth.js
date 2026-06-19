@@ -17,16 +17,21 @@ module.exports = async function (req, res, next) {
 
   const token = parts[1];
 
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ error: "Token is not valid" });
+  }
+  
+  try {
     // Dynamic Role Check
     const user = await User.findById(decoded.userId);
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    if (!user.isAdmin && user.status !== 'Active') {
+    if (user.status !== 'Active') {
        return res.status(403).json({ error: "Account is not active. Please contact administrator." });
     }
 
@@ -38,6 +43,6 @@ module.exports = async function (req, res, next) {
     
     next();
   } catch (err) {
-    res.status(401).json({ error: "Token is not valid" });
+    return res.status(500).json({ error: "Internal server error" });
   }
 };

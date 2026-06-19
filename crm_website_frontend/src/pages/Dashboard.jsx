@@ -392,7 +392,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             </svg>
                           </Link>
                         </h3>
-                        {(isAdmin || lead.agentId === user.id) && (
+                        {(isAdmin || lead.agentId === user?.id) && (
                           <button
                             onClick={() => setEditingLead(lead)}
                             className="text-gray-400 hover:text-orange-600 cursor-pointer p-1 rounded transition-colors relative z-20"
@@ -456,7 +456,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             const count = getAgentLeadCount(agent.id);
                             const statusText = agent.status && agent.status !== 'Active' ? ` (${agent.status})` : '';
                             return (
-                              <option key={agent.id} value={agent.id}>
+                              <option key={agent.id} value={agent.id} disabled={agent.status && agent.status !== 'Active'}>
                                 {agent.name}{statusText} ({count} {count === 1 ? 'lead' : 'leads'})
                               </option>
                             );
@@ -589,7 +589,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             </svg>
                           </Link>
                         </h3>
-                        {(isAdmin || lead.agentId === user.id) && (
+                        {(isAdmin || lead.agentId === user?.id) && (
                           <button
                             onClick={() => setEditingLead(lead)}
                             className="text-gray-400 hover:text-orange-600 cursor-pointer p-1 rounded transition-colors"
@@ -647,7 +647,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             const count = getAgentLeadCount(agent.id);
                             const statusText = agent.status && agent.status !== 'Active' ? ` (${agent.status})` : '';
                             return (
-                              <option key={agent.id} value={agent.id}>
+                              <option key={agent.id} value={agent.id} disabled={agent.status && agent.status !== 'Active'}>
                                 {agent.name}{statusText} ({count} {count === 1 ? 'lead' : 'leads'})
                               </option>
                             );
