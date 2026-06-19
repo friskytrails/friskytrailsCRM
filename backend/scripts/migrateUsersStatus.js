@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const config = require('../config');
-const User = require('../models/User').Model;
+const User = require('../models/User');
 
 async function migrateUsersStatus() {
   try {
@@ -10,7 +10,7 @@ async function migrateUsersStatus() {
     });
     console.log('Connected to MongoDB');
 
-    const result = await User.updateMany(
+    const result = await User.Model.updateMany(
       { status: { $exists: false } },
       { $set: { status: 'Active' } }
     );
