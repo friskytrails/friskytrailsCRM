@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function Login({ setToken, setUser, API_URL }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +28,12 @@ export default function Login({ setToken, setUser, API_URL }) {
         setUser(data.user);
         toast.success(`Welcome back, ${data.user.name}!`);
       } else {
-        toast.error(data.error || 'Invalid credentials');
+        if (data.error === "Please verify your email address first") {
+          toast.error('You must verify your email before logging in');
+          navigate('/register', { state: { requireVerificationFor: email } });
+        } else {
+          toast.error(data.error || 'Invalid credentials');
+        }
       }
     } catch (error) {
       console.error(error);
