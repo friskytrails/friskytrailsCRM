@@ -25,6 +25,10 @@ const UserSchema = new mongoose.Schema({
     enum: ['Active', 'Inactive', 'Former Employee'],
     default: 'Active'
   },
+  isVerified: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -32,7 +32,7 @@ const STATUS_OPTIONS = [
   { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
 ];
 
-export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, updateLeadBooking, user, loading }) {
+export default function MyLeads({ leads, addNote, deleteNote, user, loading }) {
   const [viewMode, setViewMode] = useState('card');
   const [noteInputs, setNoteInputs] = useState({});
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -43,7 +43,7 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
   const [sortBy, setSortBy] = useState('newest');
 
   // Filter leads to ONLY those assigned to the current user
-  const myLeads = leads.filter(lead => lead.agentId === user.id);
+  const myLeads = leads.filter(lead => (lead.agentIds || []).includes(user?.id));
 
   const toggleNotes = (leadId) => {
     setExpandedNotes(prev => ({

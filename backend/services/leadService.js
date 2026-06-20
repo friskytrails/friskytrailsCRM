@@ -3,8 +3,11 @@ const User = require('../models/User');
 const { formatDoc } = require('../utils/helpers');
 const mongoose = require('mongoose');
 
-async function getLeads() {
-  const leads = await Lead.findAll();
+async function getLeads(agentIdCondition = undefined) {
+  let leads = await Lead.findAll();
+  if (agentIdCondition !== undefined) {
+    leads = leads.filter(lead => lead.agentIds && lead.agentIds.includes(agentIdCondition));
+  }
   return leads.map(formatDoc);
 }
 
@@ -27,7 +30,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
     leadSource: leadSource || '',
     mailId: mailId || '',
     product: product || '',
-    agentId: null,
+    agentIds: [],
     notes: []
   };
 
@@ -64,9 +67,28 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
   return formatDoc(result);
 }
 
-async function assignLead(id, agentId) {
-  const updateVal = agentId ? agentId : null;
-  const result = await Lead.updateLead(id, { agentId: updateVal });
+async function assignLead(id, agentIds) {
+  const updateVal = Array.isArray(agentIds) ? agentIds : (agentIds ? [agentIds] : []);
+  
+  // Enforce single agent assignment
+  if (updateVal.length > 1) {
+    throw new Error("A lead can only be assigned to one agent at a time.");
+  }
+
+  // Verify all agents are verified before assigning
+  if (updateVal.length > 0) {
+    for (const agentId of updateVal) {
+      const agent = await User.findById(agentId);
+      if (!agent) {
+        throw new Error(`Agent with ID ${agentId} not found`);
+      }
+      if (!agent.isVerified) {
+        throw new Error(`Cannot assign lead to unverified agent: ${agent.name}`);
+      }
+    }
+  }
+
+  const result = await Lead.updateLead(id, { agentIds: updateVal });
 
   if (!result) {
     throw new Error("Lead not found");
@@ -228,7 +250,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
 
   if (!hasChanges) {
     // If agentIdCondition is set, we must also ensure the current agent is still the owner
-    if (agentIdCondition !== undefined && lead.agentId !== agentIdCondition) {
+    if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
       throw new Error("Lead not found or unauthorized");
     }
     return formatDoc(lead);

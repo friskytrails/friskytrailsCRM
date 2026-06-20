@@ -2,7 +2,8 @@ const leadService = require('../services/leadService');
 
 async function getLeads(req, res) {
   try {
-    const leads = await leadService.getLeads();
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const leads = await leadService.getLeads(agentIdCondition);
     res.json(leads);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -43,8 +44,8 @@ async function assignLead(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const { id } = req.params;
-    const { agentId } = req.body;
-    const result = await leadService.assignLead(id, agentId);
+    const { agentIds } = req.body;
+    const result = await leadService.assignLead(id, agentIds);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
