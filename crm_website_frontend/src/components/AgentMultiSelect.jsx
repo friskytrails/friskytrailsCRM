@@ -107,11 +107,12 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
                     type="radio"
                     checked={isSelected}
                     disabled={isAgentDisabled}
-                    onChange={() => {
+                    onClick={() => {
                       if (!isAgentDisabled) {
                         handleToggle(agent.id);
                       }
                     }}
+                    readOnly
                     className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded-full focus:ring-orange-500 dark:bg-slate-700 dark:border-slate-600"
                   />
                   <span className="text-xs text-gray-700 dark:text-gray-300 font-medium">

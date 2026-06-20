@@ -339,11 +339,11 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={user.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents"
-              element={user.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/leads/:id"
