@@ -34,11 +34,7 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
                 <Link to="/" className={getLinkClass('/')}>
                   Dashboard
                 </Link>
-                {!user.isAdmin && (
-                  <Link to="/my-leads" className={getLinkClass('/my-leads')}>
-                    My Leads
-                  </Link>
-                )}
+
                 {user.isAdmin && (
                   <>
                     <Link to="/add-lead" className={getLinkClass('/add-lead')}>
@@ -131,11 +127,7 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
             <Link to="/" onClick={() => setIsOpen(false)} className={getLinkClass('/', true)}>
               Dashboard
             </Link>
-            {!user.isAdmin && (
-              <Link to="/my-leads" onClick={() => setIsOpen(false)} className={getLinkClass('/my-leads', true)}>
-                My Leads
-              </Link>
-            )}
+
             {user.isAdmin && (
               <>
                 <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>

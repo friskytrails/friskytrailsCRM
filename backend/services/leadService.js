@@ -97,7 +97,7 @@ async function assignLead(id, agentIds) {
   return formatDoc(result);
 }
 
-async function addNote(id, text, userId, imageUrl) {
+async function addNote(id, text, userId, imageUrl, agentIdCondition) {
   if ((!text || !text.trim()) && !imageUrl) {
     throw new Error("Note text or image is required");
   }
@@ -105,6 +105,10 @@ async function addNote(id, text, userId, imageUrl) {
   const lead = await Lead.findById(id);
   if (!lead) {
     throw new Error("Lead not found");
+  }
+  
+  if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
+    throw new Error("Lead not found or unauthorized");
   }
 
   let author = 'System/Admin';
@@ -128,10 +132,14 @@ async function addNote(id, text, userId, imageUrl) {
   return formatDoc(result);
 }
 
-async function deleteNote(id, noteId, userId, isAdmin) {
+async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
   const lead = await Lead.findById(id);
   if (!lead) {
     throw new Error("Lead not found");
+  }
+  
+  if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
+    throw new Error("Lead not found or unauthorized");
   }
 
   const note = lead.notes.find(n => n.id === noteId || (n._id && n._id.toString() === noteId));
@@ -147,11 +155,16 @@ async function deleteNote(id, noteId, userId, isAdmin) {
   return formatDoc(result);
 }
 
-async function getLeadById(id) {
+async function getLeadById(id, agentIdCondition = undefined) {
   const lead = await Lead.findById(id);
   if (!lead) {
     throw new Error("Lead not found");
   }
+
+  if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
+    throw new Error("Lead not found or unauthorized");
+  }
+
   return formatDoc(lead);
 }
 

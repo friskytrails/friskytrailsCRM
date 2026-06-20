@@ -3,21 +3,19 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function Register({ setToken, setUser, API_URL }) {
-  const [step, setStep] = useState(1);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [step, setStep] = useState(() => location.state?.requireVerificationFor ? 2 : 1);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => location.state?.requireVerificationFor || '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     if (location.state?.requireVerificationFor) {
       const emailToVerify = location.state.requireVerificationFor;
-      setEmail(emailToVerify);
-      setStep(2);
 
       const autoResend = async () => {
         try {
@@ -40,7 +38,7 @@ export default function Register({ setToken, setUser, API_URL }) {
       // Clear state to prevent loop if user refreshes
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state, API_URL]);
+  }, [location.state, location.pathname, navigate, API_URL]);
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();

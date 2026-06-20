@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import toast, { Toaster } from "react-hot-toast";
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
-import MyLeads from './pages/MyLeads';
 import AddLead from './pages/AddLead';
 import AgentsList from './pages/AgentsList';
 import Login from './pages/Login';
@@ -337,10 +336,7 @@ function App() {
               path="/"
               element={<Dashboard leads={leads} agents={agents} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
             />
-            <Route
-              path="/my-leads"
-              element={!user.isAdmin ? <MyLeads leads={leads} addNote={addNote} deleteNote={deleteNote} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} /> : <Navigate to="/" replace />}
-            />
+
             <Route
               path="/add-lead"
               element={user.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
@@ -351,7 +347,7 @@ function App() {
             />
             <Route
               path="/leads/:id"
-              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} assignAgent={assignAgent} />} />
+              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} leads={leads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} assignAgent={assignAgent} />} />
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} />} />

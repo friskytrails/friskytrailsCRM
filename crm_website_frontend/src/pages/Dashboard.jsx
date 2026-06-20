@@ -15,7 +15,6 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Dashboard({ leads, agents, assignAgent, addNote, deleteNote, updateLead, user, loading }) {
-  const [pendingAssignments, setPendingAssignments] = useState({});
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
   const [noteInputs, setNoteInputs] = useState({}); // { [leadId]: 'comment text' }
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -28,7 +27,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [filterStatus, setFilterStatus] = useState('all');
 
   // Modal editing state
-  const [assignmentModalLeadId, setAssignmentModalLeadId] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
   const [modalData, setModalData] = useState({
     name: '',
@@ -85,21 +83,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
     return leads.filter((lead) => (lead.agentIds || []).includes(agentId)).length;
   };
 
-  const handleSelectChange = (leadId, value) => {
-    setPendingAssignments({
-      ...pendingAssignments,
-      [leadId]: value
-    });
-  };
-
-  const handleConfirm = (leadId) => {
-    const selectedAgentId = pendingAssignments[leadId];
-    if (selectedAgentId !== undefined) {
-      assignAgent(leadId, selectedAgentId);
-      const newPending = { ...pendingAssignments };
-      delete newPending[leadId];
-      setPendingAssignments(newPending);
-    }
+  const handleInlineAssign = async (leadId, newIds) => {
+    await assignAgent(leadId, newIds);
   };
 
   const toggleNotes = (leadId) => {
@@ -380,7 +365,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
             return (
               <div
                 key={lead.id}
-                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-hidden flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -447,16 +432,13 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                     </span>
 
                     {isAdmin ? (
-                      <div className="flex items-center justify-between space-x-2">
-                        <div className="text-xs font-semibold text-gray-700 dark:text-slate-200 truncate">
-                          {agentDisplayNames}
-                        </div>
-                        <button
-                          onClick={() => setAssignmentModalLeadId(lead.id)}
-                          className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                        >
-                          Assign
-                        </button>
+                      <div className="flex items-center space-x-2">
+                        <AgentMultiSelect
+                          agents={agents}
+                          selectedAgentIds={lead.agentIds || []}
+                          onChange={(newIds) => handleInlineAssign(lead.id, newIds)}
+                          getAgentLeadCount={getAgentLeadCount}
+                        />
                       </div>
                     ) : (
                       <div className="text-xs font-semibold text-gray-700 dark:text-slate-200 bg-gray-50/60 dark:bg-slate-900/50 px-3 py-2 rounded-lg border border-gray-100 dark:border-slate-800">
@@ -626,8 +608,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                       <div className="w-full max-w-[180px]">
                         <AgentMultiSelect
                           agents={agents}
-                          selectedAgentIds={pendingAssignments[lead.id] !== undefined ? pendingAssignments[lead.id] : (lead.agentIds || [])}
-                          onChange={(newIds) => handleSelectChange(lead.id, newIds)}
+                          selectedAgentIds={lead.agentIds || []}
+                          onChange={(newIds) => handleInlineAssign(lead.id, newIds)}
                           getAgentLeadCount={getAgentLeadCount}
                         />
                       </div>
@@ -858,61 +840,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
           </div>
         </div>
       )}
-      {assignmentModalLeadId && (() => {
-        const lead = leads.find(l => l.id === assignmentModalLeadId);
-        if (!lead) return null;
-        const currentAgentIds = lead.agentIds || [];
-        const pendingValue = pendingAssignments[lead.id];
-        const pendingSorted = [...(pendingValue || [])].sort().join(',');
-        const currentSorted = [...currentAgentIds].sort().join(',');
-        const hasPendingChange = pendingValue !== undefined && pendingSorted !== currentSorted;
-        return (
-          <div className="fixed inset-0 z-[100] overflow-visible flex items-center justify-center p-4" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div className="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" onClick={() => setAssignmentModalLeadId(null)}></div>
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-visible flex flex-col">
-              <div className="px-6 py-5 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900" id="modal-title">
-                  Assign Agent
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">Select an agent for {lead.name}</p>
-              </div>
-              <div className="p-6 overflow-visible min-h-[200px]">
-                <AgentMultiSelect
-                  agents={agents}
-                  selectedAgentIds={pendingAssignments[lead.id] !== undefined ? pendingAssignments[lead.id] : (lead.agentIds || [])}
-                  onChange={(newIds) => handleSelectChange(lead.id, newIds)}
-                  getAgentLeadCount={getAgentLeadCount}
-                />
-              </div>
-              <div className="bg-gray-50 px-6 py-4 flex flex-row-reverse rounded-b-xl gap-3">
-                <button
-                  type="button"
-                  disabled={!hasPendingChange}
-                  className={`inline-flex justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors shadow-sm ${hasPendingChange ? 'bg-orange-600 hover:bg-orange-700 cursor-pointer' : 'bg-orange-300 cursor-not-allowed'}`}
-                  onClick={() => {
-                    handleConfirm(lead.id);
-                    setAssignmentModalLeadId(null);
-                  }}
-                >
-                  Save Assignment
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex justify-center rounded-lg px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer"
-                  onClick={() => {
-                    setAssignmentModalLeadId(null);
-                    const newPending = { ...pendingAssignments };
-                    delete newPending[lead.id];
-                    setPendingAssignments(newPending);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

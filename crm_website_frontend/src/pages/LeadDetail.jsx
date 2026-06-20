@@ -22,7 +22,7 @@ const STATUS_OPTIONS = [
   { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
 ];
 
-export default function LeadDetail({ API_URL, token, user, setLeads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
+export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [lead, setLead] = useState(null);
@@ -41,6 +41,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
     firstCall: '',
     lastCall: ''
   });
+
+  const getAgentLeadCount = (agentId) => {
+    return leads?.filter((l) => (l.agentIds || []).includes(agentId)).length || 0;
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -92,7 +96,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLead();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleToggleLabel = async (labelName) => {
@@ -155,21 +159,21 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
 
   const handleSendNote = async () => {
     if (!noteInput.trim() && !imageFile) return;
-    
+
     setIsUploading(true);
     try {
       let finalImageUrl = null;
-      
+
       // Upload image first if it exists
       if (imageFile) {
         const formData = new FormData();
         formData.append('file', imageFile);
-        
+
         const uploadRes = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: formData
         });
-        
+
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
           finalImageUrl = uploadData.fileUrl;
@@ -432,6 +436,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 agents={agents}
                 selectedAgentIds={lead.agentIds || []}
                 onChange={handleAssignAgent}
+                getAgentLeadCount={getAgentLeadCount}
               />
             </div>
           ) : (
