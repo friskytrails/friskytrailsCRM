@@ -133,7 +133,7 @@ module.exports = {
     await lead.save();
     return { insertedId: lead._id };
   },
-  updateLead: async (id, data) => {
+  updateLead: async (id, data, agentIdCondition = undefined) => {
     let query = {};
     if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
       query = { _id: id };
@@ -144,6 +144,9 @@ module.exports = {
       } else {
         return null;
       }
+    }
+    if (agentIdCondition !== undefined) {
+      query.agentId = agentIdCondition;
     }
     return Lead.findOneAndUpdate(
       query,

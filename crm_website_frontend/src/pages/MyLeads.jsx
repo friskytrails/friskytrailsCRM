@@ -187,7 +187,7 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
       </div>
 
       {/* Search and Filter Section */}
-      <div className="mt-8 bg-white p-4 rounded-xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-gray-100">
+      <div className="mt-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-gray-100 dark:border-slate-700/50 transition-all duration-300 hover:shadow-md">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -251,7 +251,7 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
             return (
               <div
                 key={lead.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between border border-gray-100 p-6 relative group"
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-hidden flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -266,75 +266,40 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
                           </Link>
                         </h3>
                       </div>
-                      <span className="text-xs text-gray-500 block mt-0.5">
-                        {lead.phone} {lead.mailId && `• ${lead.mailId}`}
-                      </span>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {lead.leadSource && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-100/30">
-                            Source: {lead.leadSource}
-                          </span>
-                        )}
-                        {lead.product && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-100/30">
-                            Product: {lead.product}
-                          </span>
-                        )}
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100/30">
-                          👤 Assigned to You
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-sm font-medium text-gray-500">
+                          {lead.phone}
                         </span>
+                        {lead.product && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-100/30">
+                            {lead.product}
+                          </span>
+                        )}
                       </div>
+
                     </div>
-                    {lead.age && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400">
-                        Age {lead.age}
-                      </span>
-                    )}
+                    {/* Status Badge */}
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}>
+                      {lead.status || 'New'}
+                    </span>
                   </div>
 
-                  <div className="mt-4 space-y-3">
-                    <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
-                      <div className="text-center flex-1">
+                  <div className="mt-4">
+                    <div className="bg-gray-50 dark:bg-slate-800/50 rounded-xl p-3 flex items-center justify-between border border-gray-100 dark:border-slate-700/50">
+                      <div className="text-center flex-1 overflow-hidden">
                         <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Origin</span>
-                        <span className="text-sm font-medium text-gray-800">{lead.origin}</span>
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">{lead.origin || '—'}</span>
                       </div>
                       <div className="px-2 text-orange-500 font-bold">➔</div>
-                      <div className="text-center flex-1">
+                      <div className="text-center flex-1 overflow-hidden">
                         <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Destination</span>
-                        <span className="text-sm font-medium text-gray-800">{lead.destination}</span>
-                      </div>
-                    </div>
-
-                    {/* Status Badge */}
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}>
-                        {lead.status || 'New'}
-                      </span>
-                    </div>
-
-                    {/* Compact Booking Info */}
-                    <div className="grid grid-cols-4 gap-1.5">
-                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
-                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Dial</span>
-                        <span className="text-sm font-bold text-gray-800">{lead.booking?.totalDial || 0}</span>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
-                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Connected</span>
-                        <span className="text-sm font-bold text-gray-800">{lead.booking?.connected || 0}</span>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
-                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Talk</span>
-                        <span className="text-sm font-bold text-gray-800">{lead.booking?.talkTime || '0:0'}</span>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
-                        <span className="block text-[8px] uppercase tracking-wider text-gray-400 font-semibold">Age</span>
-                        <span className="text-sm font-bold text-gray-800">{lead.createdAt ? `${Math.floor((new Date() - new Date(lead.createdAt)) / (1000*60*60*24))}d` : '—'}</span>
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">{lead.destination || '—'}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-gray-100 space-y-4">
+                <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700/50 space-y-4">
                   {/* Notes / Chat logs section */}
                   <div>
                     <button
@@ -462,10 +427,10 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
             return (
               <div
                 key={lead.id}
-                className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100 p-5 flex flex-col space-y-4"
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border border-gray-100 dark:border-slate-700/50 p-5 flex flex-col space-y-4"
               >
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-6">
-                  <div className="flex items-center space-x-4 min-w-[200px]">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center">
+                  <div className="lg:col-span-4 flex items-center">
                     <div>
                       <div className="flex items-center space-x-2">
                         <h3 className="text-base font-bold transition-colors">
@@ -477,37 +442,20 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
                           </Link>
                         </h3>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-gray-500 mt-0.5">
-                        {lead.age && (
-                          <>
-                            <span>Age: {lead.age}</span>
-                            <span>•</span>
-                          </>
-                        )}
-                        <span>{lead.phone}</span>
-                        {lead.mailId && (
-                          <>
-                            <span>•</span>
-                            <span>{lead.mailId}</span>
-                          </>
-                        )}
-                        {lead.leadSource && (
-                          <>
-                            <span>•</span>
-                            <span className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100/30">Source: {lead.leadSource}</span>
-                          </>
-                        )}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-sm font-medium text-gray-500">
+                          {lead.phone}
+                        </span>
                         {lead.product && (
-                          <>
-                            <span>•</span>
-                            <span className="text-[10px] bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-100/30">Product: {lead.product}</span>
-                          </>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400 border border-purple-100/30">
+                            {lead.product}
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-4 py-2 flex-1 max-w-md mx-auto">
+                  <div className="lg:col-span-3 flex items-center space-x-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl px-4 py-2 w-full">
                     <div className="text-center flex-1">
                       <span className="block text-[9px] uppercase tracking-wider text-gray-400 font-semibold">Origin</span>
                       <span className="text-xs font-medium text-gray-800">{lead.origin}</span>
@@ -520,16 +468,13 @@ export default function MyLeads({ leads, addNote, deleteNote, updateLeadStatus, 
                   </div>
 
                   {/* Status + Compact Booking in list view */}
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}>
+                  <div className="lg:col-span-2 flex flex-col xl:flex-row items-start xl:items-center gap-2">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}>
                       {lead.status || 'New'}
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-medium">
-                      Dial: {lead.booking?.totalDial || 0} · Conn: {lead.booking?.connected || 0} · Talk: {lead.booking?.talkTime || '0:0'}
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-2 sm:min-w-[240px] justify-end">
+                  <div className="lg:col-span-3 flex items-center space-x-2 justify-end w-full">
                     <div className="text-xs font-semibold text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 min-w-[120px] text-center">
                       Assigned to You
                     </div>

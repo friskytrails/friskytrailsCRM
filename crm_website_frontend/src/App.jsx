@@ -259,6 +259,30 @@ function App() {
     }
   };
 
+  const updateAgentStatus = async (agentId, status) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${agentId}/status`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      if (response.ok) {
+        const updatedAgent = await response.json();
+        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        toast.success("Agent status updated successfully.");
+        return updatedAgent;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update agent status: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   // If not logged in, intercept and show Login Page
   if (!token) {
     return (
@@ -298,7 +322,7 @@ function App() {
             />
             <Route
               path="/agents"
-              element={user.isAdmin ? <AgentsList agents={agents} leads={leads} /> : <Navigate to="/" replace />}
+              element={user.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/leads/:id"

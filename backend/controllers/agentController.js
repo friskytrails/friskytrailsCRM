@@ -10,7 +10,21 @@ async function getAgents(req, res) {
 }
 
 
+async function updateAgentStatus(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params;
+    const { status } = req.body;
+    const agent = await agentService.updateAgentStatus(id, status);
+    res.json(agent);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
 
 module.exports = {
-  getAgents
+  getAgents,
+  updateAgentStatus
 };
