@@ -38,7 +38,14 @@ async function register(name, email, password) {
     otpExpiresAt,
     otpAttempts: 0
   });
-  await pendingUser.save();
+  try {
+    await pendingUser.save();
+  } catch (error) {
+    if (error.code === 11000 || error.code === 'E11000') {
+      throw new Error("An account registration for this email is already pending. Please verify your email or use the resend OTP option.");
+    }
+    throw error;
+  }
 
   let emailFailed = false;
   try {
