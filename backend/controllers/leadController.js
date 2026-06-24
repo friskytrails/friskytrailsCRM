@@ -2,7 +2,8 @@ const leadService = require('../services/leadService');
 
 async function getLeads(req, res) {
   try {
-    const leads = await leadService.getLeads();
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const leads = await leadService.getLeads(agentIdCondition);
     res.json(leads);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -43,8 +44,8 @@ async function assignLead(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const { id } = req.params;
-    const { agentId } = req.body;
-    const result = await leadService.assignLead(id, agentId);
+    const { agentIds } = req.body;
+    const result = await leadService.assignLead(id, agentIds);
     res.json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -55,7 +56,8 @@ async function addNote(req, res) {
   try {
     const { id } = req.params;
     const { text, imageUrl } = req.body;
-    const result = await leadService.addNote(id, text, req.user.userId, imageUrl);
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const result = await leadService.addNote(id, text, req.user.userId, imageUrl, agentIdCondition);
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -65,7 +67,8 @@ async function addNote(req, res) {
 async function deleteNote(req, res) {
   try {
     const { id, noteId } = req.params;
-    const result = await leadService.deleteNote(id, noteId, req.user.userId, req.user.isAdmin);
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const result = await leadService.deleteNote(id, noteId, req.user.userId, req.user.isAdmin, agentIdCondition);
     res.json(result);
   } catch (error) {
     if (error.message === "Unauthorized to delete this note") {
@@ -81,7 +84,8 @@ async function deleteNote(req, res) {
 async function getLead(req, res) {
   try {
     const { id } = req.params;
-    const lead = await leadService.getLeadById(id);
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const lead = await leadService.getLeadById(id, agentIdCondition);
     res.json(lead);
   } catch (error) {
     res.status(404).json({ error: error.message });

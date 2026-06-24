@@ -1,13 +1,12 @@
 
 import { useState } from 'react';
 
-export default function AgentsList({ agents = [], leads = [], updateAgentStatus }) {
+export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification }) {
   const [pendingAgents, setPendingAgents] = useState({});
-  // Precompute a map of agentId -> count
   const agentLeadCounts = leads.reduce((acc, lead) => {
-    if (lead.agentId) {
-      acc[lead.agentId] = (acc[lead.agentId] || 0) + 1;
-    }
+    (lead.agentIds || []).forEach(agentId => {
+      acc[agentId] = (acc[agentId] || 0) + 1;
+    });
     return acc;
   }, {});
 
@@ -16,6 +15,17 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus 
       setPendingAgents(prev => ({ ...prev, [agentId]: true }));
       try {
         await updateAgentStatus(agentId, newStatus);
+      } finally {
+        setPendingAgents(prev => ({ ...prev, [agentId]: false }));
+      }
+    }
+  };
+
+  const handleVerificationChange = async (agentId, isVerified) => {
+    if (updateAgentVerification) {
+      setPendingAgents(prev => ({ ...prev, [agentId]: true }));
+      try {
+        await updateAgentVerification(agentId, isVerified);
       } finally {
         setPendingAgents(prev => ({ ...prev, [agentId]: false }));
       }
@@ -61,7 +71,14 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus 
                           </span>
                         )}
                       </p>
-                      <p className="text-[10px] text-gray-400 dark:text-slate-500 font-mono mt-0.5">{agent.email}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-slate-500 font-mono mt-0.5">
+                        {agent.email}
+                        {agent.isVerified ? (
+                          <span className="ml-2 text-green-500 font-semibold">✓ Verified</span>
+                        ) : (
+                          <span className="ml-2 text-red-500 font-semibold">✗ Unverified</span>
+                        )}
+                      </p>
                     </div>
                   </div>
 
@@ -82,6 +99,20 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus 
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
                         <option value="Former Employee">Former Employee</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center space-x-2 border-l pl-4 border-gray-200 dark:border-slate-700">
+                      <label htmlFor={`verify-${agent.id}`} className="text-[10px] uppercase font-bold text-gray-400">Verified:</label>
+                      <select
+                        id={`verify-${agent.id}`}
+                        value={agent.isVerified ? 'true' : 'false'}
+                        disabled={pendingAgents[agent.id]}
+                        onChange={(e) => handleVerificationChange(agent.id, e.target.value === 'true')}
+                        className="text-xs font-semibold bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer disabled:opacity-50"
+                      >
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
                       </select>
                     </div>
                   </div>

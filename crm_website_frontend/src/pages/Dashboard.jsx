@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
+import AgentMultiSelect from '../components/AgentMultiSelect';
 
 const STATUS_OPTIONS = [
   { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600' },
@@ -13,8 +14,7 @@ const STATUS_OPTIONS = [
   { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
 ];
 
-export default function Dashboard({ leads, agents, assignAgent, addNote, deleteNote, updateLead, updateLeadStatus, updateLeadBooking, user, loading }) {
-  const [pendingAssignments, setPendingAssignments] = useState({});
+export default function Dashboard({ leads, agents, assignAgent, addNote, deleteNote, updateLead, user, loading }) {
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
   const [noteInputs, setNoteInputs] = useState({}); // { [leadId]: 'comment text' }
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -80,24 +80,11 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   };
 
   const getAgentLeadCount = (agentId) => {
-    return leads.filter((lead) => lead.agentId === agentId).length;
+    return leads.filter((lead) => (lead.agentIds || []).includes(agentId)).length;
   };
 
-  const handleSelectChange = (leadId, value) => {
-    setPendingAssignments({
-      ...pendingAssignments,
-      [leadId]: value
-    });
-  };
-
-  const handleConfirm = (leadId) => {
-    const selectedAgentId = pendingAssignments[leadId];
-    if (selectedAgentId !== undefined) {
-      assignAgent(leadId, selectedAgentId);
-      const newPending = { ...pendingAssignments };
-      delete newPending[leadId];
-      setPendingAssignments(newPending);
-    }
+  const handleInlineAssign = async (leadId, newIds) => {
+    await assignAgent(leadId, newIds);
   };
 
   const toggleNotes = (leadId) => {
@@ -168,25 +155,25 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
   // Metrics calculations
   const totalLeads = leads.length;
-  const assignedLeads = leads.filter(lead => lead.agentId && agents.some(a => a.id === lead.agentId)).length;
+  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => a.id === id))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
 
 
   // Filter logic
   const filteredLeads = leads.filter((lead) => {
-    const agentName = agents.find((a) => a.id === lead.agentId)?.name || '';
+    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => a.id === id)?.name || "").join(" ");
     const matchesSearch =
       (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.phone || '').includes(searchQuery) ||
       (lead.origin || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agentName.toLowerCase().includes(searchQuery.toLowerCase());
+      agentNames.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesAgent =
       filterAgent === 'all' ||
-      (filterAgent === 'unassigned' && (!lead.agentId || !agents.some(a => a.id === lead.agentId))) ||
-      lead.agentId === filterAgent;
+      (filterAgent === 'unassigned' && (!(lead.agentIds && lead.agentIds.length > 0) || !(lead.agentIds || []).some(id => agents.some(a => a.id === id)))) ||
+      (lead.agentIds || []).includes(filterAgent);
 
     const matchesStatus =
       filterStatus === 'all' ||
@@ -367,18 +354,18 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       ) : viewMode === 'card' ? (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 items-start">
           {sortedLeads.map((lead) => {
-            const currentValue = pendingAssignments[lead.id] !== undefined
-              ? pendingAssignments[lead.id]
-              : (lead.agentId || '');
+                        const currentAgentIds = lead.agentIds || [];
 
-            const hasPendingChange = pendingAssignments[lead.id] !== undefined && pendingAssignments[lead.id] !== (lead.agentId || '');
-            const assignedAgent = agents.find(a => a.id === lead.agentId);
+
+
+            const assignedAgents = currentAgentIds.map(id => agents.find(a => a.id === id)).filter(Boolean);
+            const agentDisplayNames = assignedAgents.length > 0 ? assignedAgents.map(a => a.name).join(', ') : 'Unassigned';
             const isNotesExpanded = !!expandedNotes[lead.id];
 
             return (
               <div
                 key={lead.id}
-                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-hidden flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -392,7 +379,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             </svg>
                           </Link>
                         </h3>
-                        {(isAdmin || lead.agentId === user?.id) && (
+                        {(isAdmin || (lead.agentIds || []).includes(user?.id)) && (
                           <button
                             onClick={() => setEditingLead(lead)}
                             className="text-gray-400 hover:text-orange-600 cursor-pointer p-1 rounded transition-colors relative z-20"
@@ -441,39 +428,21 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                 <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700/50 space-y-4">
                   <div>
                     <span className="block text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-2">
-                      {assignedAgent ? 'Assigned To' : 'Assign Lead'}
+                      {assignedAgents.length > 0 ? 'Assigned To' : 'Assign Lead'}
                     </span>
 
                     {isAdmin ? (
                       <div className="flex items-center space-x-2">
-                        <select
-                          className="block w-full pl-3 pr-10 py-2 text-sm border-gray-200 focus:outline-none focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white border cursor-pointer text-gray-700"
-                          value={currentValue}
-                          onChange={(e) => handleSelectChange(lead.id, e.target.value)}
-                        >
-                          <option value="">Unassigned</option>
-                          {agents.map((agent) => {
-                            const count = getAgentLeadCount(agent.id);
-                            const statusText = agent.status && agent.status !== 'Active' ? ` (${agent.status})` : '';
-                            return (
-                              <option key={agent.id} value={agent.id} disabled={agent.status && agent.status !== 'Active'}>
-                                {agent.name}{statusText} ({count} {count === 1 ? 'lead' : 'leads'})
-                              </option>
-                            );
-                          })}
-                        </select>
-                        {hasPendingChange && (
-                          <button
-                            onClick={() => handleConfirm(lead.id)}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-xs font-semibold rounded-xl shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors cursor-pointer"
-                          >
-                            Confirm
-                          </button>
-                        )}
+                        <AgentMultiSelect
+                          agents={agents}
+                          selectedAgentIds={lead.agentIds || []}
+                          onChange={(newIds) => handleInlineAssign(lead.id, newIds)}
+                          getAgentLeadCount={getAgentLeadCount}
+                        />
                       </div>
                     ) : (
                       <div className="text-xs font-semibold text-gray-700 dark:text-slate-200 bg-gray-50/60 dark:bg-slate-900/50 px-3 py-2 rounded-lg border border-gray-100 dark:border-slate-800">
-                        {assignedAgent ? assignedAgent.name : 'Unassigned'}
+                        {agentDisplayNames}
                       </div>
                     )}
                   </div>
@@ -564,12 +533,12 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       ) : (
         <div className="mt-8 space-y-4">
           {sortedLeads.map((lead) => {
-            const currentValue = pendingAssignments[lead.id] !== undefined
-              ? pendingAssignments[lead.id]
-              : (lead.agentId || '');
+                        const currentAgentIds = lead.agentIds || [];
 
-            const hasPendingChange = pendingAssignments[lead.id] !== undefined && pendingAssignments[lead.id] !== (lead.agentId || '');
-            const assignedAgent = agents.find(a => a.id === lead.agentId);
+
+
+            const assignedAgents = currentAgentIds.map(id => agents.find(a => a.id === id)).filter(Boolean);
+            const agentDisplayNames = assignedAgents.length > 0 ? assignedAgents.map(a => a.name).join(', ') : 'Unassigned';
             const isNotesExpanded = !!expandedNotes[lead.id];
 
             return (
@@ -589,7 +558,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                             </svg>
                           </Link>
                         </h3>
-                        {(isAdmin || lead.agentId === user?.id) && (
+                        {(isAdmin || (lead.agentIds || []).includes(user?.id)) && (
                           <button
                             onClick={() => setEditingLead(lead)}
                             className="text-gray-400 hover:text-orange-600 cursor-pointer p-1 rounded transition-colors"
@@ -637,36 +606,19 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                   <div className="lg:col-span-3 flex items-center space-x-2 justify-end w-full">
                     {isAdmin ? (
                       <div className="w-full max-w-[180px]">
-                        <select
-                          className="block w-full pl-3 pr-10 py-1.5 text-xs border-gray-200 focus:outline-none focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white border cursor-pointer text-gray-700"
-                          value={currentValue}
-                          onChange={(e) => handleSelectChange(lead.id, e.target.value)}
-                        >
-                          <option value="">Unassigned</option>
-                          {agents.map((agent) => {
-                            const count = getAgentLeadCount(agent.id);
-                            const statusText = agent.status && agent.status !== 'Active' ? ` (${agent.status})` : '';
-                            return (
-                              <option key={agent.id} value={agent.id} disabled={agent.status && agent.status !== 'Active'}>
-                                {agent.name}{statusText} ({count} {count === 1 ? 'lead' : 'leads'})
-                              </option>
-                            );
-                          })}
-                        </select>
+                        <AgentMultiSelect
+                          agents={agents}
+                          selectedAgentIds={lead.agentIds || []}
+                          onChange={(newIds) => handleInlineAssign(lead.id, newIds)}
+                          getAgentLeadCount={getAgentLeadCount}
+                        />
                       </div>
                     ) : (
                       <div className="text-xs font-semibold text-gray-700 dark:text-slate-200 bg-gray-50/60 dark:bg-slate-900/50 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-slate-800 min-w-[120px] text-center">
-                        {assignedAgent ? assignedAgent.name : 'Unassigned'}
+                        {agentDisplayNames}
                       </div>
                     )}
-                    {isAdmin && hasPendingChange && (
-                      <button
-                        onClick={() => handleConfirm(lead.id)}
-                        className="inline-flex items-center px-3.5 py-1.5 border border-transparent text-xs font-semibold rounded-xl shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none cursor-pointer"
-                      >
-                        Confirm
-                      </button>
-                    )}
+                    
                     <button
                       onClick={() => toggleNotes(lead.id)}
                       className="text-xs text-orange-600 hover:text-orange-700 font-semibold px-2 py-1 bg-orange-50 rounded-lg cursor-pointer"

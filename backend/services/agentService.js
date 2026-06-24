@@ -26,7 +26,23 @@ async function updateAgentStatus(id, status) {
   return formatDoc(user);
 }
 
+async function updateAgentVerification(id, isVerified) {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new Error("Agent not found");
+  }
+
+  if (user.isAdmin) {
+    throw new Error("Cannot update verification of an admin user");
+  }
+
+  user.isVerified = !!isVerified;
+  await user.save();
+  return formatDoc(user);
+}
+
 module.exports = {
   getAgents,
-  updateAgentStatus
+  updateAgentStatus,
+  updateAgentVerification
 };

@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import toast, { Toaster } from "react-hot-toast";
 import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
-import MyLeads from './pages/MyLeads';
 import AddLead from './pages/AddLead';
 import AgentsList from './pages/AgentsList';
 import Login from './pages/Login';
@@ -117,27 +116,28 @@ function App() {
     }
   };
 
-  const assignAgent = async (leadId, agentId) => {
+  const assignAgent = async (leadId, agentIds) => {
     try {
       const response = await fetch(`${API_URL}/leads/${leadId}/assign`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ agentId }),
+        body: JSON.stringify({ agentIds }),
       });
+
       if (response.ok) {
+        toast.success(agentIds && agentIds.length > 0 ? 'Agent assigned successfully' : 'Lead unassigned successfully');
         const updatedLead = await response.json();
-        setLeads((prev) => prev.map(lead => lead.id === leadId ? updatedLead : lead));
-        if (agentId) {
-          toast.success("Lead assigned to agent successfully.");
-        } else {
-          toast.success("Lead unassigned successfully.");
-        }
+        setLeads((prev) => prev.map((l) => (l.id === leadId ? updatedLead : l)));
+        return updatedLead;
       } else {
-        toast.error("Failed to assign lead.");
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to assign lead: ${errData.error || response.statusText}`);
+        return null;
       }
     } catch (error) {
       console.error(error);
       toast.error("Server connection error.");
+      return null;
     }
   };
 
@@ -283,6 +283,30 @@ function App() {
     }
   };
 
+  const updateAgentVerification = async (agentId, isVerified) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${agentId}/verify`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isVerified }),
+      });
+      if (response.ok) {
+        const updatedAgent = await response.json();
+        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        toast.success("Agent verification status updated.");
+        return updatedAgent;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update verification: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   // If not logged in, intercept and show Login Page
   if (!token) {
     return (
@@ -312,21 +336,18 @@ function App() {
               path="/"
               element={<Dashboard leads={leads} agents={agents} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
             />
-            <Route
-              path="/my-leads"
-              element={!user.isAdmin ? <MyLeads leads={leads} addNote={addNote} deleteNote={deleteNote} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} /> : <Navigate to="/" replace />}
-            />
+
             <Route
               path="/add-lead"
-              element={user.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents"
-              element={user.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/leads/:id"
-              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} />} />
+              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} leads={leads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} assignAgent={assignAgent} />} />
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} />} />

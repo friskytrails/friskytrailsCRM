@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
+import AgentMultiSelect from '../components/AgentMultiSelect';
 
 const PREDEFINED_LABELS = [
   { name: 'Fresh Lead', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
@@ -21,7 +22,7 @@ const STATUS_OPTIONS = [
   { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
 ];
 
-export default function LeadDetail({ API_URL, token, user, setLeads, agents, updateLeadStatus, updateLeadBooking }) {
+export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [lead, setLead] = useState(null);
@@ -40,6 +41,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
     firstCall: '',
     lastCall: ''
   });
+
+  const getAgentLeadCount = (agentId) => {
+    return leads?.filter((l) => (l.agentIds || []).includes(agentId)).length || 0;
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -91,7 +96,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLead();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleToggleLabel = async (labelName) => {
@@ -154,21 +159,21 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
 
   const handleSendNote = async () => {
     if (!noteInput.trim() && !imageFile) return;
-    
+
     setIsUploading(true);
     try {
       let finalImageUrl = null;
-      
+
       // Upload image first if it exists
       if (imageFile) {
         const formData = new FormData();
         formData.append('file', imageFile);
-        
+
         const uploadRes = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: formData
         });
-        
+
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json();
           finalImageUrl = uploadData.fileUrl;
@@ -294,6 +299,22 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
     setEditingBooking(false);
   };
 
+  const handleAssignAgent = async (newIds) => {
+    if (!lead || !assignAgent) return;
+    const previousLead = { ...lead };
+    setLead({ ...lead, agentIds: newIds }); // Optimistic update
+    syncLeadToParent({ ...lead, agentIds: newIds });
+
+    const updated = await assignAgent(lead.id, newIds);
+    if (updated) {
+      setLead(updated);
+      syncLeadToParent(updated);
+    } else {
+      setLead(previousLead);
+      syncLeadToParent(previousLead);
+    }
+  };
+
   const computeAge = () => {
     if (!lead?.createdAt) return '—';
     const created = new Date(lead.createdAt);
@@ -322,7 +343,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
   }
 
   const activeLabels = lead.labels || [];
-  const assignedAgent = agents?.find(a => a.id === lead.agentId);
+  const assignedAgents = (lead.agentIds || []).map(id => agents?.find(a => a.id === id)).filter(Boolean);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -407,15 +428,27 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
               Product: {lead.product}
             </span>
           )}
-          {assignedAgent ? (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-bold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100/50 shadow-sm">
-              👤 Assigned to: {assignedAgent.name}
-              {assignedAgent.status && assignedAgent.status !== 'Active' ? ` (${assignedAgent.status})` : ''}
-            </span>
+          {/* We will move the agent assignment down to the status block or just render it here. */}
+          {/* Let's render the interactive agent select here if user is admin, otherwise show badge */}
+          {user?.isAdmin ? (
+            <div className="w-[200px] flex items-center">
+              <AgentMultiSelect
+                agents={agents}
+                selectedAgentIds={lead.agentIds || []}
+                onChange={handleAssignAgent}
+                getAgentLeadCount={getAgentLeadCount}
+              />
+            </div>
           ) : (
-            <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-gray-100 text-gray-500 dark:bg-slate-800 dark:text-slate-400 border border-transparent">
-              👤 Unassigned
-            </span>
+            assignedAgents.length > 0 ? (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-bold bg-orange-50 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100/50 shadow-sm">
+                👤 Assigned to: {assignedAgents.map(a => a.name).join(', ')}
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-gray-100 text-gray-500 dark:bg-slate-800 dark:text-slate-400 border border-transparent">
+                👤 Unassigned
+              </span>
+            )
           )}
         </div>
       </div>
@@ -432,7 +465,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
             <select
               value={lead.status || 'New'}
               onChange={(e) => handleStatusChange(e.target.value)}
-              disabled={!(user?.isAdmin || lead.agentId === user?.id)}
+              disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
               className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'New').color}`}
             >
               {STATUS_OPTIONS.map(opt => (
@@ -448,7 +481,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 Booking Info
               </h2>
-              {(user?.isAdmin || lead.agentId === user?.id) && (
+              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
                 <button
                   onClick={editingBooking ? handleBookingSave : handleBookingEdit}
                   className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
@@ -528,7 +561,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
                 Labels
               </h2>
-              {(user?.isAdmin || lead.agentId === user?.id) && (
+              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
                 <button
                   onClick={() => setShowLabelPicker(!showLabelPicker)}
                   className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
@@ -607,7 +640,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
 
             {!showLabelPicker && activeLabels.length === 0 && (
               <p className="text-xs text-gray-400 italic">
-                {(user?.isAdmin || lead.agentId === user?.id) ? 'No labels assigned. Click Edit to add.' : 'No labels assigned.'}
+                {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) ? 'No labels assigned. Click Edit to add.' : 'No labels assigned.'}
               </p>
             )}
 
@@ -649,12 +682,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <div className="flex items-center space-x-3">
                   <input
                     type="date"
-                    disabled={!(user?.isAdmin || lead.agentId === user?.id)}
+                    disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
                     value={formatDate(lead.dates?.startDate)}
                     onChange={(e) => handleUpdateDate('startDate', e.target.value)}
                     className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
-                  {(user?.isAdmin || lead.agentId === user?.id) && lead.dates?.startDate && (
+                  {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && lead.dates?.startDate && (
                     <button
                       onClick={() => handleUpdateDate('startDate', null)}
                       className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"
@@ -670,12 +703,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, agents, upd
                 <div className="flex items-center space-x-3">
                   <input
                     type="date"
-                    disabled={!(user?.isAdmin || lead.agentId === user?.id)}
+                    disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
                     value={formatDate(lead.dates?.dueDate)}
                     onChange={(e) => handleUpdateDate('dueDate', e.target.value)}
                     className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
                   />
-                  {(user?.isAdmin || lead.agentId === user?.id) && lead.dates?.dueDate && (
+                  {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && lead.dates?.dueDate && (
                     <button
                       onClick={() => handleUpdateDate('dueDate', null)}
                       className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"

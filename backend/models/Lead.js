@@ -71,9 +71,9 @@ const LeadSchema = new mongoose.Schema({
     required: false,
     default: ''
   },
-  agentId: {
-    type: String,
-    default: null
+  agentIds: {
+    type: [String],
+    default: []
   },
   labels: {
     type: [String],
@@ -146,7 +146,7 @@ module.exports = {
       }
     }
     if (agentIdCondition !== undefined) {
-      query.agentId = agentIdCondition;
+      query.agentIds = agentIdCondition;
     }
     return Lead.findOneAndUpdate(
       query,
