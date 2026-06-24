@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config');
-const { sendOTPEmail } = require('../utils/sendEmail');
+const { sendOTPEmail, sendPasswordResetEmail } = require('../utils/sendEmail');
 const { generateOTP, hashOTP } = require('../utils/otp');
 
 const MAX_OTP_ATTEMPTS = 5;
@@ -240,6 +240,76 @@ async function resendOtp(email) {
   };
 }
 
+async function forgotPassword(email) {
+  if (!email) throw new Error("Email is required");
+
+  const user = await User.findByEmail(email);
+  if (!user) {
+    // Return success to prevent email enumeration, but don't send anything
+    return { message: "If an account exists with that email, a password reset code has been sent." };
+  }
+
+  const otp = generateOTP();
+  const hashedOtp = hashOTP(otp);
+  const otpExpiresAt = new Date(Date.now() + 10 * 60000); // 10 mins
+
+  user.resetPasswordOtp = hashedOtp;
+  user.resetPasswordExpiresAt = otpExpiresAt;
+  user.resetPasswordAttempts = 0;
+  await user.save();
+
+  let emailFailed = false;
+  try {
+    await sendPasswordResetEmail(email.toLowerCase(), otp, user.name);
+  } catch (error) {
+    console.error("Failed to send password reset email via Nodemailer", error);
+    emailFailed = true;
+  }
+
+  return {
+    message: emailFailed ? "Failed to send password reset email." : "If an account exists with that email, a password reset code has been sent.",
+    emailFailed
+  };
+}
+
+async function resetPassword(email, otp, newPassword) {
+  if (!email || !otp || !newPassword) throw new Error("Email, OTP, and new password are required");
+
+  const user = await User.findByEmail(email);
+  if (!user) throw new Error("Invalid request"); // generic error
+
+  if (user.resetPasswordExpiresAt && user.resetPasswordExpiresAt < new Date()) {
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordExpiresAt = undefined;
+    user.resetPasswordAttempts = 0;
+    await user.save();
+    throw new Error("OTP has expired");
+  }
+
+  if (user.resetPasswordAttempts >= MAX_OTP_ATTEMPTS) {
+    throw new Error("Too many failed attempts. Please request a new OTP.");
+  }
+
+  const hashedInputOtp = hashOTP(otp);
+  if (user.resetPasswordOtp !== hashedInputOtp) {
+    user.resetPasswordAttempts = (user.resetPasswordAttempts || 0) + 1;
+    await user.save();
+    throw new Error("Invalid OTP");
+  }
+
+  // OTP verified, update password
+  const salt = await bcrypt.genSalt(10);
+  user.password = await bcrypt.hash(newPassword, salt);
+  
+  // Clear reset fields
+  user.resetPasswordOtp = undefined;
+  user.resetPasswordExpiresAt = undefined;
+  user.resetPasswordAttempts = 0;
+  await user.save();
+
+  return { message: "Password has been successfully reset" };
+}
+
 module.exports = {
   register,
   login,
@@ -247,5 +317,7 @@ module.exports = {
   updatePassword,
   updateProfile,
   verifyEmail,
-  resendOtp
+  resendOtp,
+  forgotPassword,
+  resetPassword
 };

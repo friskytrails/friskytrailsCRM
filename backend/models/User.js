@@ -51,6 +51,21 @@ const UserSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     select: false
+  },
+  resetPasswordOtp: {
+    type: String,
+    required: false,
+    select: false
+  },
+  resetPasswordExpiresAt: {
+    type: Date,
+    required: false,
+    select: false
+  },
+  resetPasswordAttempts: {
+    type: Number,
+    default: 0,
+    select: false
   }
 });
 
@@ -64,7 +79,7 @@ module.exports = {
     return User.findById(id);
   },
   findByEmail: async (email) => {
-    return User.findOne({ email: email.toLowerCase() }).select('+verificationOtp +otpExpiresAt +otpAttempts');
+    return User.findOne({ email: email.toLowerCase() }).select('+verificationOtp +otpExpiresAt +otpAttempts +resetPasswordOtp +resetPasswordExpiresAt +resetPasswordAttempts');
   },
   insertUser: async (userData) => {
     const user = new User(userData);
