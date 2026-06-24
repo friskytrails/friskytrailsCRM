@@ -12,6 +12,10 @@ async function register(name, email, password) {
     throw new Error("All fields are required");
   }
 
+  if (password.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
+  }
+
   const existingUser = await User.findByEmail(email);
   if (existingUser) {
     throw new Error("User already exists with this email");
@@ -108,6 +112,10 @@ async function getProfile(userId) {
 async function updatePassword(userId, currentPassword, newPassword) {
   if (!currentPassword || !newPassword) {
     throw new Error("Current and new passwords are required");
+  }
+
+  if (newPassword.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
   }
 
   const user = await User.findById(userId);
@@ -249,6 +257,10 @@ async function forgotPassword(email) {
     return { message: "If an account exists with that email, a password reset code has been sent." };
   }
 
+  if (user.resetPasswordExpiresAt && user.resetPasswordExpiresAt > new Date() && user.resetPasswordAttempts < MAX_OTP_ATTEMPTS) {
+    throw new Error("A password reset code has already been sent recently. Please wait before requesting another.");
+  }
+
   const otp = generateOTP();
   const hashedOtp = hashOTP(otp);
   const otpExpiresAt = new Date(Date.now() + 10 * 60000); // 10 mins
@@ -274,6 +286,10 @@ async function forgotPassword(email) {
 
 async function resetPassword(email, otp, newPassword) {
   if (!email || !otp || !newPassword) throw new Error("Email, OTP, and new password are required");
+
+  if (newPassword.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
+  }
 
   const user = await User.findByEmail(email);
   if (!user) throw new Error("Invalid request"); // generic error

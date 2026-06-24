@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-export default function ResetPassword({ API_URL }) {
+export default function ResetPassword({ API_URL, setToken, setUser }) {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -32,6 +32,10 @@ export default function ResetPassword({ API_URL }) {
 
       if (res.ok) {
         toast.success(data.message || 'Password has been successfully reset');
+        if (setToken) setToken('');
+        if (setUser) setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         navigate('/login');
       } else {
         toast.error(data.error || 'Something went wrong');
@@ -110,6 +114,8 @@ export default function ResetPassword({ API_URL }) {
               <button
                 type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
+                aria-label={showNewPassword ? "Hide password" : "Show password"}
+                aria-pressed={showNewPassword}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
               >
                 {showNewPassword ? (

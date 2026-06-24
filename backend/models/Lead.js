@@ -154,7 +154,7 @@ module.exports = {
       { new: true }
     );
   },
-  pushNote: async (id, note) => {
+  pushNote: async (id, note, agentIdCondition = undefined) => {
     let query = {};
     if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
       query = { _id: id };
@@ -166,13 +166,16 @@ module.exports = {
         return null;
       }
     }
+    if (agentIdCondition !== undefined) {
+      query.agentIds = agentIdCondition;
+    }
     return Lead.findOneAndUpdate(
       query,
       { $push: { notes: note } },
       { new: true }
     );
   },
-  deleteNote: async (id, noteId) => {
+  deleteNote: async (id, noteId, agentIdCondition = undefined) => {
     let query = {};
     if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
       query = { _id: id };
@@ -183,6 +186,9 @@ module.exports = {
       } else {
         return null;
       }
+    }
+    if (agentIdCondition !== undefined) {
+      query.agentIds = agentIdCondition;
     }
 
     let noteObjectId;

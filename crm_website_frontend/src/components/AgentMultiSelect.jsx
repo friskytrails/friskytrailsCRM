@@ -101,14 +101,14 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
               return (
                 <label 
                   key={agent.id} 
-                  className={`flex items-center space-x-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer ${isAgentDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`flex items-center space-x-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer ${(isAgentDisabled && !isSelected) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <input
                     type="radio"
                     checked={isSelected}
-                    disabled={isAgentDisabled}
+                    disabled={isAgentDisabled && !isSelected}
                     onClick={() => {
-                      if (!isAgentDisabled) {
+                      if (!isAgentDisabled || isSelected) {
                         handleToggle(agent.id);
                       }
                     }}

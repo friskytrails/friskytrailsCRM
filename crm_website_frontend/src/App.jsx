@@ -320,7 +320,7 @@ function App() {
             <Routes>
               <Route path="/register" element={<Register setToken={setToken} setUser={setUser} API_URL={API_URL} />} />
               <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
-              <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} />} />
+              <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
               <Route path="*" element={<Login setToken={setToken} setUser={setUser} API_URL={API_URL} />} />
             </Routes>
           </main>
@@ -356,7 +356,7 @@ function App() {
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} />} />
             <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
-            <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} />} />
+            <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
             {/* Redirect any other path to dashboard */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

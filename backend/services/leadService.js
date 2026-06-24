@@ -85,6 +85,12 @@ async function assignLead(id, agentIds) {
       if (!agent.isVerified) {
         throw new Error(`Cannot assign lead to unverified agent: ${agent.name}`);
       }
+      if (agent.status !== 'Active') {
+        throw new Error(`Cannot assign lead to inactive agent: ${agent.name}`);
+      }
+      if (agent.isAdmin) {
+        throw new Error(`Cannot assign lead to an admin user: ${agent.name}`);
+      }
     }
   }
 
@@ -128,7 +134,10 @@ async function addNote(id, text, userId, imageUrl, agentIdCondition) {
     imageUrl: imageUrl || null
   };
 
-  const result = await Lead.pushNote(id, newNote);
+  const result = await Lead.pushNote(id, newNote, agentIdCondition);
+  if (!result) {
+    throw new Error("Lead not found or unauthorized");
+  }
   return formatDoc(result);
 }
 
@@ -151,7 +160,10 @@ async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
     throw new Error("Unauthorized to delete this note");
   }
 
-  const result = await Lead.deleteNote(id, noteId);
+  const result = await Lead.deleteNote(id, noteId, agentIdCondition);
+  if (!result) {
+    throw new Error("Lead not found or unauthorized");
+  }
   return formatDoc(result);
 }
 
