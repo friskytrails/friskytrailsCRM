@@ -9,6 +9,8 @@ import Login from './pages/Login';
 import LeadDetail from "./pages/LeadDetail";
 import Profile from './pages/Profile';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import './index.css';
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
@@ -317,6 +319,8 @@ function App() {
           <main>
             <Routes>
               <Route path="/register" element={<Register setToken={setToken} setUser={setUser} API_URL={API_URL} />} />
+              <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
+              <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
               <Route path="*" element={<Login setToken={setToken} setUser={setUser} API_URL={API_URL} />} />
             </Routes>
           </main>
@@ -351,6 +355,8 @@ function App() {
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} />} />
+            <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
+            <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
             {/* Redirect any other path to dashboard */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

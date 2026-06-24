@@ -71,6 +71,28 @@ async function resendOtp(req, res) {
   }
 }
 
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    const result = await authService.forgotPassword(email);
+    res.json(result);
+  } catch (error) {
+    console.error("forgotPassword error:", error.message);
+    res.status(400).json({ error: "Invalid request" });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { email, otp, newPassword } = req.body;
+    const result = await authService.resetPassword(email, otp, newPassword);
+    res.json(result);
+  } catch (error) {
+    console.error("resetPassword error:", error.message);
+    res.status(400).json({ error: error.message || "Invalid request" });
+  }
+}
+
 module.exports = {
   register,
   login,
@@ -78,5 +100,7 @@ module.exports = {
   updatePassword,
   updateProfile,
   verifyEmail,
-  resendOtp
+  resendOtp,
+  forgotPassword,
+  resetPassword
 };

@@ -36,7 +36,13 @@ async function updateAgentVerification(id, isVerified) {
     throw new Error("Cannot update verification of an admin user");
   }
 
-  user.isVerified = !!isVerified;
+  if (typeof isVerified !== 'boolean') {
+    if (isVerified === 'true') isVerified = true;
+    else if (isVerified === 'false') isVerified = false;
+    else throw new Error("isVerified must be a boolean value");
+  }
+
+  user.isVerified = isVerified;
   await user.save();
   return formatDoc(user);
 }

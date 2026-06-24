@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const PendingUser = require('../models/PendingUser');
 const config = require('../config');
-const { sendOTPEmail } = require('../utils/sendEmail');
+const { sendOTPEmail, sendPasswordResetEmail } = require('../utils/sendEmail');
 const { generateOTP, hashOTP } = require('../utils/otp');
 
 const MAX_OTP_ATTEMPTS = 5;
@@ -11,6 +11,10 @@ const MAX_OTP_ATTEMPTS = 5;
 async function register(name, email, password) {
   if (!name || !email || !password) {
     throw new Error("All fields are required");
+  }
+
+  if (password.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
   }
 
   const existingUser = await User.findByEmail(email);
@@ -116,6 +120,10 @@ async function getProfile(userId) {
 async function updatePassword(userId, currentPassword, newPassword) {
   if (!currentPassword || !newPassword) {
     throw new Error("Current and new passwords are required");
+  }
+
+  if (newPassword.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
   }
 
   const user = await User.findById(userId);
@@ -259,6 +267,84 @@ async function resendOtp(email) {
   };
 }
 
+async function forgotPassword(email) {
+  if (!email) throw new Error("Email is required");
+
+  const user = await User.findByEmail(email);
+  if (!user) {
+    // Return success to prevent email enumeration, but don't send anything
+    return { message: "If an account exists with that email, a password reset code has been sent." };
+  }
+
+  if (user.resetPasswordExpiresAt && user.resetPasswordExpiresAt > new Date() && user.resetPasswordAttempts < MAX_OTP_ATTEMPTS) {
+    throw new Error("A password reset code has already been sent recently. Please wait before requesting another.");
+  }
+
+  const otp = generateOTP();
+  const hashedOtp = hashOTP(otp);
+  const otpExpiresAt = new Date(Date.now() + 10 * 60000); // 10 mins
+
+  user.resetPasswordOtp = hashedOtp;
+  user.resetPasswordExpiresAt = otpExpiresAt;
+  user.resetPasswordAttempts = 0;
+  await user.save();
+
+  let emailFailed = false;
+  try {
+    await sendPasswordResetEmail(email.toLowerCase(), otp, user.name);
+  } catch (error) {
+    console.error("Failed to send password reset email via Nodemailer", error);
+    emailFailed = true;
+  }
+
+  return {
+    message: emailFailed ? "Failed to send password reset email." : "If an account exists with that email, a password reset code has been sent.",
+    emailFailed
+  };
+}
+
+async function resetPassword(email, otp, newPassword) {
+  if (!email || !otp || !newPassword) throw new Error("Email, OTP, and new password are required");
+
+  if (newPassword.length < 6) {
+    throw new Error("Password must be at least 6 characters long");
+  }
+
+  const user = await User.findByEmail(email);
+  if (!user) throw new Error("Invalid request"); // generic error
+
+  if (user.resetPasswordExpiresAt && user.resetPasswordExpiresAt < new Date()) {
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordExpiresAt = undefined;
+    user.resetPasswordAttempts = 0;
+    await user.save();
+    throw new Error("OTP has expired");
+  }
+
+  if (user.resetPasswordAttempts >= MAX_OTP_ATTEMPTS) {
+    throw new Error("Too many failed attempts. Please request a new OTP.");
+  }
+
+  const hashedInputOtp = hashOTP(otp);
+  if (user.resetPasswordOtp !== hashedInputOtp) {
+    user.resetPasswordAttempts = (user.resetPasswordAttempts || 0) + 1;
+    await user.save();
+    throw new Error("Invalid OTP");
+  }
+
+  // OTP verified, update password
+  const salt = await bcrypt.genSalt(10);
+  user.password = await bcrypt.hash(newPassword, salt);
+  
+  // Clear reset fields
+  user.resetPasswordOtp = undefined;
+  user.resetPasswordExpiresAt = undefined;
+  user.resetPasswordAttempts = 0;
+  await user.save();
+
+  return { message: "Password has been successfully reset" };
+}
+
 module.exports = {
   register,
   login,
@@ -266,5 +352,7 @@ module.exports = {
   updatePassword,
   updateProfile,
   verifyEmail,
-  resendOtp
+  resendOtp,
+  forgotPassword,
+  resetPassword
 };
