@@ -31,7 +31,9 @@ async function updateAgentStatus(id, status) {
     try {
       await BlockedEmail.create({ email: user.email });
     } catch (err) {
-      // Ignore if already blocked
+      if (err.code !== 11000) {
+        throw err;
+      }
     }
     
     await User.Model.deleteOne({ _id: user._id });
