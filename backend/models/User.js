@@ -22,7 +22,7 @@ const UserSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Active', 'Inactive', 'Former Employee'],
+    enum: ['Active', 'Inactive', 'Former Employee', 'Pending'],
     default: 'Active'
   },
   isVerified: {

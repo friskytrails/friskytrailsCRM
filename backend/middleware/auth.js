@@ -34,13 +34,11 @@ module.exports = async function (req, res, next) {
     if (user.status !== 'Active') {
        return res.status(403).json({ error: "Account is not active. Please contact administrator." });
     }
-
     req.user = {
       ...decoded,
       isAdmin: !!user.isAdmin,
       status: user.status
     };
-    
     next();
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });

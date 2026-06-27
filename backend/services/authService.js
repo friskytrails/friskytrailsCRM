@@ -2,13 +2,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const PendingUser = require('../models/PendingUser');
+const BlockedEmail = require('../models/BlockedEmail');
 const config = require('../config');
 const { sendOTPEmail, sendPasswordResetEmail } = require('../utils/sendEmail');
 const { generateOTP, hashOTP } = require('../utils/otp');
 
 const MAX_OTP_ATTEMPTS = 5;
 
-async function register(name, email, password) {
+async function register(name, email, password, role = 'agent', inviteCode = '') {
   if (!name || !email || !password) {
     throw new Error("All fields are required");
   }
@@ -17,39 +18,40 @@ async function register(name, email, password) {
     throw new Error("Password must be at least 6 characters long");
   }
 
+  if (role === 'admin') {
+    if (inviteCode !== process.env.ADMIN_INVITE_CODE) {
+      throw new Error("Invalid admin invite code");
+    }
+  }
+
+  const isBlocked = await BlockedEmail.findOne({ email: email.toLowerCase() });
+  if (isBlocked) {
+    throw new Error("Your previous registration request was rejected. You cannot apply again with this email.");
+  }
+
   const existingUser = await User.findByEmail(email);
   if (existingUser) {
     throw new Error("User already exists with this email");
   }
 
+  await PendingUser.deleteOne({ email: email.toLowerCase() });
+
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
-
   const otp = generateOTP();
   const hashedOtp = hashOTP(otp);
   const otpExpiresAt = new Date(Date.now() + 10 * 60000); // 10 mins
 
-  let pendingUser = await PendingUser.findOne({ email: email.toLowerCase() });
-  if (pendingUser) {
-    throw new Error("An account registration for this email is already pending. Please verify your email or use the resend OTP option.");
-  }
-
-  pendingUser = new PendingUser({
+  const pendingUser = new PendingUser({
     name,
     email: email.toLowerCase(),
     password: hashedPassword,
     verificationOtp: hashedOtp,
     otpExpiresAt,
-    otpAttempts: 0
+    intendedRole: role
   });
-  try {
-    await pendingUser.save();
-  } catch (error) {
-    if (error.code === 11000 || error.code === 'E11000') {
-      throw new Error("An account registration for this email is already pending. Please verify your email or use the resend OTP option.");
-    }
-    throw error;
-  }
+
+  await pendingUser.save();
 
   let emailFailed = false;
   try {
@@ -60,7 +62,7 @@ async function register(name, email, password) {
   }
 
   return {
-    message: emailFailed ? "Account created but failed to send OTP email." : "OTP sent successfully. Please verify your email.",
+    message: emailFailed ? "Registered, but failed to send OTP email." : "OTP sent to your email!",
     emailFailed
   };
 }
@@ -72,6 +74,11 @@ async function login(email, password) {
 
   const user = await User.findByEmail(email);
   if (!user) {
+    const isBlocked = await BlockedEmail.findOne({ email: email.toLowerCase() });
+    if (isBlocked) {
+      throw new Error("Your registration request was rejected by an admin.");
+    }
+
     const pendingUser = await PendingUser.findOne({ email: email.toLowerCase() });
     if (pendingUser) {
       throw new Error("Please verify your email address first");
@@ -82,6 +89,16 @@ async function login(email, password) {
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
     throw new Error("Invalid credentials");
+  }
+
+  if (user.status === 'Pending') {
+    throw new Error("Your account is pending admin approval.");
+  }
+
+
+
+  if (user.status !== 'Active') {
+    throw new Error("Your account is inactive.");
   }
 
   const token = jwt.sign(
@@ -97,7 +114,8 @@ async function login(email, password) {
       name: user.name,
       email: user.email,
       isAdmin: !!user.isAdmin,
-      isVerified: user.isVerified
+      isVerified: user.isVerified,
+      status: user.status
     }
   };
 }
@@ -197,11 +215,15 @@ async function verifyEmail(email, otp) {
     throw new Error("Invalid OTP");
   }
 
+  const isAdmin = pendingUser.intendedRole === 'admin';
+  const status = isAdmin ? 'Active' : 'Pending';
+
   const newUser = {
     name: pendingUser.name,
     email: pendingUser.email,
     password: pendingUser.password,
-    isAdmin: false,
+    isAdmin,
+    status,
     createdAt: new Date(),
     isVerified: true
   };
@@ -210,6 +232,13 @@ async function verifyEmail(email, otp) {
   const user = await User.findById(result.insertedId);
 
   await PendingUser.deleteOne({ _id: pendingUser._id });
+
+  if (status === 'Pending') {
+    return {
+      message: "Email verified! Your account is now pending admin approval.",
+      isPending: true
+    };
+  }
 
   const token = jwt.sign(
     { userId: user._id.toString(), isAdmin: !!user.isAdmin },
@@ -224,7 +253,8 @@ async function verifyEmail(email, otp) {
       name: user.name,
       email: user.email,
       isAdmin: !!user.isAdmin,
-      isVerified: user.isVerified
+      isVerified: user.isVerified,
+      status: user.status
     }
   };
 }
@@ -276,8 +306,14 @@ async function forgotPassword(email) {
     return { message: "If an account exists with that email, a password reset code has been sent." };
   }
 
-  if (user.resetPasswordExpiresAt && user.resetPasswordExpiresAt > new Date() && user.resetPasswordAttempts < MAX_OTP_ATTEMPTS) {
-    throw new Error("A password reset code has already been sent recently. Please wait before requesting another.");
+  const COOLDOWN_MS = 60000; // 1 minute cooldown
+  if (user.resetPasswordExpiresAt && user.resetPasswordAttempts < MAX_OTP_ATTEMPTS) {
+    const sentAt = new Date(user.resetPasswordExpiresAt.getTime() - 10 * 60 * 1000);
+    const timePassed = new Date() - sentAt;
+    if (timePassed < COOLDOWN_MS) {
+      const secondsLeft = Math.ceil((COOLDOWN_MS - timePassed) / 1000);
+      throw new Error(`Please wait ${secondsLeft} second(s) before requesting another code.`);
+    }
   }
 
   const otp = generateOTP();
@@ -345,6 +381,15 @@ async function resetPassword(email, otp, newPassword) {
   return { message: "Password has been successfully reset" };
 }
 
+async function deleteAccount(userId) {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  await User.Model.deleteOne({ _id: user._id });
+}
+
 module.exports = {
   register,
   login,
@@ -354,5 +399,6 @@ module.exports = {
   verifyEmail,
   resendOtp,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  deleteAccount
 };

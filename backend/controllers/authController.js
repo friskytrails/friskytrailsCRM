@@ -2,8 +2,8 @@ const authService = require('../services/authService');
 
 async function register(req, res) {
   try {
-    const { name, email, password } = req.body;
-    const result = await authService.register(name, email, password);
+    const { name, email, password, role, inviteCode } = req.body;
+    const result = await authService.register(name, email, password, role, inviteCode);
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -49,6 +49,15 @@ async function updateProfile(req, res) {
   }
 }
 
+async function deleteAccount(req, res) {
+  try {
+    await authService.deleteAccount(req.user.userId);
+    res.json({ message: "Account deleted successfully" });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
 async function verifyEmail(req, res) {
   try {
     const { email, otp } = req.body;
@@ -56,7 +65,7 @@ async function verifyEmail(req, res) {
     res.json(result);
   } catch (error) {
     console.error("verifyEmail error:", error.message);
-    res.status(400).json({ error: "Invalid request" });
+    res.status(400).json({ error: error.message || "Invalid request" });
   }
 }
 
@@ -67,7 +76,7 @@ async function resendOtp(req, res) {
     res.json(result);
   } catch (error) {
     console.error("resendOtp error:", error.message);
-    res.status(400).json({ error: "Invalid request" });
+    res.status(400).json({ error: error.message || "Invalid request" });
   }
 }
 
@@ -78,7 +87,7 @@ async function forgotPassword(req, res) {
     res.json(result);
   } catch (error) {
     console.error("forgotPassword error:", error.message);
-    res.status(400).json({ error: "Invalid request" });
+    res.status(400).json({ error: error.message || "Invalid request" });
   }
 }
 
@@ -102,5 +111,6 @@ module.exports = {
   verifyEmail,
   resendOtp,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  deleteAccount
 };

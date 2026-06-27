@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
-export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
+export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agents = [] }) {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const pendingCount = agents.filter(a => a.status === 'Pending').length;
 
   const getLinkClass = (path, isMobile = false) => {
     const baseClass = isMobile
@@ -42,6 +43,11 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
                     </Link>
                     <Link to="/agents" className={getLinkClass('/agents')}>
                       Agents
+                      {pendingCount > 0 && (
+                        <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                          {pendingCount}
+                        </span>
+                      )}
                     </Link>
                   </>
                 )}
@@ -133,8 +139,13 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
                 <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
                   Add Lead
                 </Link>
-                <Link to="/agents" onClick={() => setIsOpen(false)} className={getLinkClass('/agents', true)}>
-                  Agents
+                <Link to="/agents" onClick={() => setIsOpen(false)} className={`${getLinkClass('/agents', true)} flex justify-between items-center`}>
+                  <span>Agents</span>
+                  {pendingCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                      {pendingCount}
+                    </span>
+                  )}
                 </Link>
               </>
             )}

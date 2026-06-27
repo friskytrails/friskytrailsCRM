@@ -16,6 +16,11 @@ const PendingUserSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  intendedRole: {
+    type: String,
+    enum: ['agent', 'admin'],
+    default: 'agent'
+  },
   verificationOtp: {
     type: String,
     required: true
