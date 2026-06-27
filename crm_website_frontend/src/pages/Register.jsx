@@ -75,13 +75,15 @@ export default function Register({ setToken, setUser, API_URL }) {
         if (data.isPending) {
           toast.success(data.message, { duration: 5000 });
           navigate('/'); // Go back to login
-        } else {
+        } else if (data.token && data.user) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           setToken(data.token);
           setUser(data.user);
           toast.success(`Account verified! Welcome, ${data.user?.name || 'Admin'}!`);
           navigate('/');
+        } else {
+          toast.error('Verification failed: Invalid response from server');
         }
       } else {
         toast.error(data.error || 'Verification failed');

@@ -273,23 +273,25 @@ export default function Profile({ user, setUser, token, API_URL, handleLogout })
             </form>
           </div>
 
-          <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-6">
-            <h3 className="text-sm font-semibold text-red-500 uppercase tracking-wider mb-4">Danger Zone</h3>
-            <div className="bg-red-50/50 dark:bg-red-950/20 rounded-xl p-6 border border-red-100 dark:border-red-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h4 className="text-sm font-bold text-red-700 dark:text-red-400">Delete Account</h4>
-                <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">Once you delete your account, there is no going back. Please be certain.</p>
+          {!user.isAdmin && (
+            <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-6">
+              <h3 className="text-sm font-semibold text-red-500 uppercase tracking-wider mb-4">Danger Zone</h3>
+              <div className="bg-red-50/50 dark:bg-red-950/20 rounded-xl p-6 border border-red-100 dark:border-red-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-red-700 dark:text-red-400">Delete Account</h4>
+                  <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">Once you delete your account, there is no going back. Please be certain.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading}
+                  className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-5 rounded-lg transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap shrink-0"
+                >
+                  {deleteLoading ? 'Deleting...' : 'Delete Account'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleDeleteAccount}
-                disabled={deleteLoading}
-                className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-5 rounded-lg transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap shrink-0"
-              >
-                {deleteLoading ? 'Deleting...' : 'Delete Account'}
-              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

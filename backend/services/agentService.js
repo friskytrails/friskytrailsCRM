@@ -14,10 +14,20 @@ async function updateAgentStatus(id, status) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
 
+  const user = await User.findById(id);
+  if (!user) {
+    throw new Error("Agent not found");
+  }
+
+  if (user.isAdmin) {
+    throw new Error("Cannot update status of an admin user");
+  }
+
   if (status === 'Rejected') {
-    const user = await User.findById(id);
-    if (!user) throw new Error("Agent not found");
-    
+    if (user.status !== 'Pending') {
+      throw new Error("Only pending agents can be rejected");
+    }
+
     try {
       await BlockedEmail.create({ email: user.email });
     } catch (err) {
@@ -33,15 +43,6 @@ async function updateAgentStatus(id, status) {
     }
     
     return { id, message: "Agent rejected and moved to blocklist" };
-  }
-
-  const user = await User.findById(id);
-  if (!user) {
-    throw new Error("Agent not found");
-  }
-
-  if (user.isAdmin) {
-    throw new Error("Cannot update status of an admin user");
   }
 
   const wasPending = user.status === 'Pending';

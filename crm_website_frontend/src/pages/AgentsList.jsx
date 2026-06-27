@@ -18,8 +18,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     setLoadingAction(prev => ({ ...prev, [agentId]: true }));
     try {
       if (action === 'status' && updateAgentStatus) {
-        await updateAgentStatus(agentId, value);
-        if (value === 'Active' || value === 'Rejected') {
+        const result = await updateAgentStatus(agentId, value);
+        if (result && (value === 'Active' || value === 'Rejected')) {
           setProcessedAgents(prev => ({ ...prev, [agentId]: value }));
         }
       } else if (action === 'verify' && updateAgentVerification) {

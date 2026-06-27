@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Lead = require('../models/Lead');
 const PendingUser = require('../models/PendingUser');
 const BlockedEmail = require('../models/BlockedEmail');
 const config = require('../config');
@@ -311,8 +312,7 @@ async function forgotPassword(email) {
     const sentAt = new Date(user.resetPasswordExpiresAt.getTime() - 10 * 60 * 1000);
     const timePassed = new Date() - sentAt;
     if (timePassed < COOLDOWN_MS) {
-      const secondsLeft = Math.ceil((COOLDOWN_MS - timePassed) / 1000);
-      throw new Error(`Please wait ${secondsLeft} second(s) before requesting another code.`);
+      return { message: "If an account exists with that email, a password reset code has been sent." };
     }
   }
 
@@ -386,6 +386,19 @@ async function deleteAccount(userId) {
   if (!user) {
     throw new Error("User not found");
   }
+
+  const userIdStr = user._id.toString();
+
+  await Lead.Model.updateMany(
+    { agentIds: userIdStr },
+    { $pull: { agentIds: userIdStr } }
+  );
+
+  await Lead.Model.updateMany(
+    { "notes.authorId": userIdStr },
+    { $set: { "notes.$[note].authorId": null } },
+    { arrayFilters: [{ "note.authorId": userIdStr }] }
+  );
 
   await User.Model.deleteOne({ _id: user._id });
 }

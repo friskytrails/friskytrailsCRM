@@ -48,9 +48,13 @@ export default function ResetPassword({ API_URL, setToken, setUser }) {
 
       if (res.ok) {
         toast.success(data.message || 'Reset code sent!');
-        setResendTimer(60);
+        setResendTimer(data.secondsLeft || 60);
       } else {
-        toast.error(data.error || 'Failed to resend reset code');
+        if (data.secondsLeft) {
+          setResendTimer(data.secondsLeft);
+        } else {
+          toast.error(data.error || 'Failed to resend reset code');
+        }
       }
     } catch (error) {
       console.error(error);
