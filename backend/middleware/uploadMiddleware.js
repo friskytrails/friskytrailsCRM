@@ -24,7 +24,8 @@ const storage = new CloudinaryStorage({
 
     return {
       folder: 'crm_attachments',
-      resource_type: isImage ? 'image' : 'raw',
+      resource_type: 'auto', // Fix: Use 'auto' so Cloudinary correctly handles images, PDFs, and raw files
+      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'], // explicitly pass formats to avoid strict configuration rejections
       public_id: publicId
     };
   }

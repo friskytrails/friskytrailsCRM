@@ -171,6 +171,9 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
         const uploadRes = await fetch(`${API_URL}/upload`, {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
           body: formData
         });
 
