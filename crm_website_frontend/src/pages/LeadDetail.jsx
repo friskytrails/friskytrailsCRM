@@ -4,22 +4,13 @@ import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
 
-const PREDEFINED_LABELS = [
-  { name: 'Fresh Lead', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
-  { name: 'Interested Lead', color: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-400', light: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900/50' },
-  { name: 'Pre Prospect Lead', color: 'bg-purple-500', text: 'text-white', border: 'border-purple-400', light: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
-  { name: 'Prospect Lead', color: 'bg-orange-500', text: 'text-white', border: 'border-orange-400', light: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/50' },
-  { name: 'Booked', color: 'bg-green-500', text: 'text-white', border: 'border-green-400', light: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900/50' },
-];
-
 const STATUS_OPTIONS = [
-  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600' },
-  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/60 dark:text-blue-300 dark:border-blue-700' },
-  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/60 dark:text-yellow-300 dark:border-yellow-700' },
-  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/60 dark:text-purple-300 dark:border-purple-700' },
+  { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'Interested Leads', color: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800' },
+  { value: 'Pre Prospect Leads', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
+  { value: 'Prospect Leads', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
   { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
-  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
-  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
+  { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
 
 export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
@@ -28,8 +19,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
   const [noteInput, setNoteInput] = useState('');
-  const [showLabelPicker, setShowLabelPicker] = useState(false);
-  const [customLabel, setCustomLabel] = useState('');
+
   const [selectedImage, setSelectedImage] = useState(null); // base64 preview
   const [imageFile, setImageFile] = useState(null); // actual file to upload
   const [isUploading, setIsUploading] = useState(false);
@@ -99,43 +89,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleToggleLabel = async (labelName) => {
-    if (!lead) return;
-    const currentLabels = lead.labels || [];
-    const newLabels = currentLabels.includes(labelName)
-      ? currentLabels.filter(l => l !== labelName)
-      : [...currentLabels, labelName];
 
-    // Optimistic update
-    const previousLead = { ...lead };
-    const optimisticLead = { ...lead, labels: newLabels };
-    setLead(optimisticLead);
-    syncLeadToParent(optimisticLead);
-
-    try {
-      const res = await fetch(`${API_URL}/leads/${id}/labels`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ labels: newLabels })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
-      } else {
-        // Revert on failure
-        setLead(previousLead);
-        syncLeadToParent(previousLead);
-        toast.error('Failed to update labels');
-      }
-    } catch (error) {
-      console.error(error);
-      // Revert on failure
-      setLead(previousLead);
-      syncLeadToParent(previousLead);
-      toast.error('Server connection error');
-    }
-  };
 
   const handleUpdateDate = async (field, value) => {
     try {
@@ -342,7 +296,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     );
   }
 
-  const activeLabels = lead.labels || [];
   const assignedAgents = (lead.agentIds || []).map(id => agents?.find(a => a.id === id)).filter(Boolean);
 
   return (
@@ -364,31 +317,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
           <div className="flex-1 min-w-[250px]">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{lead.name || 'Unnamed Lead'}</h1>
 
-            {/* Active Labels */}
-            {activeLabels.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {activeLabels.map(labelName => {
-                  const labelDef = PREDEFINED_LABELS.find(l => l.name === labelName);
-                  return (
-                    <span key={labelName} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border ${labelDef ? labelDef.light : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'}`}>
-                      {labelName}
-                      {user?.isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLabel(labelName);
-                          }}
-                          className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-current font-bold text-xs cursor-pointer"
-                          title={`Remove ${labelName}`}
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+
+
           </div>
           <div className="flex-1 flex justify-center">
             <div className="bg-gray-50 rounded-xl p-4 flex items-center space-x-6 w-full max-w-[320px] sm:max-w-[360px]">
@@ -463,10 +393,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               Lead Status
             </h2>
             <select
-              value={lead.status || 'New'}
+              value={lead.status || 'Fresh Leads'}
               onChange={(e) => handleStatusChange(e.target.value)}
               disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'New').color}`}
+              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color}`}
             >
               {STATUS_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.value}</option>
@@ -552,123 +482,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       {/* Two-section layout */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left section: Labels & Dates */}
+        {/* Left section: Dates */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Labels */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center">
-                <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                Labels
-              </h2>
-              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
-                <button
-                  onClick={() => setShowLabelPicker(!showLabelPicker)}
-                  className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
-                >
-                  {showLabelPicker ? 'Done' : '+ Edit'}
-                </button>
-              )}
-            </div>
-
-            {showLabelPicker && (
-              <div className="space-y-3 mb-4">
-                <div className="space-y-2">
-                  {/* Predefined Labels */}
-                  {PREDEFINED_LABELS.map(label => {
-                    const isActive = activeLabels.includes(label.name);
-                    return (
-                      <button
-                        key={label.name}
-                        onClick={() => handleToggleLabel(label.name)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer border ${isActive
-                          ? `${label.color} ${label.text} ${label.border} shadow-sm`
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60'
-                          }`}
-                      >
-                        <span>{label.name}</span>
-                        {isActive && (
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                        )}
-                      </button>
-                    );
-                  })}
-
-                  {/* Active Custom Labels (not predefined) */}
-                  {activeLabels.filter(name => !PREDEFINED_LABELS.some(pl => pl.name === name)).map(customName => {
-                    return (
-                      <button
-                        key={customName}
-                        onClick={() => handleToggleLabel(customName)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer border bg-gray-500 hover:bg-gray-600 text-white border-gray-400 dark:bg-slate-700 dark:border-slate-600 dark:hover:bg-slate-650 shadow-sm"
-                      >
-                        <span>{customName}</span>
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Custom Label Input Form */}
-                <div className="pt-3 border-t border-gray-100 dark:border-slate-800">
-                  <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">Or add custom label</label>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (customLabel.trim()) {
-                      handleToggleLabel(customLabel.trim());
-                      setCustomLabel('');
-                    }
-                  }} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Cold Lead"
-                      value={customLabel}
-                      onChange={(e) => setCustomLabel(e.target.value)}
-                      className="flex-1 text-xs py-1.5 px-3 border border-gray-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!customLabel.trim()}
-                      className="bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition-colors"
-                    >
-                      Add
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {!showLabelPicker && activeLabels.length === 0 && (
-              <p className="text-xs text-gray-400 italic">
-                {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) ? 'No labels assigned. Click Edit to add.' : 'No labels assigned.'}
-              </p>
-            )}
-
-            {!showLabelPicker && activeLabels.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {activeLabels.map(labelName => {
-                  const labelDef = PREDEFINED_LABELS.find(l => l.name === labelName);
-                  return (
-                    <span key={labelName} className={`inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-lg text-xs font-semibold ${labelDef ? `${labelDef.color} ${labelDef.text}` : 'bg-gray-500 dark:bg-slate-700 text-white'}`}>
-                      <span>{labelName}</span>
-                      {user?.isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLabel(labelName);
-                          }}
-                          className="w-4 h-4 rounded-md flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-current font-normal text-xs cursor-pointer"
-                          title={`Remove ${labelName}`}
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
           {/* Dates */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
