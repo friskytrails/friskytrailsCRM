@@ -1,5 +1,6 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
+import AgentMetricsTable from '../components/AgentMetricsTable';
 
 export default function AgentLeads({ leads, agents }) {
   const { id } = useParams();
@@ -13,7 +14,7 @@ export default function AgentLeads({ leads, agents }) {
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 mb-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-2xl border border-orange-200 dark:border-orange-800/50">
             {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
@@ -26,6 +27,9 @@ export default function AgentLeads({ leads, agents }) {
               {agentLeads.length} {agentLeads.length === 1 ? 'Lead' : 'Leads'} Assigned
             </p>
           </div>
+        </div>
+        <div className="w-full md:w-auto flex justify-start md:justify-end shrink-0">
+          <AgentMetricsTable agentId={agent.id} agentName={agent.name} />
         </div>
       </div>
       
