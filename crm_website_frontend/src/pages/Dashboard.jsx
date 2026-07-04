@@ -33,6 +33,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [filterAgent, setFilterAgent] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterProduct, setFilterProduct] = useState('all');
 
   // Modal editing state
   const [editingLead, setEditingLead] = useState(null);
@@ -188,7 +189,11 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       filterStatus === 'all' ||
       leadStatus === filterStatus;
 
-    return matchesSearch && matchesAgent && matchesStatus;
+    const matchesProduct = 
+      filterProduct === 'all' ||
+      lead.product === filterProduct;
+
+    return matchesSearch && matchesAgent && matchesStatus && matchesProduct;
   });
 
   // Sort logic
@@ -320,6 +325,20 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               <option value="name-desc">Name (Z-A)</option>
               <option value="age-asc">Age (Youngest First)</option>
               <option value="age-desc">Age (Oldest First)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Package:</span>
+            <select
+              value={filterProduct}
+              onChange={(e) => setFilterProduct(e.target.value)}
+              className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
+            >
+              <option value="all">All Packages</option>
+              {[...new Set(leads.map(l => l.product).filter(Boolean))].map(prod => (
+                <option key={prod} value={prod}>{prod}</option>
+              ))}
             </select>
           </div>
 

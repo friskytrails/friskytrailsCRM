@@ -32,14 +32,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [selectedImage, setSelectedImage] = useState(null); // base64 preview
   const [imageFile, setImageFile] = useState(null); // actual file to upload
   const [isUploading, setIsUploading] = useState(false);
-  const [editingBooking, setEditingBooking] = useState(false);
-  const [bookingForm, setBookingForm] = useState({
-    totalDial: 0,
-    connected: 0,
-    talkTime: '0:0',
-    firstCall: '',
-    lastCall: ''
-  });
 
   const getAgentLeadCount = (agentId) => {
     return leads?.filter((l) => (l.agentIds || []).includes(agentId)).length || 0;
@@ -98,27 +90,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-
-
-  const handleUpdateDate = async (field, value) => {
-    try {
-      const res = await fetch(`${API_URL}/leads/${id}/dates`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ [field]: value || null })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
-      } else {
-        toast.error('Failed to update dates');
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error('Server connection error');
-    }
-  };
 
   const handleSendNote = async () => {
     if (!noteInput.trim() && !imageFile) return;
@@ -235,32 +206,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
   };
 
-  const handleBookingEdit = () => {
-    setBookingForm({
-      totalDial: lead.booking?.totalDial || 0,
-      connected: lead.booking?.connected || 0,
-      talkTime: lead.booking?.talkTime || '0:0',
-      firstCall: lead.booking?.firstCall ? new Date(lead.booking.firstCall).toISOString().split('T')[0] : '',
-      lastCall: lead.booking?.lastCall ? new Date(lead.booking.lastCall).toISOString().split('T')[0] : ''
-    });
-    setEditingBooking(true);
-  };
 
-  const handleBookingSave = async () => {
-    const data = {};
-    if (bookingForm.totalDial !== undefined) data.totalDial = bookingForm.totalDial;
-    if (bookingForm.connected !== undefined) data.connected = bookingForm.connected;
-    if (bookingForm.talkTime !== undefined) data.talkTime = bookingForm.talkTime;
-    if (bookingForm.firstCall !== undefined) data.firstCall = bookingForm.firstCall || null;
-    if (bookingForm.lastCall !== undefined) data.lastCall = bookingForm.lastCall || null;
-
-    const updated = await updateLeadBooking(lead.id, data);
-    if (updated) {
-      setLead(updated);
-      syncLeadToParent(updated);
-    }
-    setEditingBooking(false);
-  };
 
   const handleAssignAgent = async (newIds) => {
     if (!lead || !assignAgent) return;
@@ -420,71 +366,34 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 Booking Info
               </h2>
-              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
-                <button
-                  onClick={editingBooking ? handleBookingSave : handleBookingEdit}
-                  className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
-                >
-                  {editingBooking ? '✓ Save' : '✎ Edit'}
-                </button>
-              )}
             </div>
 
-            {editingBooking ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Total Dial</label>
-                  <input type="number" min="0" value={bookingForm.totalDial} onChange={(e) => setBookingForm(prev => ({ ...prev, totalDial: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Connected</label>
-                  <input type="number" min="0" value={bookingForm.connected} onChange={(e) => setBookingForm(prev => ({ ...prev, connected: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Talk Time</label>
-                  <input type="text" value={bookingForm.talkTime} onChange={(e) => setBookingForm(prev => ({ ...prev, talkTime: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="0:0" />
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Age</label>
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{computeAge()}</span>
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-200 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold mb-1">First Call</label>
-                  <input type="date" value={bookingForm.firstCall} onChange={(e) => setBookingForm(prev => ({ ...prev, firstCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-200 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold mb-1">Last Call</label>
-                  <input type="date" value={bookingForm.lastCall} onChange={(e) => setBookingForm(prev => ({ ...prev, lastCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
-                </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
-                </div>
-                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
-                </div>
-                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
-                </div>
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
               </div>
-            )}
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
+              </div>
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
+              </div>
+              <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
+              </div>
+              <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -503,45 +412,15 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Start Date</label>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="date"
-                    disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-                    value={formatDate(lead.dates?.startDate)}
-                    onChange={(e) => handleUpdateDate('startDate', e.target.value)}
-                    className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  />
-                  {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && lead.dates?.startDate && (
-                    <button
-                      onClick={() => handleUpdateDate('startDate', null)}
-                      className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"
-                    >
-                      Clear
-                    </button>
-                  )}
+                <div className="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                  {formatDisplayDate(lead.dates?.startDate)}
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1">{formatDisplayDate(lead.dates?.startDate)}</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Due Date</label>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="date"
-                    disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-                    value={formatDate(lead.dates?.dueDate)}
-                    onChange={(e) => handleUpdateDate('dueDate', e.target.value)}
-                    className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  />
-                  {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && lead.dates?.dueDate && (
-                    <button
-                      onClick={() => handleUpdateDate('dueDate', null)}
-                      className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"
-                    >
-                      Clear
-                    </button>
-                  )}
+                <div className="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                  {formatDisplayDate(lead.dates?.dueDate)}
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1">{formatDisplayDate(lead.dates?.dueDate)}</p>
               </div>
             </div>
           </div>
