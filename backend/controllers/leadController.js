@@ -13,12 +13,7 @@ async function getLeads(req, res) {
 async function createLead(req, res) {
   try {
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
-    let result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
-    
-    // If an agent creates a lead, automatically assign it to them
-    if (!req.user.isAdmin) {
-      result = await leadService.assignLead(result.id, [req.user.userId]);
-    }
+    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
     
     res.status(201).json(result);
   } catch (error) {
