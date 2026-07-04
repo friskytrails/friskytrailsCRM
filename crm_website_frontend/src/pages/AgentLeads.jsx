@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AgentMetricsTable from '../components/AgentMetricsTable';
 
-export default function AgentLeads({ leads, agents }) {
+export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
   const { id } = useParams();
   const agent = agents.find(a => a.id === id);
   
@@ -29,7 +29,7 @@ export default function AgentLeads({ leads, agents }) {
           </div>
         </div>
         <div className="w-full md:w-auto flex justify-start md:justify-end shrink-0">
-          <AgentMetricsTable agentId={agent.id} agentName={agent.name} />
+          <AgentMetricsTable agent={agent} agentId={agent.id} agentName={agent.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
         </div>
       </div>
       

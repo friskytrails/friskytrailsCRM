@@ -38,8 +38,37 @@ async function updateAgentVerification(req, res) {
   }
 }
 
+async function updateAgentMetrics(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params;
+    const { monthlyTarget, targetCompleted, attendance, attendanceDate } = req.body;
+    const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate);
+    res.json(agent);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
+async function getAgentAttendance(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params;
+    const logs = await agentService.getAgentAttendance(id);
+    res.json(logs);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
-  updateAgentVerification
+  updateAgentVerification,
+  updateAgentMetrics,
+  getAgentAttendance
 };
