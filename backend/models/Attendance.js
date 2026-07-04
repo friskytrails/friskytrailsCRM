@@ -2,7 +2,16 @@ const mongoose = require('mongoose');
 
 const AttendanceSchema = new mongoose.Schema({
   agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  date: { type: String, required: true }, // Format: 'YYYY-MM-DD'
+  date: { 
+    type: String, 
+    required: true,
+    validate: {
+      validator: function(v) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(v);
+      },
+      message: props => `${props.value} is not a valid date format! Use YYYY-MM-DD.`
+    }
+  }, // Format: 'YYYY-MM-DD'
   status: { type: String, enum: ['P', 'A'], required: true }
 }, { timestamps: true });
 

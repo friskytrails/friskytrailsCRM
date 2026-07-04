@@ -6,7 +6,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [processedAgents, setProcessedAgents] = useState({});
 
   const pendingAgentsList = agents.filter(a => a.status === 'Pending');
-  const activeAgentsList = agents.filter(a => a.status !== 'Pending' && a.status !== 'Rejected');
+  const activeAgentsList = agents.filter(a => a.status !== 'Pending');
 
   const agentLeadCounts = leads.reduce((acc, lead) => {
     (lead.agentIds || []).forEach(agentId => {
@@ -19,7 +19,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     setLoadingAction(prev => ({ ...prev, [agentId]: true }));
     try {
       if (action === 'status' && updateAgentStatus) {
-        const result = await updateAgentStatus(agentId, value);
+        const backendValue = value === 'Rejected' ? 'Inactive' : value;
+        const result = await updateAgentStatus(agentId, backendValue);
         if (result && (value === 'Active' || value === 'Rejected')) {
           setProcessedAgents(prev => ({ ...prev, [agentId]: value }));
         }
@@ -46,7 +47,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
       return (
         <div key={agent.id} className="flex flex-col p-3.5 bg-gray-50/80 dark:bg-slate-900/60 hover:bg-white dark:hover:bg-slate-800 transition-colors rounded-xl border border-gray-200 dark:border-slate-700 gap-3 group shadow-sm">
           <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/60 dark:to-orange-950 text-orange-700 dark:text-orange-400 flex items-center justify-center font-bold text-xs border border-orange-300/50 dark:border-orange-800/50 shrink-0 shadow-inner">
+            <div className="h-9 w-9 rounded-full bg-linear-to-br from-orange-100 to-orange-200 dark:from-orange-900/60 dark:to-orange-950 text-orange-700 dark:text-orange-400 flex items-center justify-center font-bold text-xs border border-orange-300/50 dark:border-orange-800/50 shrink-0 shadow-inner">
               {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
             </div>
             <div className="flex-1 min-w-0">
@@ -82,7 +83,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     return (
       <div key={agent.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white dark:bg-slate-800/50 hover:bg-gray-50/80 dark:hover:bg-slate-800 transition-colors rounded-xl border border-gray-200/80 dark:border-slate-700 gap-4 shadow-sm hover:shadow-md group">
         <div className="flex items-center space-x-4">
-          <div className="h-11 w-11 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900 text-gray-600 dark:text-slate-300 flex items-center justify-center font-bold text-sm border border-gray-300/50 dark:border-slate-700/50 shrink-0 shadow-inner group-hover:from-orange-100 group-hover:to-orange-50 group-hover:text-orange-600 dark:group-hover:from-orange-950 dark:group-hover:to-slate-900 dark:group-hover:text-orange-400 transition-colors">
+          <div className="h-11 w-11 rounded-full bg-linear-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900 text-gray-600 dark:text-slate-300 flex items-center justify-center font-bold text-sm border border-gray-300/50 dark:border-slate-700/50 shrink-0 shadow-inner group-hover:from-orange-100 group-hover:to-orange-50 group-hover:text-orange-600 dark:group-hover:from-orange-950 dark:group-hover:to-slate-900 dark:group-hover:text-orange-400 transition-colors">
             {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
           </div>
           <div>

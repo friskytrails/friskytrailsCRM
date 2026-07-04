@@ -31,11 +31,13 @@ const UserSchema = new mongoose.Schema({
   },
   monthlyTarget: {
     type: Number,
-    default: 0
+    default: 0,
+    min: 0
   },
   targetCompleted: {
     type: Number,
-    default: 0
+    default: 0,
+    min: 0
   },
   attendance: {
     type: String,

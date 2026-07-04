@@ -59,23 +59,52 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     throw new Error("Cannot update metrics of an admin user");
   }
 
-  if (monthlyTarget !== undefined) user.monthlyTarget = Number(monthlyTarget);
-  if (targetCompleted !== undefined) user.targetCompleted = Number(targetCompleted);
-  if (attendance !== undefined) user.attendance = attendance;
+  // Backup for manual rollback
+  const originalState = {
+    monthlyTarget: user.monthlyTarget,
+    targetCompleted: user.targetCompleted,
+    attendance: user.attendance
+  };
+
+  if (monthlyTarget !== undefined) {
+    const num = Number(monthlyTarget);
+    if (!Number.isFinite(num) || num < 0) throw new Error("Invalid monthlyTarget");
+    user.monthlyTarget = num;
+  }
+  if (targetCompleted !== undefined) {
+    const num = Number(targetCompleted);
+    if (!Number.isFinite(num) || num < 0) throw new Error("Invalid targetCompleted");
+    user.targetCompleted = num;
+  }
+  
+  // Only overwrite current attendance if it is today
+  const todayStr = new Date().toLocaleDateString('en-CA');
+  if (attendance !== undefined && (!attendanceDate || attendanceDate === todayStr)) {
+    user.attendance = attendance;
+  }
 
   await user.save();
 
-  // Upsert or Delete attendance log for the specific date if provided
-  if (attendanceDate) {
-    if (attendance === 'P' || attendance === 'A') {
-      await Attendance.findOneAndUpdate(
-        { agentId: user._id, date: attendanceDate },
-        { status: attendance },
-        { upsert: true, new: true }
-      );
-    } else if (attendance === '') {
-      await Attendance.findOneAndDelete({ agentId: user._id, date: attendanceDate });
+  try {
+    // Upsert or Delete attendance log for the specific date if provided
+    if (attendanceDate) {
+      if (attendance === 'P' || attendance === 'A') {
+        await Attendance.findOneAndUpdate(
+          { agentId: user._id, date: attendanceDate },
+          { status: attendance },
+          { upsert: true, new: true, runValidators: true }
+        );
+      } else if (attendance === '') {
+        await Attendance.findOneAndDelete({ agentId: user._id, date: attendanceDate });
+      }
     }
+  } catch (error) {
+    // Rollback
+    user.monthlyTarget = originalState.monthlyTarget;
+    user.targetCompleted = originalState.targetCompleted;
+    user.attendance = originalState.attendance;
+    await user.save();
+    throw new Error("Failed to persist attendance log, update rolled back. " + error.message);
   }
 
   return formatDoc(user);

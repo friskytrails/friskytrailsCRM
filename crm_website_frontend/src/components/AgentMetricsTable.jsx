@@ -55,10 +55,13 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     setLoading(true);
     try {
       // Send the metrics along with the date string for the log
-      await updateAgentMetrics(agentId, {
+      const updatedAgent = await updateAgentMetrics(agentId, {
         ...form,
         attendanceDate: todayDateStr
       });
+
+      // If the update failed, updatedAgent will be null, so exit early
+      if (!updatedAgent) return;
 
       // Update local logs state without refetching for UI snappy feel
       setAttendanceLogs(prev => {
