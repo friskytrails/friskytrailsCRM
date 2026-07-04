@@ -35,15 +35,14 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
                   Dashboard
                 </Link>
 
+                <Link to="/add-lead" className={getLinkClass('/add-lead')}>
+                  Add Lead
+                </Link>
+                
                 {user.isAdmin && (
-                  <>
-                    <Link to="/add-lead" className={getLinkClass('/add-lead')}>
-                      Add Lead
-                    </Link>
-                    <Link to="/agents" className={getLinkClass('/agents')}>
-                      Agents
-                    </Link>
-                  </>
+                  <Link to="/agents" className={getLinkClass('/agents')}>
+                    Agents
+                  </Link>
                 )}
               </div>
             )}
@@ -128,15 +127,14 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout }) {
               Dashboard
             </Link>
 
+            <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
+              Add Lead
+            </Link>
+
             {user.isAdmin && (
-              <>
-                <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
-                  Add Lead
-                </Link>
-                <Link to="/agents" onClick={() => setIsOpen(false)} className={getLinkClass('/agents', true)}>
-                  Agents
-                </Link>
-              </>
+              <Link to="/agents" onClick={() => setIsOpen(false)} className={getLinkClass('/agents', true)}>
+                Agents
+              </Link>
             )}
 
             {/* User Profile and Logout section in mobile menu */}

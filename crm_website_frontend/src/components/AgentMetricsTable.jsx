@@ -113,9 +113,9 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   });
 
   return (
-    <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-sm w-full min-w-[340px] md:min-w-[400px] max-w-lg">
+    <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-sm w-full sm:w-[340px] md:w-[400px] lg:w-[420px] max-w-full">
       {/* Header - Redesigned to use theme colors and prevent overlapping */}
-      <div className="bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 flex justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-slate-700">
+      <div className="bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 flex justify-between items-center px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-slate-700">
         <div>
           <span className="font-bold text-base tracking-wide block">Monthly Metrics</span>
           <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 block">{currentDateDisplay}</span>

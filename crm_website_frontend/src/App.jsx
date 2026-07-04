@@ -375,7 +375,7 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={user?.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
+              element={<AddLead addLead={addLead} />}
             />
             <Route
               path="/agents"

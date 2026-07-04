@@ -12,11 +12,14 @@ async function getLeads(req, res) {
 
 async function createLead(req, res) {
   try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ error: "Forbidden: Admin access only" });
-    }
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
-    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
+    let result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
+    
+    // If an agent creates a lead, automatically assign it to them
+    if (!req.user.isAdmin) {
+      result = await leadService.assignLead(result.id, [req.user.userId]);
+    }
+    
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
