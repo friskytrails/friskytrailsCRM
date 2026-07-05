@@ -379,7 +379,7 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={<AddLead addLead={addLead} />}
+              element={<AddLead addLead={addLead} user={user} />}
             />
             <Route
               path="/agents"
