@@ -105,7 +105,10 @@ function App() {
       });
       if (response.ok) {
         const savedLead = await response.json();
-        setLeads((prev) => [savedLead, ...prev]);
+        // Only admins should see unassigned leads added to their dashboard
+        if (user?.isAdmin) {
+          setLeads((prev) => [savedLead, ...prev]);
+        }
         toast.success("Lead added successfully.");
         return true;
       } else {
