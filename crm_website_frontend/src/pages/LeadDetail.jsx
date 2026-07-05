@@ -5,13 +5,18 @@ import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
 
 const STATUS_OPTIONS = [
-  { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
-  { value: 'Interested Leads', color: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800' },
-  { value: 'Pre Prospect Leads', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
-  { value: 'Prospect Leads', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
-  { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
-  { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
+  { value: 'New', label: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'Interested', label: 'Interested Leads', color: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800' },
+  { value: 'Contacted', label: 'Pre Prospect Leads', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
+  { value: 'Follow Up', label: 'Prospect Leads', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
+  { value: 'Booked', label: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
+  { value: 'Rejected', label: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
+
+export const getStatusLabel = (statusValue) => {
+  const opt = STATUS_OPTIONS.find(s => s.value === statusValue || s.label === statusValue);
+  return opt ? opt.label : (statusValue || 'Fresh Leads');
+};
 
 export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
   const { id } = useParams();
@@ -339,13 +344,15 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               Lead Status
             </h2>
             <select
-              value={lead.status || 'Fresh Leads'}
+              value={lead.status || 'New'}
               onChange={(e) => handleStatusChange(e.target.value)}
               disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color}`}
+              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'New')) || STATUS_OPTIONS[0]).color}`}
             >
               {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.value}</option>
+                <option key={opt.value} value={opt.value} className="bg-white text-gray-900 font-medium">
+                  {opt.label}
+                </option>
               ))}
             </select>
           </div>
