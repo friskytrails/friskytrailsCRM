@@ -112,7 +112,8 @@ function App() {
         toast.success("Lead added successfully.");
         return true;
       } else {
-        toast.error("Failed to add lead.");
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to add lead: ${errData.error || response.statusText}`);
         return false;
       }
     } catch (error) {
