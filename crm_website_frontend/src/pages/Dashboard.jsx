@@ -5,22 +5,13 @@ import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
 
 const STATUS_OPTIONS = [
-  { value: 'New', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
-  { value: 'Contacted', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
-  { value: 'Follow Up', color: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800' },
-  { value: 'Interested', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
+  { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'Interested Leads', color: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800' },
+  { value: 'Pre Prospect Leads', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
+  { value: 'Prospect Leads', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
   { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
-  { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
-  { value: 'Closed', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800/60 dark:text-gray-300 dark:border-gray-700' },
+  { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
-
-export const LEGACY_STATUS_MAP = {
-  'Fresh Leads': 'New',
-  'Interested Leads': 'Interested',
-  'Pre Prospect Leads': 'Contacted',
-  'Prospect Leads': 'Follow Up',
-  'Rejected Leads': 'Rejected'
-};
 
 export default function Dashboard({ leads, agents, assignAgent, addNote, deleteNote, updateLead, user, loading }) {
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
@@ -184,10 +175,9 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       (filterAgent === 'unassigned' && (!(lead.agentIds && lead.agentIds.length > 0) || !(lead.agentIds || []).some(id => agents.some(a => a.id === id)))) ||
       (lead.agentIds || []).includes(filterAgent);
 
-    const leadStatus = LEGACY_STATUS_MAP[lead.status] || lead.status || 'New';
     const matchesStatus =
       filterStatus === 'all' ||
-      leadStatus === filterStatus;
+      (lead.status || 'Fresh Leads') === filterStatus;
 
     const matchesProduct = 
       filterProduct === 'all' ||

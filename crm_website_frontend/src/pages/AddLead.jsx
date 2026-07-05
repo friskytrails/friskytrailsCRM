@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from "react-hot-toast";
 
-export default function AddLead({ addLead }) {
+export default function AddLead({ addLead, user }) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -42,7 +42,20 @@ export default function AddLead({ addLead }) {
     try {
       const success = await addLead(formData);
       if (success) {
-        navigate('/');
+        if (user?.isAdmin) {
+          navigate('/');
+        } else {
+          setFormData({
+            name: '',
+            phone: '',
+            age: '',
+            origin: '',
+            destination: '',
+            leadSource: '',
+            product: '',
+            mailId: ''
+          });
+        }
       }
     } finally {
       setSubmitting(false);
