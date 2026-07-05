@@ -4,23 +4,23 @@ import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
 
-const PREDEFINED_LABELS = [
-  { name: 'Fresh Lead', color: 'bg-blue-500', text: 'text-white', border: 'border-blue-400', light: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/50' },
-  { name: 'Interested Lead', color: 'bg-yellow-500', text: 'text-white', border: 'border-yellow-400', light: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-900/50' },
-  { name: 'Pre Prospect Lead', color: 'bg-purple-500', text: 'text-white', border: 'border-purple-400', light: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900/50' },
-  { name: 'Prospect Lead', color: 'bg-orange-500', text: 'text-white', border: 'border-orange-400', light: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-900/50' },
-  { name: 'Booked', color: 'bg-green-500', text: 'text-white', border: 'border-green-400', light: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-900/50' },
-];
-
 const STATUS_OPTIONS = [
-  { value: 'New', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600' },
-  { value: 'Contacted', color: 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/60 dark:text-blue-300 dark:border-blue-700' },
-  { value: 'Follow Up', color: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-900/60 dark:text-yellow-300 dark:border-yellow-700' },
-  { value: 'Interested', color: 'bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/60 dark:text-purple-300 dark:border-purple-700' },
+  { value: 'New', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'Contacted', color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-800' },
+  { value: 'Follow Up', color: 'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-800' },
+  { value: 'Interested', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
   { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
   { value: 'Rejected', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
-  { value: 'Closed', color: 'bg-slate-200 text-slate-700 border-slate-400 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' },
+  { value: 'Closed', color: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800/60 dark:text-gray-300 dark:border-gray-700' },
 ];
+
+export const LEGACY_STATUS_MAP = {
+  'Fresh Leads': 'New',
+  'Interested Leads': 'Interested',
+  'Pre Prospect Leads': 'Contacted',
+  'Prospect Leads': 'Follow Up',
+  'Rejected Leads': 'Rejected'
+};
 
 export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
   const { id } = useParams();
@@ -28,19 +28,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
   const [noteInput, setNoteInput] = useState('');
-  const [showLabelPicker, setShowLabelPicker] = useState(false);
-  const [customLabel, setCustomLabel] = useState('');
+
   const [selectedImage, setSelectedImage] = useState(null); // base64 preview
   const [imageFile, setImageFile] = useState(null); // actual file to upload
   const [isUploading, setIsUploading] = useState(false);
-  const [editingBooking, setEditingBooking] = useState(false);
-  const [bookingForm, setBookingForm] = useState({
-    totalDial: 0,
-    connected: 0,
-    talkTime: '0:0',
-    firstCall: '',
-    lastCall: ''
-  });
 
   const getAgentLeadCount = (agentId) => {
     return leads?.filter((l) => (l.agentIds || []).includes(agentId)).length || 0;
@@ -99,63 +90,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handleToggleLabel = async (labelName) => {
-    if (!lead) return;
-    const currentLabels = lead.labels || [];
-    const newLabels = currentLabels.includes(labelName)
-      ? currentLabels.filter(l => l !== labelName)
-      : [...currentLabels, labelName];
-
-    // Optimistic update
-    const previousLead = { ...lead };
-    const optimisticLead = { ...lead, labels: newLabels };
-    setLead(optimisticLead);
-    syncLeadToParent(optimisticLead);
-
-    try {
-      const res = await fetch(`${API_URL}/leads/${id}/labels`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ labels: newLabels })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
-      } else {
-        // Revert on failure
-        setLead(previousLead);
-        syncLeadToParent(previousLead);
-        toast.error('Failed to update labels');
-      }
-    } catch (error) {
-      console.error(error);
-      // Revert on failure
-      setLead(previousLead);
-      syncLeadToParent(previousLead);
-      toast.error('Server connection error');
-    }
-  };
-
-  const handleUpdateDate = async (field, value) => {
-    try {
-      const res = await fetch(`${API_URL}/leads/${id}/dates`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ [field]: value || null })
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
-      } else {
-        toast.error('Failed to update dates');
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error('Server connection error');
-    }
-  };
 
   const handleSendNote = async () => {
     if (!noteInput.trim() && !imageFile) return;
@@ -272,32 +206,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
   };
 
-  const handleBookingEdit = () => {
-    setBookingForm({
-      totalDial: lead.booking?.totalDial || 0,
-      connected: lead.booking?.connected || 0,
-      talkTime: lead.booking?.talkTime || '0:0',
-      firstCall: lead.booking?.firstCall ? new Date(lead.booking.firstCall).toISOString().split('T')[0] : '',
-      lastCall: lead.booking?.lastCall ? new Date(lead.booking.lastCall).toISOString().split('T')[0] : ''
-    });
-    setEditingBooking(true);
-  };
 
-  const handleBookingSave = async () => {
-    const data = {};
-    if (bookingForm.totalDial !== undefined) data.totalDial = bookingForm.totalDial;
-    if (bookingForm.connected !== undefined) data.connected = bookingForm.connected;
-    if (bookingForm.talkTime !== undefined) data.talkTime = bookingForm.talkTime;
-    if (bookingForm.firstCall !== undefined) data.firstCall = bookingForm.firstCall || null;
-    if (bookingForm.lastCall !== undefined) data.lastCall = bookingForm.lastCall || null;
-
-    const updated = await updateLeadBooking(lead.id, data);
-    if (updated) {
-      setLead(updated);
-      syncLeadToParent(updated);
-    }
-    setEditingBooking(false);
-  };
 
   const handleAssignAgent = async (newIds) => {
     if (!lead || !assignAgent) return;
@@ -342,7 +251,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     );
   }
 
-  const activeLabels = lead.labels || [];
   const assignedAgents = (lead.agentIds || []).map(id => agents?.find(a => a.id === id)).filter(Boolean);
 
   return (
@@ -364,31 +272,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
           <div className="flex-1 min-w-[250px]">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{lead.name || 'Unnamed Lead'}</h1>
 
-            {/* Active Labels */}
-            {activeLabels.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {activeLabels.map(labelName => {
-                  const labelDef = PREDEFINED_LABELS.find(l => l.name === labelName);
-                  return (
-                    <span key={labelName} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold border ${labelDef ? labelDef.light : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'}`}>
-                      {labelName}
-                      {user?.isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLabel(labelName);
-                          }}
-                          className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-current font-bold text-xs cursor-pointer"
-                          title={`Remove ${labelName}`}
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
+
+
           </div>
           <div className="flex-1 flex justify-center">
             <div className="bg-gray-50 rounded-xl p-4 flex items-center space-x-6 w-full max-w-[320px] sm:max-w-[360px]">
@@ -463,10 +348,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               Lead Status
             </h2>
             <select
-              value={lead.status || 'New'}
+              value={lead.status || 'Fresh Leads'}
               onChange={(e) => handleStatusChange(e.target.value)}
               disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'New').color}`}
+              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color}`}
             >
               {STATUS_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.value}</option>
@@ -481,194 +366,42 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 Booking Info
               </h2>
-              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
-                <button
-                  onClick={editingBooking ? handleBookingSave : handleBookingEdit}
-                  className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
-                >
-                  {editingBooking ? '✓ Save' : '✎ Edit'}
-                </button>
-              )}
             </div>
 
-            {editingBooking ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Total Dial</label>
-                  <input type="number" min="0" value={bookingForm.totalDial} onChange={(e) => setBookingForm(prev => ({ ...prev, totalDial: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Connected</label>
-                  <input type="number" min="0" value={bookingForm.connected} onChange={(e) => setBookingForm(prev => ({ ...prev, connected: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" />
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Talk Time</label>
-                  <input type="text" value={bookingForm.talkTime} onChange={(e) => setBookingForm(prev => ({ ...prev, talkTime: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500" placeholder="0:0" />
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
-                  <label className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold mb-1">Age</label>
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{computeAge()}</span>
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-200 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold mb-1">First Call</label>
-                  <input type="date" value={bookingForm.firstCall} onChange={(e) => setBookingForm(prev => ({ ...prev, firstCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-200 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold mb-1">Last Call</label>
-                  <input type="date" value={bookingForm.lastCall} onChange={(e) => setBookingForm(prev => ({ ...prev, lastCall: e.target.value }))} className="w-full text-sm font-semibold text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-700/50 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 cursor-pointer" />
-                </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
-                </div>
-                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
-                </div>
-                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
-                </div>
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
               </div>
-            )}
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
+              </div>
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
+              </div>
+              <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
+              </div>
+              <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Two-section layout */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left section: Labels & Dates */}
+        {/* Left section: Dates */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Labels */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center">
-                <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                Labels
-              </h2>
-              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
-                <button
-                  onClick={() => setShowLabelPicker(!showLabelPicker)}
-                  className="text-xs text-orange-600 hover:text-orange-700 font-semibold cursor-pointer"
-                >
-                  {showLabelPicker ? 'Done' : '+ Edit'}
-                </button>
-              )}
-            </div>
-
-            {showLabelPicker && (
-              <div className="space-y-3 mb-4">
-                <div className="space-y-2">
-                  {/* Predefined Labels */}
-                  {PREDEFINED_LABELS.map(label => {
-                    const isActive = activeLabels.includes(label.name);
-                    return (
-                      <button
-                        key={label.name}
-                        onClick={() => handleToggleLabel(label.name)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer border ${isActive
-                          ? `${label.color} ${label.text} ${label.border} shadow-sm`
-                          : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60'
-                          }`}
-                      >
-                        <span>{label.name}</span>
-                        {isActive && (
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                        )}
-                      </button>
-                    );
-                  })}
-
-                  {/* Active Custom Labels (not predefined) */}
-                  {activeLabels.filter(name => !PREDEFINED_LABELS.some(pl => pl.name === name)).map(customName => {
-                    return (
-                      <button
-                        key={customName}
-                        onClick={() => handleToggleLabel(customName)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer border bg-gray-500 hover:bg-gray-600 text-white border-gray-400 dark:bg-slate-700 dark:border-slate-600 dark:hover:bg-slate-650 shadow-sm"
-                      >
-                        <span>{customName}</span>
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Custom Label Input Form */}
-                <div className="pt-3 border-t border-gray-100 dark:border-slate-800">
-                  <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">Or add custom label</label>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (customLabel.trim()) {
-                      handleToggleLabel(customLabel.trim());
-                      setCustomLabel('');
-                    }
-                  }} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. Cold Lead"
-                      value={customLabel}
-                      onChange={(e) => setCustomLabel(e.target.value)}
-                      className="flex-1 text-xs py-1.5 px-3 border border-gray-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 bg-white"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!customLabel.trim()}
-                      className="bg-orange-600 hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer transition-colors"
-                    >
-                      Add
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {!showLabelPicker && activeLabels.length === 0 && (
-              <p className="text-xs text-gray-400 italic">
-                {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) ? 'No labels assigned. Click Edit to add.' : 'No labels assigned.'}
-              </p>
-            )}
-
-            {!showLabelPicker && activeLabels.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {activeLabels.map(labelName => {
-                  const labelDef = PREDEFINED_LABELS.find(l => l.name === labelName);
-                  return (
-                    <span key={labelName} className={`inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-lg text-xs font-semibold ${labelDef ? `${labelDef.color} ${labelDef.text}` : 'bg-gray-500 dark:bg-slate-700 text-white'}`}>
-                      <span>{labelName}</span>
-                      {user?.isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLabel(labelName);
-                          }}
-                          className="w-4 h-4 rounded-md flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-current font-normal text-xs cursor-pointer"
-                          title={`Remove ${labelName}`}
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
           {/* Dates */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -679,45 +412,15 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Start Date</label>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="date"
-                    disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-                    value={formatDate(lead.dates?.startDate)}
-                    onChange={(e) => handleUpdateDate('startDate', e.target.value)}
-                    className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  />
-                  {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && lead.dates?.startDate && (
-                    <button
-                      onClick={() => handleUpdateDate('startDate', null)}
-                      className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"
-                    >
-                      Clear
-                    </button>
-                  )}
+                <div className="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                  {formatDisplayDate(lead.dates?.startDate)}
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1">{formatDisplayDate(lead.dates?.startDate)}</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Due Date</label>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="date"
-                    disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-                    value={formatDate(lead.dates?.dueDate)}
-                    onChange={(e) => handleUpdateDate('dueDate', e.target.value)}
-                    className="flex-1 text-sm py-2 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white cursor-pointer disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  />
-                  {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && lead.dates?.dueDate && (
-                    <button
-                      onClick={() => handleUpdateDate('dueDate', null)}
-                      className="text-xs text-red-400 hover:text-red-600 cursor-pointer font-medium"
-                    >
-                      Clear
-                    </button>
-                  )}
+                <div className="text-sm font-medium text-gray-800 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                  {formatDisplayDate(lead.dates?.dueDate)}
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1">{formatDisplayDate(lead.dates?.dueDate)}</p>
               </div>
             </div>
           </div>

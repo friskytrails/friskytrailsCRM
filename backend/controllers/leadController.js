@@ -12,11 +12,9 @@ async function getLeads(req, res) {
 
 async function createLead(req, res) {
   try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ error: "Forbidden: Admin access only" });
-    }
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
     const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
+    
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });

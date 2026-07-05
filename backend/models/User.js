@@ -29,6 +29,21 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  monthlyTarget: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  targetCompleted: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  attendance: {
+    type: String,
+    enum: ['P', 'A', ''],
+    default: ''
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import AddLead from './pages/AddLead';
 import AgentsList from './pages/AgentsList';
+import AgentLeads from './pages/AgentLeads';
 import Login from './pages/Login';
 import LeadDetail from "./pages/LeadDetail";
 import Profile from './pages/Profile';
@@ -117,6 +118,8 @@ function App() {
       return false;
     }
   };
+
+
 
   const assignAgent = async (leadId, agentIds) => {
     try {
@@ -269,10 +272,15 @@ function App() {
         body: JSON.stringify({ status }),
       });
       if (response.ok) {
-        const updatedAgent = await response.json();
-        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
-        toast.success("Agent status updated successfully.");
-        return updatedAgent;
+        const data = await response.json();
+        if (status === 'Rejected') {
+          setAgents((prev) => prev.filter(agent => agent.id !== agentId));
+          toast.success(data.message || "Agent rejected successfully.");
+        } else {
+          setAgents((prev) => prev.map(agent => agent.id === agentId ? data : agent));
+          toast.success("Agent status updated successfully.");
+        }
+        return data;
       } else {
         const errData = await response.json().catch(() => ({}));
         toast.error(`Failed to update agent status: ${errData.error || response.statusText}`);
@@ -309,6 +317,30 @@ function App() {
     }
   };
 
+  const updateAgentMetrics = async (agentId, metrics) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${agentId}/metrics`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(metrics),
+      });
+      if (response.ok) {
+        const updatedAgent = await response.json();
+        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        toast.success("Agent metrics updated successfully.");
+        return updatedAgent;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update metrics: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   // If not logged in, intercept and show Login Page
   if (!token) {
     return (
@@ -318,7 +350,7 @@ function App() {
           <Toaster position='top-center' />
           <main>
             <Routes>
-              <Route path="/register" element={<Register setToken={setToken} setUser={setUser} API_URL={API_URL} />} />
+              <Route path="/register" element={<Register API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
               <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
               <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
               <Route path="*" element={<Login setToken={setToken} setUser={setUser} API_URL={API_URL} />} />
@@ -332,7 +364,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen">
-        <Navbar darkMode={darkMode} setDarkMode={setDarkMode} user={user} handleLogout={handleLogout} />
+        <Navbar darkMode={darkMode} setDarkMode={setDarkMode} user={user} handleLogout={handleLogout} agents={agents} />
         <Toaster position='top-center' />
         <main>
           <Routes>
@@ -343,18 +375,23 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={user?.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
+              element={<AddLead addLead={addLead} />}
             />
             <Route
               path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
             />
+            <Route
+              path="/agents/:id"
+              element={user?.isAdmin ? <AgentLeads leads={leads} agents={agents} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+            />
+
             <Route
               path="/leads/:id"
               element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} leads={leads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} assignAgent={assignAgent} />} />
             <Route
               path="/profile"
-              element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} />} />
+              element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} handleLogout={handleLogout} />} />
             <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
             <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
             {/* Redirect any other path to dashboard */}
