@@ -65,10 +65,24 @@ async function getAgentAttendance(req, res) {
   }
 }
 
+async function getAgentMetrics(req, res) {
+  try {
+    const { id } = req.params;
+    if (!req.user.isAdmin && req.user.userId !== id) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const metrics = await agentService.getAgentMetrics(id);
+    res.json(metrics);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
   updateAgentVerification,
+  getAgentMetrics,
   updateAgentMetrics,
   getAgentAttendance
 };

@@ -120,10 +120,23 @@ async function getAgentAttendance(agentId) {
   });
 }
 
+async function getAgentMetrics(id) {
+  const user = await User.findById(id);
+  if (!user) {
+    throw new Error("Agent not found");
+  }
+  return {
+    monthlyTarget: user.monthlyTarget || 0,
+    targetCompleted: user.targetCompleted || 0,
+    attendance: user.attendance || ''
+  };
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
   updateAgentVerification,
+  getAgentMetrics,
   updateAgentMetrics,
   getAgentAttendance
 };
