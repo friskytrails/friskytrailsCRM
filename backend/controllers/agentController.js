@@ -20,7 +20,15 @@ async function updateAgentStatus(req, res) {
     const agent = await agentService.updateAgentStatus(id, status);
     res.json(agent);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.message === "Agent not found") {
+      res.status(404).json({ error: error.message });
+    } else if (error.name === "CastError") {
+      res.status(400).json({ error: "Invalid agent ID format" });
+    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 }
 
@@ -34,7 +42,15 @@ async function updateAgentVerification(req, res) {
     const agent = await agentService.updateAgentVerification(id, isVerified);
     res.json(agent);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.message === "Agent not found") {
+      res.status(404).json({ error: error.message });
+    } else if (error.name === "CastError") {
+      res.status(400).json({ error: "Invalid agent ID format" });
+    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 }
 
@@ -48,7 +64,15 @@ async function updateAgentMetrics(req, res) {
     const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate);
     res.json(agent);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.message === "Agent not found") {
+      res.status(404).json({ error: error.message });
+    } else if (error.name === "CastError") {
+      res.status(400).json({ error: "Invalid agent ID format" });
+    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 }
 
@@ -61,7 +85,15 @@ async function getAgentAttendance(req, res) {
     const logs = await agentService.getAgentAttendance(id);
     res.json(logs);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.message === "Agent not found") {
+      res.status(404).json({ error: error.message });
+    } else if (error.name === "CastError") {
+      res.status(400).json({ error: "Invalid agent ID format" });
+    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 }
 
@@ -74,7 +106,15 @@ async function getAgentMetrics(req, res) {
     const metrics = await agentService.getAgentMetrics(id);
     res.json(metrics);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.message === "Agent not found") {
+      res.status(404).json({ error: error.message });
+    } else if (error.name === "CastError") {
+      res.status(400).json({ error: "Invalid agent ID format" });
+    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: error.message });
+    }
   }
 }
 
