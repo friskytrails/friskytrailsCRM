@@ -1,5 +1,17 @@
 const agentService = require('../services/agentService');
 
+function handleAgentServiceError(error, res) {
+  if (error.name === "NotFoundError") {
+    return res.status(404).json({ error: error.message });
+  }
+  if (error.name === "ValidationError" || error.name === "CastError") {
+    const message = error.name === "CastError" ? "Invalid agent ID format" : error.message;
+    return res.status(400).json({ error: message });
+  }
+  console.error("Agent service error:", error);
+  return res.status(500).json({ error: "Internal server error" });
+}
+
 async function getAgents(req, res) {
   try {
     const agents = await agentService.getAgents();
@@ -20,15 +32,7 @@ async function updateAgentStatus(req, res) {
     const agent = await agentService.updateAgentStatus(id, status);
     res.json(agent);
   } catch (error) {
-    if (error.message === "Agent not found") {
-      res.status(404).json({ error: error.message });
-    } else if (error.name === "CastError") {
-      res.status(400).json({ error: "Invalid agent ID format" });
-    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message });
-    }
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -42,15 +46,7 @@ async function updateAgentVerification(req, res) {
     const agent = await agentService.updateAgentVerification(id, isVerified);
     res.json(agent);
   } catch (error) {
-    if (error.message === "Agent not found") {
-      res.status(404).json({ error: error.message });
-    } else if (error.name === "CastError") {
-      res.status(400).json({ error: "Invalid agent ID format" });
-    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message });
-    }
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -64,15 +60,7 @@ async function updateAgentMetrics(req, res) {
     const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate);
     res.json(agent);
   } catch (error) {
-    if (error.message === "Agent not found") {
-      res.status(404).json({ error: error.message });
-    } else if (error.name === "CastError") {
-      res.status(400).json({ error: "Invalid agent ID format" });
-    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message });
-    }
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -85,15 +73,7 @@ async function getAgentAttendance(req, res) {
     const logs = await agentService.getAgentAttendance(id);
     res.json(logs);
   } catch (error) {
-    if (error.message === "Agent not found") {
-      res.status(404).json({ error: error.message });
-    } else if (error.name === "CastError") {
-      res.status(400).json({ error: "Invalid agent ID format" });
-    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message });
-    }
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -106,15 +86,7 @@ async function getAgentMetrics(req, res) {
     const metrics = await agentService.getAgentMetrics(id);
     res.json(metrics);
   } catch (error) {
-    if (error.message === "Agent not found") {
-      res.status(404).json({ error: error.message });
-    } else if (error.name === "CastError") {
-      res.status(400).json({ error: "Invalid agent ID format" });
-    } else if (error.message.startsWith("Invalid") || error.message.startsWith("Cannot") || error.message.includes("must be")) {
-      res.status(400).json({ error: error.message });
-    } else {
-      res.status(500).json({ error: error.message });
-    }
+    return handleAgentServiceError(error, res);
   }
 }
 
