@@ -3,6 +3,12 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const { formatDoc } = require('../utils/helpers');
 
+function createError(message, name = 'ValidationError') {
+  const err = new Error(message);
+  err.name = name;
+  return err;
+}
+
 async function getAgents() {
   const agents = await User.findAgents();
   return agents.map(formatDoc);
@@ -11,16 +17,16 @@ async function getAgents() {
 async function updateAgentStatus(id, status) {
   const validStatuses = ['Active', 'Inactive', 'Former Employee'];
   if (!validStatuses.includes(status)) {
-    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    throw createError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
 
   const user = await User.findById(id);
   if (!user) {
-    throw new Error("Agent not found");
+    throw createError("Agent not found", "NotFoundError");
   }
 
   if (user.isAdmin) {
-    throw new Error("Cannot update status of an admin user");
+    throw createError("Cannot update status of an admin user");
   }
 
   user.status = status;
@@ -31,17 +37,17 @@ async function updateAgentStatus(id, status) {
 async function updateAgentVerification(id, isVerified) {
   const user = await User.findById(id);
   if (!user) {
-    throw new Error("Agent not found");
+    throw createError("Agent not found", "NotFoundError");
   }
 
   if (user.isAdmin) {
-    throw new Error("Cannot update verification of an admin user");
+    throw createError("Cannot update verification of an admin user");
   }
 
   if (typeof isVerified !== 'boolean') {
     if (isVerified === 'true') isVerified = true;
     else if (isVerified === 'false') isVerified = false;
-    else throw new Error("isVerified must be a boolean value");
+    else throw createError("isVerified must be a boolean value");
   }
 
   user.isVerified = isVerified;
@@ -52,11 +58,11 @@ async function updateAgentVerification(id, isVerified) {
 async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate) {
   const user = await User.findById(id);
   if (!user) {
-    throw new Error("Agent not found");
+    throw createError("Agent not found", "NotFoundError");
   }
 
   if (user.isAdmin) {
-    throw new Error("Cannot update metrics of an admin user");
+    throw createError("Cannot update metrics of an admin user");
   }
 
   // Backup for manual rollback
@@ -68,12 +74,12 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
 
   if (monthlyTarget !== undefined) {
     const num = Number(monthlyTarget);
-    if (!Number.isFinite(num) || num < 0) throw new Error("Invalid monthlyTarget");
+    if (!Number.isFinite(num) || num < 0) throw createError("Invalid monthlyTarget");
     user.monthlyTarget = num;
   }
   if (targetCompleted !== undefined) {
     const num = Number(targetCompleted);
-    if (!Number.isFinite(num) || num < 0) throw new Error("Invalid targetCompleted");
+    if (!Number.isFinite(num) || num < 0) throw createError("Invalid targetCompleted");
     user.targetCompleted = num;
   }
   
@@ -120,10 +126,23 @@ async function getAgentAttendance(agentId) {
   });
 }
 
+async function getAgentMetrics(id) {
+  const user = await User.findById(id);
+  if (!user) {
+    throw createError("Agent not found", "NotFoundError");
+  }
+  return {
+    monthlyTarget: user.monthlyTarget || 0,
+    targetCompleted: user.targetCompleted || 0,
+    attendance: user.attendance || ''
+  };
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
   updateAgentVerification,
+  getAgentMetrics,
   updateAgentMetrics,
   getAgentAttendance
 };

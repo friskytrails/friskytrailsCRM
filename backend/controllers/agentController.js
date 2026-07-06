@@ -1,5 +1,17 @@
 const agentService = require('../services/agentService');
 
+function handleAgentServiceError(error, res) {
+  if (error.name === "NotFoundError") {
+    return res.status(404).json({ error: error.message });
+  }
+  if (error.name === "ValidationError" || error.name === "CastError") {
+    const message = error.name === "CastError" ? "Invalid agent ID format" : error.message;
+    return res.status(400).json({ error: message });
+  }
+  console.error("Agent service error:", error);
+  return res.status(500).json({ error: "Internal server error" });
+}
+
 async function getAgents(req, res) {
   try {
     const agents = await agentService.getAgents();
@@ -20,7 +32,7 @@ async function updateAgentStatus(req, res) {
     const agent = await agentService.updateAgentStatus(id, status);
     res.json(agent);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -34,7 +46,7 @@ async function updateAgentVerification(req, res) {
     const agent = await agentService.updateAgentVerification(id, isVerified);
     res.json(agent);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -48,7 +60,7 @@ async function updateAgentMetrics(req, res) {
     const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate);
     res.json(agent);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -61,7 +73,20 @@ async function getAgentAttendance(req, res) {
     const logs = await agentService.getAgentAttendance(id);
     res.json(logs);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    return handleAgentServiceError(error, res);
+  }
+}
+
+async function getAgentMetrics(req, res) {
+  try {
+    const { id } = req.params;
+    if (!req.user.isAdmin && req.user.userId !== id) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const metrics = await agentService.getAgentMetrics(id);
+    res.json(metrics);
+  } catch (error) {
+    return handleAgentServiceError(error, res);
   }
 }
 
@@ -69,6 +94,7 @@ module.exports = {
   getAgents,
   updateAgentStatus,
   updateAgentVerification,
+  getAgentMetrics,
   updateAgentMetrics,
   getAgentAttendance
 };
