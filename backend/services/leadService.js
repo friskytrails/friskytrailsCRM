@@ -291,32 +291,48 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   const istDate = new Date(utc + (3600000 * 5.5));
   const todayDate = istDate.toISOString().split('T')[0];
   
-  const callLogs = lead.callLogs ? [...lead.callLogs] : [];
-  const todayLogIndex = callLogs.findIndex(log => log.date === todayDate);
-
-  if (todayLogIndex >= 0) {
-    callLogs[todayLogIndex].dailyDial = dailyDial;
-    callLogs[todayLogIndex].dailyTalkTime = dailyTalkTime;
+  let query = {};
+  if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
+    query = { _id: id };
   } else {
-    callLogs.push({
-      date: todayDate,
-      dailyDial,
-      dailyTalkTime
-    });
+    query = { leadId: Number(id) };
+  }
+  if (agentIdCondition !== undefined) {
+    query.agentIds = agentIdCondition;
   }
 
-  const result = await Lead.updateLead(id, {
-    booking: {
-      totalDial,
-      dailyDial,
-      connected,
-      talkTime,
-      dailyTalkTime,
-      firstCall,
-      lastCall
+  const baseSet = {
+    'booking.totalDial': totalDial,
+    'booking.dailyDial': dailyDial,
+    'booking.connected': connected,
+    'booking.talkTime': talkTime,
+    'booking.dailyTalkTime': dailyTalkTime,
+    'booking.firstCall': firstCall,
+    'booking.lastCall': lastCall
+  };
+
+  let result = await Lead.Model.findOneAndUpdate(
+    { ...query, 'callLogs.date': todayDate },
+    {
+      $set: {
+        ...baseSet,
+        'callLogs.$.dailyDial': dailyDial,
+        'callLogs.$.dailyTalkTime': dailyTalkTime
+      }
     },
-    callLogs
-  }, agentIdCondition);
+    { new: true }
+  );
+
+  if (!result) {
+    result = await Lead.Model.findOneAndUpdate(
+      query,
+      {
+        $set: baseSet,
+        $push: { callLogs: { date: todayDate, dailyDial, dailyTalkTime } }
+      },
+      { new: true }
+    );
+  }
 
   if (!result) {
     throw new Error("Lead not found or unauthorized");

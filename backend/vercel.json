@@ -15,7 +15,7 @@
   ],
   "crons": [
     {
-      "path": "/cron/reset-daily",
+      "path": "/api/cron/reset-daily",
       "schedule": "30 18 * * *"
     }
   ]

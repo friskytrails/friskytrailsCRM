@@ -175,7 +175,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return 'Not set';
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    let d;
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [year, month, day] = dateStr.split('-');
+      d = new Date(year, month - 1, day);
+    } else {
+      d = new Date(dateStr);
+    }
+    return d.toLocaleDateString('en-IN', {
       day: 'numeric', month: 'short', year: 'numeric'
     });
   };
@@ -196,8 +203,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       setLead(previousLead);
     }
   };
-
-
 
   const handleAssignAgent = async (newIds) => {
     if (!lead || !assignAgent) return;
