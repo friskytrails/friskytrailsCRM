@@ -240,8 +240,10 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   const currentBooking = lead.booking || {};
 
   const totalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : (currentBooking.totalDial || 0);
+  const dailyDial = bookingData.dailyDial !== undefined ? (Number(bookingData.dailyDial) || 0) : (currentBooking.dailyDial || 0);
   const connected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : (currentBooking.connected || 0);
   const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
+  const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
 
   let firstCall = currentBooking.firstCall || null;
   if (bookingData.firstCall !== undefined) {
@@ -268,8 +270,10 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   // Check if any changes were actually made. If not, bypass the update.
   const hasChanges =
     totalDial !== (currentBooking.totalDial || 0) ||
+    dailyDial !== (currentBooking.dailyDial || 0) ||
     connected !== (currentBooking.connected || 0) ||
     talkTime !== (currentBooking.talkTime || '0:0') ||
+    dailyTalkTime !== (currentBooking.dailyTalkTime || '0:0') ||
     (firstCall ? new Date(firstCall).getTime() : null) !== (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) ||
     (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
 
@@ -281,14 +285,37 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     return formatDoc(lead);
   }
 
+  // Manage callLogs for the current date in IST (Asia/Kolkata)
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utc + (3600000 * 5.5));
+  const todayDate = istDate.toISOString().split('T')[0];
+  
+  const callLogs = lead.callLogs ? [...lead.callLogs] : [];
+  const todayLogIndex = callLogs.findIndex(log => log.date === todayDate);
+
+  if (todayLogIndex >= 0) {
+    callLogs[todayLogIndex].dailyDial = dailyDial;
+    callLogs[todayLogIndex].dailyTalkTime = dailyTalkTime;
+  } else {
+    callLogs.push({
+      date: todayDate,
+      dailyDial,
+      dailyTalkTime
+    });
+  }
+
   const result = await Lead.updateLead(id, {
     booking: {
       totalDial,
+      dailyDial,
       connected,
       talkTime,
+      dailyTalkTime,
       firstCall,
       lastCall
-    }
+    },
+    callLogs
   }, agentIdCondition);
 
   if (!result) {
