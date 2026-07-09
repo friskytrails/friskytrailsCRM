@@ -138,9 +138,9 @@ async function updateStatus(req, res) {
 async function updateBooking(req, res) {
   try {
     const { id } = req.params;
-    const { totalDial, connected, talkTime, firstCall, lastCall } = req.body;
+    const { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall } = req.body;
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
-    const result = await leadService.updateBooking(id, { totalDial, connected, talkTime, firstCall, lastCall }, agentIdCondition);
+    const result = await leadService.updateBooking(id, { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall }, agentIdCondition);
     res.json(result);
   } catch (error) {
     if (error.message === "Lead not found or unauthorized") {

@@ -3,6 +3,7 @@ const authRoutes = require('./authRoutes');
 const leadRoutes = require('./leadRoutes');
 const agentRoutes = require('./agentRoutes');
 const uploadRoutes = require('./uploadRoutes');
+const cronRoutes = require('./cronRoutes');
 
 const router = express.Router();
 
@@ -10,5 +11,6 @@ router.use('/auth', authRoutes);
 router.use('/leads', leadRoutes);
 router.use('/agents', agentRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/cron', cronRoutes);
 
 module.exports = router;

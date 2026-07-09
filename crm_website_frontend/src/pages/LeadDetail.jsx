@@ -175,7 +175,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const formatDisplayDate = (dateStr) => {
     if (!dateStr) return 'Not set';
-    return new Date(dateStr).toLocaleDateString('en-IN', {
+    let d;
+    if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [year, month, day] = dateStr.split('-');
+      d = new Date(year, month - 1, day);
+    } else {
+      d = new Date(dateStr);
+    }
+    return d.toLocaleDateString('en-IN', {
       day: 'numeric', month: 'short', year: 'numeric'
     });
   };
@@ -196,8 +203,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       setLead(previousLead);
     }
   };
-
-
 
   const handleAssignAgent = async (newIds) => {
     if (!lead || !assignAgent) return;
@@ -364,6 +369,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
                 <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
               </div>
+              <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
+                <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Dial</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyDial || 0}</span>
+              </div>
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
                 <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
                 <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
@@ -371,6 +380,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
                 <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
                 <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
+              </div>
+              <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
+                <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Talk Time</span>
+                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyTalkTime || '0:0'}</span>
               </div>
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
                 <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
@@ -388,6 +401,36 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
           </div>
         </div>
       </div>
+
+      {/* Historical Call Logs */}
+      {lead.callLogs && lead.callLogs.length > 0 && (
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
+          <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center mb-4">
+            <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Historical Call Logs
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700/50 dark:text-gray-400">
+                <tr>
+                  <th className="px-4 py-3 rounded-l-lg">Date</th>
+                  <th className="px-4 py-3">Dials</th>
+                  <th className="px-4 py-3 rounded-r-lg">Talk Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...lead.callLogs].reverse().map((log, idx) => (
+                  <tr key={idx} className="border-b last:border-0 border-gray-100 dark:border-slate-700">
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{formatDisplayDate(log.date)}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyDial}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyTalkTime}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Two-section layout */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
