@@ -27,6 +27,21 @@ const NoteSchema = new mongoose.Schema({
   }
 });
 
+const CallLogSchema = new mongoose.Schema({
+  date: {
+    type: String, // Format: YYYY-MM-DD
+    required: true
+  },
+  dailyDial: {
+    type: Number,
+    default: 0
+  },
+  dailyTalkTime: {
+    type: String,
+    default: '0:0'
+  }
+});
+
 const LeadSchema = new mongoose.Schema({
   leadId: {
     type: Number,
@@ -89,15 +104,21 @@ const LeadSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['New', 'Contacted', 'Follow Up', 'Interested', 'Booked', 'Rejected', 'Closed'],
-    default: 'New'
+    enum: ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'],
+    default: 'Fresh Leads'
   },
   booking: {
     totalDial: { type: Number, default: 0 },
+    dailyDial: { type: Number, default: 0 },
     connected: { type: Number, default: 0 },
     talkTime: { type: String, default: '0:0' },
+    dailyTalkTime: { type: String, default: '0:0' },
     firstCall: { type: Date, default: null },
     lastCall: { type: Date, default: null }
+  },
+  callLogs: {
+    type: [CallLogSchema],
+    default: []
   }
 }, { timestamps: true });
 

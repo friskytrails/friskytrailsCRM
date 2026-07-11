@@ -36,20 +36,19 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                   Dashboard
                 </Link>
 
+                <Link to="/add-lead" className={getLinkClass('/add-lead')}>
+                  Add Lead
+                </Link>
+                
                 {user.isAdmin && (
-                  <>
-                    <Link to="/add-lead" className={getLinkClass('/add-lead')}>
-                      Add Lead
-                    </Link>
-                    <Link to="/agents" className={getLinkClass('/agents')}>
-                      Agents
-                      {pendingCount > 0 && (
-                        <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                          {pendingCount}
-                        </span>
-                      )}
-                    </Link>
-                  </>
+                  <Link to="/agents" className={getLinkClass('/agents')}>
+                    Agents
+                    {pendingCount > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </Link>
                 )}
               </div>
             )}
@@ -134,20 +133,19 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
               Dashboard
             </Link>
 
+            <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
+              Add Lead
+            </Link>
+
             {user.isAdmin && (
-              <>
-                <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
-                  Add Lead
-                </Link>
-                <Link to="/agents" onClick={() => setIsOpen(false)} className={`${getLinkClass('/agents', true)} flex justify-between items-center`}>
-                  <span>Agents</span>
-                  {pendingCount > 0 && (
-                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                      {pendingCount}
-                    </span>
-                  )}
-                </Link>
-              </>
+              <Link to="/agents" onClick={() => setIsOpen(false)} className={`${getLinkClass('/agents', true)} flex justify-between items-center`}>
+                <span>Agents</span>
+                {pendingCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                    {pendingCount}
+                  </span>
+                )}
+              </Link>
             )}
 
             {/* User Profile and Logout section in mobile menu */}

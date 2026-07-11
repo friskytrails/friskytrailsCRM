@@ -5,6 +5,7 @@ import Navbar from './components/Navbar';
 import Dashboard from './pages/Dashboard';
 import AddLead from './pages/AddLead';
 import AgentsList from './pages/AgentsList';
+import AgentLeads from './pages/AgentLeads';
 import Login from './pages/Login';
 import LeadDetail from "./pages/LeadDetail";
 import Profile from './pages/Profile';
@@ -104,11 +105,15 @@ function App() {
       });
       if (response.ok) {
         const savedLead = await response.json();
-        setLeads((prev) => [savedLead, ...prev]);
+        // Only admins should see unassigned leads added to their dashboard
+        if (user?.isAdmin) {
+          setLeads((prev) => [savedLead, ...prev]);
+        }
         toast.success("Lead added successfully.");
         return true;
       } else {
-        toast.error("Failed to add lead.");
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to add lead: ${errData.error || response.statusText}`);
         return false;
       }
     } catch (error) {
@@ -316,6 +321,30 @@ function App() {
     }
   };
 
+  const updateAgentMetrics = async (agentId, metrics) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${agentId}/metrics`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(metrics),
+      });
+      if (response.ok) {
+        const updatedAgent = await response.json();
+        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        toast.success("Agent metrics updated successfully.");
+        return updatedAgent;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update metrics: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   // If not logged in, intercept and show Login Page
   if (!token) {
     return (
@@ -350,12 +379,17 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={user?.isAdmin ? <AddLead addLead={addLead} /> : <Navigate to="/" replace />}
+              element={<AddLead addLead={addLead} user={user} />}
             />
             <Route
               path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
             />
+            <Route
+              path="/agents/:id"
+              element={user?.isAdmin ? <AgentLeads leads={leads} agents={agents} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+            />
+
             <Route
               path="/leads/:id"
               element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} leads={leads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} assignAgent={assignAgent} />} />

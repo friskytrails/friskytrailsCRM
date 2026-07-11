@@ -12,5 +12,11 @@
       "src": "/(.*)",
       "dest": "index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reset-daily",
+      "schedule": "30 18 * * *"
+    }
   ]
 }

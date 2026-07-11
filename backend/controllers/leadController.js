@@ -12,11 +12,9 @@ async function getLeads(req, res) {
 
 async function createLead(req, res) {
   try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ error: "Forbidden: Admin access only" });
-    }
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
     const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
+    
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -140,9 +138,9 @@ async function updateStatus(req, res) {
 async function updateBooking(req, res) {
   try {
     const { id } = req.params;
-    const { totalDial, connected, talkTime, firstCall, lastCall } = req.body;
+    const { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall } = req.body;
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
-    const result = await leadService.updateBooking(id, { totalDial, connected, talkTime, firstCall, lastCall }, agentIdCondition);
+    const result = await leadService.updateBooking(id, { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall }, agentIdCondition);
     res.json(result);
   } catch (error) {
     if (error.message === "Lead not found or unauthorized") {

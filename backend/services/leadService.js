@@ -220,7 +220,7 @@ async function updateDates(id, dates, agentIdCondition) {
 }
 
 async function updateStatus(id, status, agentIdCondition) {
-  const validStatuses = ['New', 'Contacted', 'Follow Up', 'Interested', 'Booked', 'Rejected', 'Closed'];
+  const validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
   if (!validStatuses.includes(status)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
@@ -240,8 +240,10 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   const currentBooking = lead.booking || {};
 
   const totalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : (currentBooking.totalDial || 0);
+  const dailyDial = bookingData.dailyDial !== undefined ? (Number(bookingData.dailyDial) || 0) : (currentBooking.dailyDial || 0);
   const connected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : (currentBooking.connected || 0);
   const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
+  const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
 
   let firstCall = currentBooking.firstCall || null;
   if (bookingData.firstCall !== undefined) {
@@ -268,8 +270,10 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   // Check if any changes were actually made. If not, bypass the update.
   const hasChanges =
     totalDial !== (currentBooking.totalDial || 0) ||
+    dailyDial !== (currentBooking.dailyDial || 0) ||
     connected !== (currentBooking.connected || 0) ||
     talkTime !== (currentBooking.talkTime || '0:0') ||
+    dailyTalkTime !== (currentBooking.dailyTalkTime || '0:0') ||
     (firstCall ? new Date(firstCall).getTime() : null) !== (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) ||
     (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
 
@@ -281,15 +285,54 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     return formatDoc(lead);
   }
 
-  const result = await Lead.updateLead(id, {
-    booking: {
-      totalDial,
-      connected,
-      talkTime,
-      firstCall,
-      lastCall
-    }
-  }, agentIdCondition);
+  // Manage callLogs for the current date in IST (Asia/Kolkata)
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utc + (3600000 * 5.5));
+  const todayDate = istDate.toISOString().split('T')[0];
+  
+  let query = {};
+  if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
+    query = { _id: id };
+  } else {
+    query = { leadId: Number(id) };
+  }
+  if (agentIdCondition !== undefined) {
+    query.agentIds = agentIdCondition;
+  }
+
+  const baseSet = {
+    'booking.totalDial': totalDial,
+    'booking.dailyDial': dailyDial,
+    'booking.connected': connected,
+    'booking.talkTime': talkTime,
+    'booking.dailyTalkTime': dailyTalkTime,
+    'booking.firstCall': firstCall,
+    'booking.lastCall': lastCall
+  };
+
+  let result = await Lead.Model.findOneAndUpdate(
+    { ...query, 'callLogs.date': todayDate },
+    {
+      $set: {
+        ...baseSet,
+        'callLogs.$.dailyDial': dailyDial,
+        'callLogs.$.dailyTalkTime': dailyTalkTime
+      }
+    },
+    { new: true }
+  );
+
+  if (!result) {
+    result = await Lead.Model.findOneAndUpdate(
+      query,
+      {
+        $set: baseSet,
+        $push: { callLogs: { date: todayDate, dailyDial, dailyTalkTime } }
+      },
+      { new: true }
+    );
+  }
 
   if (!result) {
     throw new Error("Lead not found or unauthorized");

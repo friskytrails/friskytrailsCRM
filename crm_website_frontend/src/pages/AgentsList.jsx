@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification }) {
   const [loadingAction, setLoadingAction] = useState({});
@@ -49,9 +50,9 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-gray-900 dark:text-slate-100 truncate group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+              <Link to={`/agents/${agent.id}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
                 {agent.name}
-              </p>
+              </Link>
               <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">
                 {agent.email}
               </p>
@@ -86,7 +87,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-              {agent.name}
+              <Link to={`/agents/${agent.id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
               {status !== 'Active' && (
                 <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide ${statusColors[status] || statusColors['Inactive']}`}>
                   {status}
