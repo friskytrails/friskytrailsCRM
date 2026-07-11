@@ -372,7 +372,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       ) : viewMode === 'card' ? (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 items-start">
           {sortedLeads.map((lead) => {
-                        const currentAgentIds = lead.agentIds || [];
+            const currentAgentIds = lead.agentIds || [];
 
 
 
@@ -551,7 +551,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       ) : (
         <div className="mt-8 space-y-4">
           {sortedLeads.map((lead) => {
-                        const currentAgentIds = lead.agentIds || [];
+            const currentAgentIds = lead.agentIds || [];
 
 
 
@@ -636,7 +636,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                         {agentDisplayNames}
                       </div>
                     )}
-                    
+
                     <button
                       onClick={() => toggleNotes(lead.id)}
                       className="text-xs text-orange-600 hover:text-orange-700 font-semibold px-2 py-1 bg-orange-50 rounded-lg cursor-pointer"

@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const BlockedEmail = require('../models/BlockedEmail');
 const Attendance = require('../models/Attendance');
 const { formatDoc } = require('../utils/helpers');
+const { sendAgentApprovalEmail, sendAgentRejectionEmail } = require('../utils/sendEmail');
 
 function createError(message, name = 'ValidationError') {
   const err = new Error(message);
@@ -15,7 +17,7 @@ async function getAgents() {
 }
 
 async function updateAgentStatus(id, status) {
-  const validStatuses = ['Active', 'Inactive', 'Former Employee'];
+  const validStatuses = ['Active', 'Inactive', 'Former Employee', 'Rejected'];
   if (!validStatuses.includes(status)) {
     throw createError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
@@ -29,8 +31,42 @@ async function updateAgentStatus(id, status) {
     throw createError("Cannot update status of an admin user");
   }
 
+  if (status === 'Rejected') {
+    if (user.status !== 'Pending') {
+      throw new Error("Only pending agents can be rejected");
+    }
+
+    try {
+      await BlockedEmail.create({ email: user.email });
+    } catch (err) {
+      if (err.code !== 11000) {
+        throw err;
+      }
+    }
+    
+    await User.Model.deleteOne({ _id: user._id });
+    
+    try {
+      await sendAgentRejectionEmail(user.email, user.name);
+    } catch (err) {
+      console.error("Failed to send rejection email", err);
+    }
+    
+    return { id, message: "Agent rejected and moved to blocklist" };
+  }
+
+  const wasPending = user.status === 'Pending';
   user.status = status;
   await user.save();
+
+  if (wasPending && status === 'Active') {
+    try {
+      await sendAgentApprovalEmail(user.email, user.name);
+    } catch (err) {
+      console.error("Failed to send approval email", err);
+    }
+  }
+
   return formatDoc(user);
 }
 

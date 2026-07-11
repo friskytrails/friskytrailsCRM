@@ -19,6 +19,7 @@ router.post('/verify-email', authController.verifyEmail);
 router.post('/resend-otp', authController.resendOtp);
 router.get('/me', auth, authController.getProfile);
 router.put('/me', auth, authController.updateProfile);
+router.delete('/me', auth, authController.deleteAccount);
 router.put('/password', auth, authController.updatePassword);
 router.post('/forgot-password', passwordResetLimiter, authController.forgotPassword);
 router.post('/reset-password', passwordResetLimiter, authController.resetPassword);

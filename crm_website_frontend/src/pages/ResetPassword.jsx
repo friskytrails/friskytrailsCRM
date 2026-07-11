@@ -17,6 +17,53 @@ export default function ResetPassword({ API_URL, setToken, setUser }) {
     }
   }, [location.state]);
 
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const handleResendCode = async () => {
+    if (!email) {
+      toast.error('Please enter your email address first');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(data.message || 'Reset code sent!');
+        setResendTimer(data.secondsLeft || 60);
+      } else {
+        if (data.secondsLeft) {
+          setResendTimer(data.secondsLeft);
+        } else {
+          toast.error(data.error || 'Failed to resend reset code');
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Could not connect to the server');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !otp || !newPassword) return;
@@ -143,7 +190,15 @@ export default function ResetPassword({ API_URL, setToken, setUser }) {
             </button>
           </div>
           
-          <div className="text-center mt-4">
+          <div className="text-center mt-4 flex flex-col space-y-2">
+            <button
+              type="button"
+              disabled={resendTimer > 0 || loading}
+              onClick={handleResendCode}
+              className="text-sm font-semibold text-orange-600 hover:text-orange-500 transition-colors disabled:text-gray-400 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {resendTimer > 0 ? `Resend Code in ${resendTimer}s` : 'Resend Code'}
+            </button>
             <span className="text-sm text-gray-600 dark:text-slate-400">
               <Link to="/login" className="font-semibold text-orange-600 hover:text-orange-500 transition-colors">
                 Back to Sign In
