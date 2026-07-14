@@ -28,13 +28,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
   const [liveStatus, setLiveStatus] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    const interval = setInterval(() => setCurrentTime(Date.now()), 60000); // update every minute
-    return () => clearInterval(interval);
-  }, [isAdmin]);
 
   // Modal editing state
   const [editingLead, setEditingLead] = useState(null);
@@ -69,7 +62,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
   useEffect(() => {
     if (!isAdmin) return;
-    
+
+
     let eventSource;
     let isMounted = true;
 
@@ -77,12 +71,12 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
-        
+
         // 1. Get short-lived ticket
         const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/stream-ticket`, { method: 'POST', headers });
         if (!res.ok) throw new Error("Failed to get SSE ticket");
         const { ticket } = await res.json();
-        
+
         if (!isMounted) return;
 
         // 2. Connect with ticket
@@ -360,10 +354,9 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                 </thead>
                 <tbody>
                   {liveStatus.map(status => {
-                    const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
-                    const idleHours = idleMs / (1000 * 60 * 60);
+                    const idleHours = status.idleMs / (1000 * 60 * 60);
                     const isIdle = idleHours > 2;
-                    const idleMins = Math.floor(idleMs / (1000 * 60));
+                    const idleMins = Math.floor(status.idleMs / (1000 * 60));
                     return (
                       <tr key={status.agentId} className={`border-b dark:border-slate-700/50 ${isIdle ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{status.name}</td>
