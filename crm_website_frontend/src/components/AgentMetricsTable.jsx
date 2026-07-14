@@ -16,6 +16,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   const todayDateStr = getLocalDateString();
   const currentMonthPrefix = todayDateStr.substring(0, 7); // "YYYY-MM"
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthPrefix);
 
   const [form, setForm] = useState({
     monthlyTarget: agent?.monthlyTarget || 0,
@@ -55,26 +56,29 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     setLoading(true);
     try {
       // Send the metrics along with the date string for the log
+      // Only update today's attendance if we're on the current month
       const updatedAgent = await updateAgentMetrics(agentId, {
         ...form,
-        attendanceDate: todayDateStr
+        attendanceDate: selectedMonth === currentMonthPrefix ? todayDateStr : null
       });
 
       // If the update failed, updatedAgent will be null, so exit early
       if (!updatedAgent) return;
 
       // Update local logs state without refetching for UI snappy feel
-      setAttendanceLogs(prev => {
-        let newLogs = [...prev];
-        const existingIdx = newLogs.findIndex(l => l.date === todayDateStr);
-        if (form.attendance === 'P' || form.attendance === 'A') {
-          if (existingIdx > -1) newLogs[existingIdx].status = form.attendance;
-          else newLogs.push({ date: todayDateStr, status: form.attendance });
-        } else if (form.attendance === '') {
-          if (existingIdx > -1) newLogs.splice(existingIdx, 1);
-        }
-        return newLogs;
-      });
+      if (selectedMonth === currentMonthPrefix) {
+        setAttendanceLogs(prev => {
+          let newLogs = [...prev];
+          const existingIdx = newLogs.findIndex(l => l.date === todayDateStr);
+          if (form.attendance === 'P' || form.attendance === 'A') {
+            if (existingIdx > -1) newLogs[existingIdx].status = form.attendance;
+            else newLogs.push({ date: todayDateStr, status: form.attendance });
+          } else if (form.attendance === '') {
+            if (existingIdx > -1) newLogs.splice(existingIdx, 1);
+          }
+          return newLogs;
+        });
+      }
 
       setIsEditing(false);
     } finally {
@@ -82,15 +86,16 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     }
   };
 
-  const targetCompleted = agent?.targetCompleted || 0;
-  const monthlyTarget = agent?.monthlyTarget || 0;
+  const historicalMetric = agent?.historicalMetrics?.find(m => m.month === selectedMonth);
+  const monthlyTarget = selectedMonth === currentMonthPrefix ? (agent?.monthlyTarget || 0) : (historicalMetric?.monthlyTarget || 0);
+  const targetCompleted = selectedMonth === currentMonthPrefix ? (agent?.targetCompleted || 0) : (historicalMetric?.targetCompleted || 0);
 
   // Calculate Bookings
   const bookedLeads = agentLeads.filter(lead => lead.status === 'Booked' || lead.status === 'Closed').length;
   const totalLeads = agentLeads.length;
 
-  // Calculate Attendance Stats for the current month
-  const currentMonthLogs = attendanceLogs.filter(log => log.date.startsWith(currentMonthPrefix));
+  // Calculate Attendance Stats for the selected month
+  const currentMonthLogs = attendanceLogs.filter(log => log.date.startsWith(selectedMonth));
   const presentCount = currentMonthLogs.filter(log => log.status === 'P').length;
   const absentCount = currentMonthLogs.filter(log => log.status === 'A').length;
 
@@ -110,18 +115,26 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     { label: 'Monthly Attendance', value: monthlyAttendanceDisplay },
   ];
 
-  const currentDateDisplay = new Date().toLocaleDateString('en-US', {
+  const currentDateDisplay = new Date(selectedMonth + '-01').toLocaleDateString('en-US', {
     month: 'long',
-    day: 'numeric'
+    year: 'numeric'
   });
 
   return (
     <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-sm w-full sm:w-[340px] md:w-[400px] lg:w-[420px] max-w-full">
       {/* Header - Redesigned to use theme colors and prevent overlapping */}
       <div className="bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 flex justify-between items-center px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-slate-700">
-        <div>
-          <span className="font-bold text-base tracking-wide block">Monthly Metrics</span>
-          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 block">{currentDateDisplay}</span>
+        <div className="flex items-center gap-3">
+          <div>
+            <span className="font-bold text-base tracking-wide block">Monthly Metrics</span>
+            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 block">{currentDateDisplay}</span>
+          </div>
+          <input 
+            type="month" 
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          />
         </div>
 
         <div className="flex items-center gap-2">

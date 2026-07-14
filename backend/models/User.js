@@ -44,6 +44,11 @@ const UserSchema = new mongoose.Schema({
     enum: ['P', 'A', ''],
     default: ''
   },
+  historicalMetrics: [{
+    month: String, // "YYYY-MM"
+    monthlyTarget: { type: Number, default: 0 },
+    targetCompleted: { type: Number, default: 0 }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

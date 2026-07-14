@@ -41,14 +41,19 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                 </Link>
                 
                 {user.isAdmin && (
-                  <Link to="/agents" className={getLinkClass('/agents')}>
-                    Agents
-                    {pendingCount > 0 && (
-                      <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                        {pendingCount}
-                      </span>
-                    )}
-                  </Link>
+                  <>
+                    <Link to="/agents" className={getLinkClass('/agents')}>
+                      Agents
+                      {pendingCount > 0 && (
+                        <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                          {pendingCount}
+                        </span>
+                      )}
+                    </Link>
+                    <Link to="/reports" className={getLinkClass('/reports')}>
+                      Reports
+                    </Link>
+                  </>
                 )}
               </div>
             )}
@@ -138,14 +143,19 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
             </Link>
 
             {user.isAdmin && (
-              <Link to="/agents" onClick={() => setIsOpen(false)} className={`${getLinkClass('/agents', true)} flex justify-between items-center`}>
-                <span>Agents</span>
-                {pendingCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                    {pendingCount}
-                  </span>
-                )}
-              </Link>
+              <>
+                <Link to="/agents" onClick={() => setIsOpen(false)} className={`${getLinkClass('/agents', true)} flex justify-between items-center`}>
+                  <span>Agents</span>
+                  {pendingCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                      {pendingCount}
+                    </span>
+                  )}
+                </Link>
+                <Link to="/reports" onClick={() => setIsOpen(false)} className={getLinkClass('/reports', true)}>
+                  Reports
+                </Link>
+              </>
             )}
 
             {/* User Profile and Logout section in mobile menu */}

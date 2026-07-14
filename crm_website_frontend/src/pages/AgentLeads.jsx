@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AgentMetricsTable from '../components/AgentMetricsTable';
 
 export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
   const { id } = useParams();
+  const [filterStatus, setFilterStatus] = useState('all');
   const agent = agents.find(a => a.id === id);
   
   if (!agent) {
@@ -11,6 +12,7 @@ export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
   }
   
   const agentLeads = leads.filter(lead => (lead.agentIds || []).includes(id));
+  const filteredAgentLeads = agentLeads.filter(lead => filterStatus === 'all' || (lead.status || 'Fresh Leads') === filterStatus);
   
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -21,10 +23,10 @@ export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
           </div>
           <div>
             <h1 className="text-3xl font-black text-gray-900 dark:text-white">
-              {agent.name}'s Leads
+              {agent.name}'s Board
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {agentLeads.length} {agentLeads.length === 1 ? 'Lead' : 'Leads'} Assigned
+            <p className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-1">
+              Showing {filteredAgentLeads.length} of {agentLeads.length} Assigned Leads
             </p>
           </div>
         </div>
@@ -32,14 +34,30 @@ export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
           <AgentMetricsTable agent={agent} agentId={agent.id} agentName={agent.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
         </div>
       </div>
+      <div className="mb-6 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Assigned Leads</h2>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow"
+        >
+          <option value="all">All Statuses</option>
+          <option value="Fresh Leads">Fresh Leads</option>
+          <option value="Interested Leads">Interested Leads</option>
+          <option value="Pre Prospect Leads">Pre Prospect Leads</option>
+          <option value="Prospect Leads">Prospect Leads</option>
+          <option value="Booked">Booked</option>
+          <option value="Rejected Leads">Rejected Leads</option>
+        </select>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {agentLeads.length === 0 ? (
+        {filteredAgentLeads.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
-            No leads assigned to this agent yet.
+            No leads matching the selected status.
           </div>
         ) : (
-          agentLeads.map(lead => (
+          filteredAgentLeads.map(lead => (
             <Link key={lead.id} to={`/leads/${lead.id}`} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-5 hover:shadow-md transition-shadow group">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="font-bold text-lg text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">

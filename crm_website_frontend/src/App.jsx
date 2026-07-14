@@ -12,6 +12,7 @@ import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import Reports from './pages/Reports';
 import './index.css';
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
@@ -388,6 +389,10 @@ function App() {
             <Route
               path="/agents/:id"
               element={user?.isAdmin ? <AgentLeads leads={leads} agents={agents} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/reports"
+              element={user?.isAdmin ? <Reports /> : <Navigate to="/" replace />}
             />
 
             <Route

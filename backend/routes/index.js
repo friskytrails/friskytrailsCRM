@@ -4,6 +4,7 @@ const leadRoutes = require('./leadRoutes');
 const agentRoutes = require('./agentRoutes');
 const uploadRoutes = require('./uploadRoutes');
 const cronRoutes = require('./cronRoutes');
+const callRoutes = require('./callRoutes');
 
 const router = express.Router();
 
@@ -12,5 +13,6 @@ router.use('/leads', leadRoutes);
 router.use('/agents', agentRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/cron', cronRoutes);
+router.use('/calls', callRoutes);
 
 module.exports = router;
