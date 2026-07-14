@@ -108,19 +108,39 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     attendance: user.attendance
   };
 
+  // Get today's date in YYYY-MM-DD format using IST
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const todayStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}`;
+  const dateToUse = attendanceDate || todayStr;
+  const monthPrefix = dateToUse.substring(0, 7);
+
   if (monthlyTarget !== undefined) {
     const num = Number(monthlyTarget);
     if (!Number.isFinite(num) || num < 0) throw createError("Invalid monthlyTarget");
-    user.monthlyTarget = num;
+    if (monthPrefix === todayStr.substring(0, 7)) user.monthlyTarget = num;
   }
   if (targetCompleted !== undefined) {
     const num = Number(targetCompleted);
     if (!Number.isFinite(num) || num < 0) throw createError("Invalid targetCompleted");
-    user.targetCompleted = num;
+    if (monthPrefix === todayStr.substring(0, 7)) user.targetCompleted = num;
   }
   
+  // Historical metrics update
+  if (monthlyTarget !== undefined || targetCompleted !== undefined) {
+    let histIdx = user.historicalMetrics.findIndex(m => m.month === monthPrefix);
+    if (histIdx === -1) {
+      user.historicalMetrics.push({ 
+        month: monthPrefix, 
+        monthlyTarget: user.monthlyTarget || 0, 
+        targetCompleted: user.targetCompleted || 0 
+      });
+      histIdx = user.historicalMetrics.length - 1;
+    }
+    if (monthlyTarget !== undefined) user.historicalMetrics[histIdx].monthlyTarget = Number(monthlyTarget);
+    if (targetCompleted !== undefined) user.historicalMetrics[histIdx].targetCompleted = Number(targetCompleted);
+  }
+
   // Only overwrite current attendance if it is today
-  const todayStr = new Date().toLocaleDateString('en-CA');
   if (attendance !== undefined && (!attendanceDate || attendanceDate === todayStr)) {
     user.attendance = attendance;
   }
@@ -170,7 +190,8 @@ async function getAgentMetrics(id) {
   return {
     monthlyTarget: user.monthlyTarget || 0,
     targetCompleted: user.targetCompleted || 0,
-    attendance: user.attendance || ''
+    attendance: user.attendance || '',
+    historicalMetrics: user.historicalMetrics || []
   };
 }
 

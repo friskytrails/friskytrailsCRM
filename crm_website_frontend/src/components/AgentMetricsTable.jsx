@@ -16,6 +16,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   const todayDateStr = getLocalDateString();
   const currentMonthPrefix = todayDateStr.substring(0, 7); // "YYYY-MM"
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthPrefix);
 
   const [form, setForm] = useState({
     monthlyTarget: agent?.monthlyTarget || 0,
@@ -54,27 +55,37 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     if (!updateAgentMetrics) return;
     setLoading(true);
     try {
-      // Send the metrics along with the date string for the log
-      const updatedAgent = await updateAgentMetrics(agentId, {
-        ...form,
-        attendanceDate: todayDateStr
-      });
+      const payload = {
+        monthlyTarget: form.monthlyTarget,
+        targetCompleted: form.targetCompleted,
+      };
+      
+      if (selectedMonth === currentMonthPrefix) {
+        payload.attendance = form.attendance;
+        payload.attendanceDate = todayDateStr;
+      } else {
+        payload.date = selectedMonth + '-01';
+      }
+
+      const updatedAgent = await updateAgentMetrics(agentId, payload);
 
       // If the update failed, updatedAgent will be null, so exit early
       if (!updatedAgent) return;
 
       // Update local logs state without refetching for UI snappy feel
-      setAttendanceLogs(prev => {
-        let newLogs = [...prev];
-        const existingIdx = newLogs.findIndex(l => l.date === todayDateStr);
-        if (form.attendance === 'P' || form.attendance === 'A') {
-          if (existingIdx > -1) newLogs[existingIdx].status = form.attendance;
-          else newLogs.push({ date: todayDateStr, status: form.attendance });
-        } else if (form.attendance === '') {
-          if (existingIdx > -1) newLogs.splice(existingIdx, 1);
-        }
-        return newLogs;
-      });
+      if (selectedMonth === currentMonthPrefix) {
+        setAttendanceLogs(prev => {
+          let newLogs = [...prev];
+          const existingIdx = newLogs.findIndex(l => l.date === todayDateStr);
+          if (form.attendance === 'P' || form.attendance === 'A') {
+            if (existingIdx > -1) newLogs[existingIdx].status = form.attendance;
+            else newLogs.push({ date: todayDateStr, status: form.attendance });
+          } else if (form.attendance === '') {
+            if (existingIdx > -1) newLogs.splice(existingIdx, 1);
+          }
+          return newLogs;
+        });
+      }
 
       setIsEditing(false);
     } finally {
@@ -82,15 +93,16 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     }
   };
 
-  const targetCompleted = agent?.targetCompleted || 0;
-  const monthlyTarget = agent?.monthlyTarget || 0;
+  const historicalMetric = agent?.historicalMetrics?.find(m => m.month === selectedMonth);
+  const monthlyTarget = selectedMonth === currentMonthPrefix ? (agent?.monthlyTarget || 0) : (historicalMetric?.monthlyTarget || 0);
+  const targetCompleted = selectedMonth === currentMonthPrefix ? (agent?.targetCompleted || 0) : (historicalMetric?.targetCompleted || 0);
 
   // Calculate Bookings
   const bookedLeads = agentLeads.filter(lead => lead.status === 'Booked' || lead.status === 'Closed').length;
   const totalLeads = agentLeads.length;
 
-  // Calculate Attendance Stats for the current month
-  const currentMonthLogs = attendanceLogs.filter(log => log.date.startsWith(currentMonthPrefix));
+  // Calculate Attendance Stats for the selected month
+  const currentMonthLogs = attendanceLogs.filter(log => log.date.startsWith(selectedMonth));
   const presentCount = currentMonthLogs.filter(log => log.status === 'P').length;
   const absentCount = currentMonthLogs.filter(log => log.status === 'A').length;
 
@@ -110,24 +122,39 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     { label: 'Monthly Attendance', value: monthlyAttendanceDisplay },
   ];
 
-  const currentDateDisplay = new Date().toLocaleDateString('en-US', {
+  const currentDateDisplay = new Date(selectedMonth + '-01').toLocaleDateString('en-US', {
     month: 'long',
-    day: 'numeric'
+    year: 'numeric'
   });
 
   return (
     <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-sm w-full sm:w-[340px] md:w-[400px] lg:w-[420px] max-w-full">
       {/* Header - Redesigned to use theme colors and prevent overlapping */}
       <div className="bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 flex justify-between items-center px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-slate-700">
-        <div>
-          <span className="font-bold text-base tracking-wide block">Monthly Metrics</span>
-          <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 block">{currentDateDisplay}</span>
+        <div className="flex items-center gap-3">
+          <div>
+            <span className="font-bold text-base tracking-wide block">Monthly Metrics</span>
+            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 block">{currentDateDisplay}</span>
+          </div>
+          <input 
+            type="month" 
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500"
+          />
         </div>
 
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => {
+                setIsEditing(true);
+                setForm({
+                  monthlyTarget: monthlyTarget,
+                  targetCompleted: targetCompleted,
+                  attendance: selectedMonth === currentMonthPrefix ? (todayLog?.status || '') : ''
+                });
+              }}
               className="text-xs bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-all font-semibold flex items-center gap-1 border border-gray-200 dark:border-slate-600 shadow-sm"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -139,9 +166,9 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 onClick={() => {
                   setIsEditing(false);
                   setForm({
-                    monthlyTarget: agent?.monthlyTarget || 0,
-                    targetCompleted: agent?.targetCompleted || 0,
-                    attendance: todayLog?.status || ''
+                    monthlyTarget: monthlyTarget,
+                    targetCompleted: targetCompleted,
+                    attendance: selectedMonth === currentMonthPrefix ? (todayLog?.status || '') : ''
                   });
                 }}
                 className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg transition-all font-semibold"
@@ -181,18 +208,20 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
               />
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Today's Attendance</span>
-              <select
-                value={form.attendance}
-                onChange={e => setForm({ ...form, attendance: e.target.value })}
-                className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
-              >
-                <option value="">-</option>
-                <option value="P">Present (P)</option>
-                <option value="A">Absent (A)</option>
-              </select>
-            </div>
+            {selectedMonth === currentMonthPrefix && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Today's Attendance</span>
+                <select
+                  value={form.attendance}
+                  onChange={e => setForm({ ...form, attendance: e.target.value })}
+                  className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
+                >
+                  <option value="">-</option>
+                  <option value="P">Present (P)</option>
+                  <option value="A">Absent (A)</option>
+                </select>
+              </div>
+            )}
           </div>
         ) : (
           metrics.map((metric, index) => (

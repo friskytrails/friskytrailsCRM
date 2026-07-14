@@ -26,6 +26,16 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterProduct, setFilterProduct] = useState('all');
 
+  const [liveStatus, setLiveStatus] = useState([]);
+  const [liveActivity, setLiveActivity] = useState([]);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const interval = setInterval(() => setCurrentTime(Date.now()), 60000); // update every minute
+    return () => clearInterval(interval);
+  }, [isAdmin]);
+
   // Modal editing state
   const [editingLead, setEditingLead] = useState(null);
   const [modalData, setModalData] = useState({
@@ -56,6 +66,59 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       });
     }
   }, [editingLead]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    let eventSource;
+    let isMounted = true;
+
+    const setupSSE = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        // 1. Get short-lived ticket
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/stream-ticket`, { method: 'POST', headers });
+        if (!res.ok) throw new Error("Failed to get SSE ticket");
+        const { ticket } = await res.json();
+        
+        if (!isMounted) return;
+
+        // 2. Connect with ticket
+        const sseUrl = `${import.meta.env.VITE_API_URL}/calls/stream?ticket=${ticket}`;
+        eventSource = new EventSource(sseUrl);
+
+        eventSource.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'live-status') {
+              setLiveStatus(payload.data);
+            } else if (payload.type === 'live-activity') {
+              setLiveActivity(payload.data);
+            }
+          } catch (err) {
+            console.error("Error parsing SSE data", err);
+          }
+        };
+
+        eventSource.onerror = (error) => {
+          console.error("SSE connection error", error);
+        };
+      } catch (err) {
+        console.error("Error setting up SSE:", err);
+      }
+    };
+
+    setupSSE();
+
+    return () => {
+      isMounted = false;
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [isAdmin]);
 
   const handleModalPhoneChange = (e) => {
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
@@ -128,6 +191,9 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
         formData.append('file', file);
         const uploadRes = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
           body: formData
         });
         if (uploadRes.ok) {
@@ -179,7 +245,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       filterStatus === 'all' ||
       (lead.status || 'Fresh Leads') === filterStatus;
 
-    const matchesProduct = 
+    const matchesProduct =
       filterProduct === 'all' ||
       lead.product === filterProduct;
 
@@ -241,8 +307,15 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
         {/* Total Leads Card */}
         <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 rounded-xl border border-gray-100 dark:border-slate-700/50 p-6 relative group">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-transparent dark:from-blue-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider relative z-10">Total Leads</p>
-          <p className="text-3xl font-extrabold bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent mt-1 relative z-10">{totalLeads}</p>
+          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider relative z-10">
+            {filteredLeads.length < totalLeads ? 'Matching Leads' : 'Total Leads'}
+          </p>
+          <p className="text-3xl font-extrabold bg-gradient-to-br from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 bg-clip-text text-transparent mt-1 relative z-10">
+            {filteredLeads.length}
+            {filteredLeads.length < totalLeads && (
+              <span className="text-sm text-gray-500 dark:text-gray-400 font-medium ml-2">/ {totalLeads}</span>
+            )}
+          </p>
         </div>
 
         {/* Assigned Leads Card */}
@@ -263,6 +336,105 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
           </p>
         </div>
       </div>
+
+      {/* Admin Live Panels */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          {/* Live Status Panel */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+              Live Status Panel
+            </h2>
+            <div className="overflow-x-auto max-h-80 overflow-y-auto relative border border-gray-100 dark:border-slate-700 rounded-lg">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300 sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    <th className="px-4 py-2 rounded-l-lg">Agent</th>
+                    <th className="px-4 py-2">Idle Time</th>
+                    <th className="px-4 py-2 rounded-r-lg">Last Call</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liveStatus.map(status => {
+                    const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
+                    const idleHours = idleMs / (1000 * 60 * 60);
+                    const isIdle = idleHours > 2;
+                    const idleMins = Math.floor(idleMs / (1000 * 60));
+                    return (
+                      <tr key={status.agentId} className={`border-b dark:border-slate-700/50 ${isIdle ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
+                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{status.name}</td>
+                        <td className={`px-4 py-3 ${isIdle ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
+                          {idleHours >= 1 ? `${Math.floor(idleHours)}h ${idleMins % 60}m` : `${idleMins}m`}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                          {new Date(status.lastCallAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {liveStatus.length === 0 && (
+                    <tr>
+                      <td colSpan="3" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Enhanced Live Activity Dashboard */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Daily Activity Audit
+              </h2>
+              <span className="text-xs text-green-500 dark:text-green-400 font-bold flex items-center gap-1">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                Live Updates
+              </span>
+            </div>
+            <div className="overflow-x-auto max-h-80 overflow-y-auto relative border border-gray-100 dark:border-slate-700 rounded-lg">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300 sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    <th className="px-4 py-2 rounded-l-lg">Agent</th>
+                    <th className="px-4 py-2">First Call</th>
+                    <th className="px-4 py-2 rounded-r-lg">Last Call</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...liveActivity].sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall)).map(act => (
+                    <tr key={act.agentId} className="border-b dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{act.name}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {new Date(act.firstCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                        {new Date(act.lastCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  ))}
+                  {liveActivity.length === 0 && (
+                    <tr>
+                      <td colSpan="3" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search and Filters Section */}
       <div className="mt-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-gray-100 dark:border-slate-700/50 transition-all duration-300 hover:shadow-md">
