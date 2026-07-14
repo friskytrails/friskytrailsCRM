@@ -8,20 +8,15 @@ module.exports = async function (req, res, next) {
   let token;
   const authHeader = req.header('Authorization');
   
-  if (authHeader) {
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-      return res.status(401).json({ error: "Token format is invalid" });
-    }
-    token = parts[1];
-  } else if (req.query.token) {
-    token = req.query.token;
-  }
-
-  if (!token) {
+  if (!authHeader) {
     return res.status(401).json({ error: "No token, authorization denied" });
   }
 
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    return res.status(401).json({ error: "Token format is invalid" });
+  }
+  token = parts[1];
   let decoded;
   try {
     decoded = jwt.verify(token, JWT_SECRET);

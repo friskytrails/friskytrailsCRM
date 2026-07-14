@@ -2,13 +2,20 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 
 export default function Reports() {
+  const getLocalDateString = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
     d.setDate(1); // First day of current month
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   });
   const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
+    return getLocalDateString(new Date());
   });
   const [teamFilter, setTeamFilter] = useState('all');
   const [reports, setReports] = useState([]);

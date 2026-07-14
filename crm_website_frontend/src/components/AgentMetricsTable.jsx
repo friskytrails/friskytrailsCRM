@@ -55,12 +55,19 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     if (!updateAgentMetrics) return;
     setLoading(true);
     try {
-      // Send the metrics along with the date string for the log
-      // Only update today's attendance if we're on the current month
-      const updatedAgent = await updateAgentMetrics(agentId, {
-        ...form,
-        attendanceDate: selectedMonth === currentMonthPrefix ? todayDateStr : null
-      });
+      const payload = {
+        monthlyTarget: form.monthlyTarget,
+        targetCompleted: form.targetCompleted,
+      };
+      
+      if (selectedMonth === currentMonthPrefix) {
+        payload.attendance = form.attendance;
+        payload.attendanceDate = todayDateStr;
+      } else {
+        payload.date = selectedMonth + '-01';
+      }
+
+      const updatedAgent = await updateAgentMetrics(agentId, payload);
 
       // If the update failed, updatedAgent will be null, so exit early
       if (!updatedAgent) return;
@@ -140,7 +147,14 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <button
-              onClick={() => setIsEditing(true)}
+              onClick={() => {
+                setIsEditing(true);
+                setForm({
+                  monthlyTarget: monthlyTarget,
+                  targetCompleted: targetCompleted,
+                  attendance: selectedMonth === currentMonthPrefix ? (todayLog?.status || '') : ''
+                });
+              }}
               className="text-xs bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-all font-semibold flex items-center gap-1 border border-gray-200 dark:border-slate-600 shadow-sm"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -152,9 +166,9 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 onClick={() => {
                   setIsEditing(false);
                   setForm({
-                    monthlyTarget: agent?.monthlyTarget || 0,
-                    targetCompleted: agent?.targetCompleted || 0,
-                    attendance: todayLog?.status || ''
+                    monthlyTarget: monthlyTarget,
+                    targetCompleted: targetCompleted,
+                    attendance: selectedMonth === currentMonthPrefix ? (todayLog?.status || '') : ''
                   });
                 }}
                 className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg transition-all font-semibold"
@@ -194,18 +208,20 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
               />
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Today's Attendance</span>
-              <select
-                value={form.attendance}
-                onChange={e => setForm({ ...form, attendance: e.target.value })}
-                className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
-              >
-                <option value="">-</option>
-                <option value="P">Present (P)</option>
-                <option value="A">Absent (A)</option>
-              </select>
-            </div>
+            {selectedMonth === currentMonthPrefix && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Today's Attendance</span>
+                <select
+                  value={form.attendance}
+                  onChange={e => setForm({ ...form, attendance: e.target.value })}
+                  className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
+                >
+                  <option value="">-</option>
+                  <option value="P">Present (P)</option>
+                  <option value="A">Absent (A)</option>
+                </select>
+              </div>
+            )}
           </div>
         ) : (
           metrics.map((metric, index) => (

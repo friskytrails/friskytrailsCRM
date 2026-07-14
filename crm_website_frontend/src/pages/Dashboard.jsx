@@ -28,6 +28,13 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
   const [liveStatus, setLiveStatus] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const interval = setInterval(() => setCurrentTime(Date.now()), 60000); // update every minute
+    return () => clearInterval(interval);
+  }, [isAdmin]);
 
   // Modal editing state
   const [editingLead, setEditingLead] = useState(null);
@@ -63,30 +70,53 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   useEffect(() => {
     if (!isAdmin) return;
     
-    const token = localStorage.getItem('token');
-    const sseUrl = `${import.meta.env.VITE_API_URL}/calls/stream?token=${token}`;
-    const eventSource = new EventSource(sseUrl);
+    let eventSource;
+    let isMounted = true;
 
-    eventSource.onmessage = (event) => {
+    const setupSSE = async () => {
       try {
-        const payload = JSON.parse(event.data);
-        if (payload.type === 'live-status') {
-          setLiveStatus(payload.data);
-        } else if (payload.type === 'live-activity') {
-          setLiveActivity(payload.data);
-        }
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        // 1. Get short-lived ticket
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/stream-ticket`, { method: 'POST', headers });
+        if (!res.ok) throw new Error("Failed to get SSE ticket");
+        const { ticket } = await res.json();
+        
+        if (!isMounted) return;
+
+        // 2. Connect with ticket
+        const sseUrl = `${import.meta.env.VITE_API_URL}/calls/stream?ticket=${ticket}`;
+        eventSource = new EventSource(sseUrl);
+
+        eventSource.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'live-status') {
+              setLiveStatus(payload.data);
+            } else if (payload.type === 'live-activity') {
+              setLiveActivity(payload.data);
+            }
+          } catch (err) {
+            console.error("Error parsing SSE data", err);
+          }
+        };
+
+        eventSource.onerror = (error) => {
+          console.error("SSE connection error", error);
+        };
       } catch (err) {
-        console.error("Error parsing SSE data", err);
+        console.error("Error setting up SSE:", err);
       }
     };
 
-    eventSource.onerror = (error) => {
-      console.error("SSE connection error", error);
-      // EventSource automatically attempts to reconnect on error.
-    };
+    setupSSE();
 
     return () => {
-      eventSource.close();
+      isMounted = false;
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, [isAdmin]);
 
@@ -330,9 +360,10 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                 </thead>
                 <tbody>
                   {liveStatus.map(status => {
-                    const idleHours = status.idleMs / (1000 * 60 * 60);
+                    const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
+                    const idleHours = idleMs / (1000 * 60 * 60);
                     const isIdle = idleHours > 2;
-                    const idleMins = Math.floor(status.idleMs / (1000 * 60));
+                    const idleMins = Math.floor(idleMs / (1000 * 60));
                     return (
                       <tr key={status.agentId} className={`border-b dark:border-slate-700/50 ${isIdle ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{status.name}</td>

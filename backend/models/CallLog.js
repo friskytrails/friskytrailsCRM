@@ -9,7 +9,8 @@ const CallLogSchema = new mongoose.Schema({
   duration: { 
     type: Number, // duration in seconds
     required: true,
-    default: 0
+    default: 0,
+    min: 0
   },
   timestamp: {
     type: Date,
