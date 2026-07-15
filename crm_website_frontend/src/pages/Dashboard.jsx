@@ -70,54 +70,42 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   useEffect(() => {
     if (!isAdmin) return;
 
-
-    let eventSource;
     let isMounted = true;
 
-    const setupSSE = async () => {
+    const fetchLiveData = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
 
-        // 1. Get short-lived ticket
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/stream-ticket`, { method: 'POST', headers });
-        if (!res.ok) throw new Error("Failed to get SSE ticket");
-        const { ticket } = await res.json();
+        const [statusRes, activityRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/calls/live-status`, { headers }),
+          fetch(`${import.meta.env.VITE_API_URL}/calls/live-activity`, { headers })
+        ]);
 
         if (!isMounted) return;
 
-        // 2. Connect with ticket
-        const sseUrl = `${import.meta.env.VITE_API_URL}/calls/stream?ticket=${ticket}`;
-        eventSource = new EventSource(sseUrl);
-
-        eventSource.onmessage = (event) => {
-          try {
-            const payload = JSON.parse(event.data);
-            if (payload.type === 'live-status') {
-              setLiveStatus(payload.data);
-            } else if (payload.type === 'live-activity') {
-              setLiveActivity(payload.data);
-            }
-          } catch (err) {
-            console.error("Error parsing SSE data", err);
-          }
-        };
-
-        eventSource.onerror = (error) => {
-          console.error("SSE connection error", error);
-        };
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          setLiveStatus(statusData);
+        }
+        if (activityRes.ok) {
+          const activityData = await activityRes.json();
+          setLiveActivity(activityData);
+        }
       } catch (err) {
-        console.error("Error setting up SSE:", err);
+        console.error("Error fetching live data:", err);
       }
     };
 
-    setupSSE();
+    // Fetch immediately on mount
+    fetchLiveData();
+
+    // Then poll every 30 seconds
+    const interval = setInterval(fetchLiveData, 30000);
 
     return () => {
       isMounted = false;
-      if (eventSource) {
-        eventSource.close();
-      }
+      clearInterval(interval);
     };
   }, [isAdmin]);
 

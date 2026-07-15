@@ -1,8 +1,5 @@
 const CallLog = require('../models/CallLog');
 const User = require('../models/User');
-const EventEmitter = require('events');
-
-const callEmitter = new EventEmitter();
 
 async function logCall(data) {
   const { agentId, duration, timestamp, status, contactNumber } = data;
@@ -20,7 +17,6 @@ async function logCall(data) {
   });
 
   await callLog.save();
-  callEmitter.emit('callLogged');
   return callLog;
 }
 
@@ -148,6 +144,5 @@ module.exports = {
   logCall,
   getHistoricalReports,
   getLiveStatus,
-  getLiveActivity,
-  callEmitter
+  getLiveActivity
 };
