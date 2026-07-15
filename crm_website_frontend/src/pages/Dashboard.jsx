@@ -72,40 +72,49 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
     let isMounted = true;
 
-    const fetchLiveData = async () => {
+    const fetchLiveStatus = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
-
-        const [statusRes, activityRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/calls/live-status`, { headers }),
-          fetch(`${import.meta.env.VITE_API_URL}/calls/live-activity`, { headers })
-        ]);
-
+        const statusRes = await fetch(`${import.meta.env.VITE_API_URL}/calls/live-status`, { headers });
         if (!isMounted) return;
-
         if (statusRes.ok) {
           const statusData = await statusRes.json();
           setLiveStatus(statusData);
         }
+      } catch (err) {
+        console.error("Error fetching live status:", err);
+      }
+    };
+
+    const fetchLiveActivity = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        const activityRes = await fetch(`${import.meta.env.VITE_API_URL}/calls/live-activity`, { headers });
+        if (!isMounted) return;
         if (activityRes.ok) {
           const activityData = await activityRes.json();
           setLiveActivity(activityData);
         }
       } catch (err) {
-        console.error("Error fetching live data:", err);
+        console.error("Error fetching live activity:", err);
       }
     };
 
-    // Fetch immediately on mount
-    fetchLiveData();
+    // Fetch both immediately on mount
+    fetchLiveStatus();
+    fetchLiveActivity();
 
-    // Then poll every 1 minute to reduce server load
-    const interval = setInterval(fetchLiveData, 60000);
+    // Live Status polling: Every 1 minute
+    const statusInterval = setInterval(fetchLiveStatus, 60000);
+    // Live Activity polling: Every 5 minutes
+    const activityInterval = setInterval(fetchLiveActivity, 300000);
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      clearInterval(statusInterval);
+      clearInterval(activityInterval);
     };
   }, [isAdmin]);
 
