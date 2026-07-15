@@ -30,6 +30,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [liveActivity, setLiveActivity] = useState([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
 
+  const isAdmin = user && user.isAdmin;
+
   useEffect(() => {
     if (!isAdmin) return;
     const interval = setInterval(() => setCurrentTime(Date.now()), 60000); // update every minute
@@ -49,8 +51,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
     mailId: ''
   });
 
-  const isAdmin = user && user.isAdmin;
-
   useEffect(() => {
     if (editingLead) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -69,7 +69,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
   useEffect(() => {
     if (!isAdmin) return;
-    
+
+
     let eventSource;
     let isMounted = true;
 
@@ -77,12 +78,12 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
-        
+
         // 1. Get short-lived ticket
         const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/stream-ticket`, { method: 'POST', headers });
         if (!res.ok) throw new Error("Failed to get SSE ticket");
         const { ticket } = await res.json();
-        
+
         if (!isMounted) return;
 
         // 2. Connect with ticket
