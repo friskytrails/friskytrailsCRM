@@ -100,8 +100,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
     // Fetch immediately on mount
     fetchLiveData();
 
-    // Then poll every 30 seconds
-    const interval = setInterval(fetchLiveData, 30000);
+    // Then poll every 1 minute to reduce server load
+    const interval = setInterval(fetchLiveData, 60000);
 
     return () => {
       isMounted = false;
