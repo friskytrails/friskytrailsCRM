@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 export default function AgentMetricsTable({ agent, agentId, agentName, updateAgentMetrics, agentLeads = [] }) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0 });
 
   // Calculate today's date in YYYY-MM-DD format based on local time
   const getLocalDateString = (d = new Date()) => {
@@ -21,35 +21,39 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const [form, setForm] = useState({
     monthlyTarget: agent?.monthlyTarget || 0,
     targetCompleted: agent?.targetCompleted || 0,
-    attendance: ''
+    attendance: agent?.attendance || ''
   });
 
-  // Fetch attendance logs when component mounts or agentId changes
+  // Update form if agent prop changes
   useEffect(() => {
-    const fetchAttendance = async () => {
-      try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/agents/${agentId}/attendance`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setAttendanceLogs(data);
+    setForm({
+      monthlyTarget: agent?.monthlyTarget || 0,
+      targetCompleted: agent?.targetCompleted || 0,
+      attendance: agent?.attendance || ''
+    });
+  }, [agent]);
 
-          // Set initial attendance in form for today if it exists
-          const todayLog = data.find(log => log.date === todayDateStr);
-          setForm(prev => ({
-            ...prev,
-            attendance: todayLog ? todayLog.status : ''
-          }));
-        }
-      } catch (error) {
-        console.error("Failed to fetch attendance:", error);
+  // Fetch monthly attendance summary
+  const fetchAttendanceSummary = async () => {
+    try {
+      const [year, month] = selectedMonth.split('-');
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/agents/${agentId}/attendance/monthly?year=${year}&month=${month}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAttendanceSummary({ present: data.present || 0, absent: data.absent || 0 });
       }
-    };
-    fetchAttendance();
-  }, [agentId, todayDateStr]);
+    } catch (error) {
+      console.error("Failed to fetch attendance summary:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendanceSummary();
+  }, [agentId, selectedMonth]);
 
   const handleSave = async () => {
     if (!updateAgentMetrics) return;
@@ -69,23 +73,10 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
       const updatedAgent = await updateAgentMetrics(agentId, payload);
 
-      // If the update failed, updatedAgent will be null, so exit early
       if (!updatedAgent) return;
 
-      // Update local logs state without refetching for UI snappy feel
-      if (selectedMonth === currentMonthPrefix) {
-        setAttendanceLogs(prev => {
-          let newLogs = [...prev];
-          const existingIdx = newLogs.findIndex(l => l.date === todayDateStr);
-          if (form.attendance === 'P' || form.attendance === 'A') {
-            if (existingIdx > -1) newLogs[existingIdx].status = form.attendance;
-            else newLogs.push({ date: todayDateStr, status: form.attendance });
-          } else if (form.attendance === '') {
-            if (existingIdx > -1) newLogs.splice(existingIdx, 1);
-          }
-          return newLogs;
-        });
-      }
+      // Re-fetch summary in case today's attendance change affects it
+      await fetchAttendanceSummary();
 
       setIsEditing(false);
     } finally {
@@ -101,18 +92,12 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const bookedLeads = agentLeads.filter(lead => lead.status === 'Booked' || lead.status === 'Closed').length;
   const totalLeads = agentLeads.length;
 
-  // Calculate Attendance Stats for the selected month
-  const currentMonthLogs = attendanceLogs.filter(log => log.date.startsWith(selectedMonth));
-  const presentCount = currentMonthLogs.filter(log => log.status === 'P').length;
-  const absentCount = currentMonthLogs.filter(log => log.status === 'A').length;
-
-  const todayLog = attendanceLogs.find(log => log.date === todayDateStr);
   let todayDisplay = '-';
-  if (todayLog?.status === 'P') todayDisplay = 'Present';
-  else if (todayLog?.status === 'A') todayDisplay = 'Absent';
+  if (agent?.attendance === 'P') todayDisplay = 'Present';
+  else if (agent?.attendance === 'A') todayDisplay = 'Absent';
 
-  const monthlyAttendanceDisplay = presentCount > 0 || absentCount > 0
-    ? `${presentCount} P / ${absentCount} A`
+  const monthlyAttendanceDisplay = attendanceSummary.present > 0 || attendanceSummary.absent > 0
+    ? `${attendanceSummary.present} P / ${attendanceSummary.absent} A`
     : '-';
 
   const metrics = [
@@ -152,7 +137,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 setForm({
                   monthlyTarget: monthlyTarget,
                   targetCompleted: targetCompleted,
-                  attendance: selectedMonth === currentMonthPrefix ? (todayLog?.status || '') : ''
+                  attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                 });
               }}
               className="text-xs bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-all font-semibold flex items-center gap-1 border border-gray-200 dark:border-slate-600 shadow-sm"
@@ -168,7 +153,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                   setForm({
                     monthlyTarget: monthlyTarget,
                     targetCompleted: targetCompleted,
-                    attendance: selectedMonth === currentMonthPrefix ? (todayLog?.status || '') : ''
+                    attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                   });
                 }}
                 className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg transition-all font-semibold"
