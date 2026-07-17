@@ -108,8 +108,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
 
     // Live Status polling: Every 1 minute
     const statusInterval = setInterval(fetchLiveStatus, 60000);
-    // Live Activity polling: Every 5 minutes
-    const activityInterval = setInterval(fetchLiveActivity, 300000);
+    // Live Activity polling: Every 1 minute
+    const activityInterval = setInterval(fetchLiveActivity, 60000);
 
     return () => {
       isMounted = false;
