@@ -26,12 +26,14 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   // Update form if agent prop changes
   useEffect(() => {
-    setForm({
-      monthlyTarget: agent?.monthlyTarget || 0,
-      targetCompleted: agent?.targetCompleted || 0,
-      attendance: agent?.attendance || ''
-    });
-  }, [agent]);
+    if (!isEditing) {
+      setForm({
+        monthlyTarget: agent?.monthlyTarget || 0,
+        targetCompleted: agent?.targetCompleted || 0,
+        attendance: agent?.attendance || ''
+      });
+    }
+  }, [agent, isEditing]);
 
   // Fetch monthly attendance summary
   const fetchAttendanceSummary = async () => {
