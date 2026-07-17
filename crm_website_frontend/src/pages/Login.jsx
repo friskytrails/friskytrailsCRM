@@ -44,166 +44,96 @@ export default function Login({ setToken, setUser, API_URL }) {
     }
   };
 
-  const handleDemoClick = (demoEmail, demoPassword) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    toast.success('Credentials autofilled! Click Sign In.');
-  };
-
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full items-stretch">
+      <div className="max-w-md w-full space-y-8 bg-white dark:bg-slate-800 p-8 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 transition-colors flex flex-col justify-between">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+            FriskyTrails CRM
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-slate-400">
+            Sign in to your account to manage travel leads and agents.
+          </p>
+        </div>
 
-        {/* Left Column: Login Portal */}
-        <div className="space-y-8 bg-white dark:bg-slate-800 p-8 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 transition-colors flex flex-col justify-between">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-              FriskyTrails CRM
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600 dark:text-slate-400">
-              Sign in to your account to manage travel leads and agents.
-            </p>
-          </div>
-
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            <div className="rounded-md space-y-4">
-              <div>
-                <label htmlFor="email-address" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                  Email Address
-                </label>
-                <input
-                  id="email-address"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full text-sm py-2.5 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
-                  placeholder="email@example.com"
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label htmlFor="password" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    Password
-                  </label>
-                  <Link to="/forgot-password" className="text-xs font-medium text-orange-600 hover:text-orange-500 transition-colors">
-                    Forgot password?
-                  </Link>
-                </div>
-                <div className="relative">
-                  <input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full text-sm py-2.5 pl-3 pr-10 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
-                    placeholder="••••••••"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    aria-pressed={showPassword}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
-                  >
-                    {showPassword ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="rounded-md space-y-4">
             <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
-              </button>
+              <label htmlFor="email-address" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                Email Address
+              </label>
+              <input
+                id="email-address"
+                name="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full text-sm py-2.5 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
+                placeholder="email@example.com"
+              />
             </div>
-            
-            <div className="text-center mt-4">
-              <span className="text-sm text-gray-600 dark:text-slate-400">
-                Don't have an account?{' '}
-                <Link to="/register" className="font-semibold text-orange-600 hover:text-orange-500 transition-colors">
-                  Register as Agent
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="password" className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Password
+                </label>
+                <Link to="/forgot-password" className="text-xs font-medium text-orange-600 hover:text-orange-500 transition-colors">
+                  Forgot password?
                 </Link>
-              </span>
+              </div>
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full text-sm py-2.5 pl-3 pr-10 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
-          </form>
-        </div>
+          </div>
 
-        {/* Right Column: Demo Accounts Helper */}
-        <div className="space-y-6 bg-gradient-to-br from-orange-50/60 to-orange-100/40 dark:from-slate-800/40 dark:to-slate-800/60 p-8 rounded-xl border border-orange-100/60 dark:border-slate-700/60 transition-colors flex flex-col justify-center">
           <div>
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              Quick Test Accounts
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
-              Select any role or agent email below to auto-fill the login form.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {/* Admin User */}
-            <div
-              onClick={() => handleDemoClick('admin@friskytrails.com', 'admin123')}
-              className="p-3 bg-white dark:bg-slate-800/80 rounded-lg border border-orange-200/60 dark:border-slate-700 hover:border-orange-500 dark:hover:border-orange-500 hover:shadow-md cursor-pointer transition-all group"
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-orange-700 dark:text-orange-400">🔑 Administrator</span>
-                <span className="text-[10px] text-gray-400 group-hover:text-orange-500 font-medium">Click to fill</span>
-              </div>
-              <div className="text-xs mt-1 text-gray-600 dark:text-slate-300">
-                Email: <code className="font-mono bg-gray-50 dark:bg-slate-900 px-1 py-0.5 rounded">admin@friskytrails.com</code>
-              </div>
-              <div className="text-xs mt-0.5 text-gray-600 dark:text-slate-300">
-                Password: <code className="font-mono bg-gray-50 dark:bg-slate-900 px-1 py-0.5 rounded">admin123</code>
-              </div>
-            </div>
-
-            {/* Agent Users */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
-                👤 Team Agents (Password: <code className="font-mono">agent123</code>)
-              </span>
-              <div className="grid grid-cols-1 gap-2">
-                {[
-                  { name: 'Agent Alice', email: 'alice@friskytrails.com' },
-                  { name: 'Agent Bob', email: 'bob@friskytrails.com' },
-                  { name: 'Agent Charlie', email: 'charlie@friskytrails.com' },
-                  { name: 'Agent Dave', email: 'dave@friskytrails.com' },
-                  { name: 'Agent Eve', email: 'eve@friskytrails.com' }
-                ].map((agent) => (
-                  <div
-                    key={agent.email}
-                    onClick={() => handleDemoClick(agent.email, 'agent123')}
-                    className="p-2 bg-white/70 dark:bg-slate-800/50 rounded-lg border border-gray-100 dark:border-slate-800 hover:border-orange-500 dark:hover:border-orange-500 hover:shadow-sm cursor-pointer transition-all flex justify-between items-center group"
-                  >
-                    <div>
-                      <div className="text-xs font-medium text-gray-700 dark:text-slate-200">{agent.name}</div>
-                      <div className="text-[10px] text-gray-500 dark:text-slate-400 font-mono">{agent.email}</div>
-                    </div>
-                    <span className="text-[9px] text-gray-400 group-hover:text-orange-500 font-medium whitespace-nowrap">Click To Fill</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
           </div>
-        </div>
-
+          
+          <div className="text-center mt-4">
+            <span className="text-sm text-gray-600 dark:text-slate-400">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-semibold text-orange-600 hover:text-orange-500 transition-colors">
+                Register as Agent
+              </Link>
+            </span>
+          </div>
+        </form>
       </div>
     </div>
   );
