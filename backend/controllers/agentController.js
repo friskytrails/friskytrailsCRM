@@ -90,11 +90,31 @@ async function getAgentMetrics(req, res) {
   }
 }
 
+async function getAgentMonthlyAttendance(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params;
+    const { month, year } = req.query;
+    
+    if (!month || !year) {
+      return res.status(400).json({ error: "Month and year are required query parameters" });
+    }
+    
+    const summary = await agentService.getAgentMonthlyAttendance(id, month, year);
+    res.json(summary);
+  } catch (error) {
+    return handleAgentServiceError(error, res);
+  }
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
   updateAgentVerification,
   getAgentMetrics,
   updateAgentMetrics,
-  getAgentAttendance
+  getAgentAttendance,
+  getAgentMonthlyAttendance
 };

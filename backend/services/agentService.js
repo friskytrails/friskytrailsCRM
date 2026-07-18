@@ -195,11 +195,43 @@ async function getAgentMetrics(id) {
   };
 }
 
+async function getAgentMonthlyAttendance(agentId, month, year) {
+  // Sanitize inputs and pad month to 2 digits
+  const safeYear = Number(year);
+  const safeMonth = Number(month);
+  
+  if (isNaN(safeYear) || isNaN(safeMonth)) {
+    throw new Error("Invalid year or month format");
+  }
+
+  const paddedMonth = String(safeMonth).padStart(2, '0');
+  const monthPrefix = `${safeYear}-${paddedMonth}`;
+  
+  const logs = await Attendance.find({ 
+    agentId: new mongoose.Types.ObjectId(agentId),
+    date: { $regex: `^${monthPrefix}` }
+  });
+  
+  let presentCount = 0;
+  let absentCount = 0;
+  
+  logs.forEach(log => {
+    if (log.status === 'P') presentCount++;
+    if (log.status === 'A') absentCount++;
+  });
+  
+  return {
+    present: presentCount,
+    absent: absentCount,
+  };
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
   updateAgentVerification,
   getAgentMetrics,
   updateAgentMetrics,
-  getAgentAttendance
+  getAgentAttendance,
+  getAgentMonthlyAttendance
 };
