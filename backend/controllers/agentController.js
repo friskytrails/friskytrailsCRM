@@ -66,10 +66,10 @@ async function updateAgentMetrics(req, res) {
 
 async function getAgentAttendance(req, res) {
   try {
-    if (!req.user.isAdmin) {
+    const { id } = req.params;
+    if (!req.user.isAdmin && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
-    const { id } = req.params;
     const logs = await agentService.getAgentAttendance(id);
     res.json(logs);
   } catch (error) {
@@ -92,10 +92,10 @@ async function getAgentMetrics(req, res) {
 
 async function getAgentMonthlyAttendance(req, res) {
   try {
-    if (!req.user.isAdmin) {
+    const { id } = req.params;
+    if (!req.user.isAdmin && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
-    const { id } = req.params;
     const { month, year } = req.query;
     
     if (!month || !year) {
