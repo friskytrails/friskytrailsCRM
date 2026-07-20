@@ -590,6 +590,11 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                           </span>
                         )}
                       </div>
+                      {lead.createdBy && lead.createdBy.name && (
+                        <div className="mt-1 text-xs text-gray-400">
+                          Created by: {lead.createdBy.name}{lead.createdBy.email ? ` , ${lead.createdBy.email}` : ''}
+                        </div>
+                      )}
 
                     </div>
                     {/* Status Badge */}
@@ -769,6 +774,11 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                           </span>
                         )}
                       </div>
+                      {lead.createdBy && lead.createdBy.name && (
+                        <div className="mt-1 text-xs text-gray-400">
+                          Created by: {lead.createdBy.name}{lead.createdBy.email ? ` , ${lead.createdBy.email}` : ''}
+                        </div>
+                      )}
                     </div>
                   </div>
 

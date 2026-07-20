@@ -11,7 +11,7 @@ async function getLeads(agentIdCondition = undefined) {
   return leads.map(formatDoc);
 }
 
-async function createLead(name, phone, age, origin, destination, leadSource, mailId, product) {
+async function createLead(name, phone, age, origin, destination, leadSource, mailId, product, createdByUser) {
   if (!phone) {
     throw new Error("Phone number is required");
   }
@@ -19,6 +19,27 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   const cleanPhone = phone.replace(/\s+/g, '');
   if (!/^\d{10}$/.test(cleanPhone)) {
     throw new Error("Phone number must be exactly 10 digits with no spaces");
+  }
+
+  const existingPhone = await Lead.Model.findOne({ phone: cleanPhone });
+  if (existingPhone) {
+    throw new Error("A lead with this phone number already exists.");
+  }
+
+  if (mailId) {
+    const existingMail = await Lead.Model.findOne({ mailId });
+    if (existingMail) {
+      throw new Error("A lead with this email already exists.");
+    }
+  }
+
+  let createdBy = { name: '', email: '' };
+  if (createdByUser && createdByUser.userId) {
+    const user = await User.findById(createdByUser.userId);
+    if (user) {
+      createdBy.name = user.name || '';
+      createdBy.email = user.email || '';
+    }
   }
 
   const lead = {
@@ -31,7 +52,8 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
     mailId: mailId || '',
     product: product || '',
     agentIds: [],
-    notes: []
+    notes: [],
+    createdBy
   };
 
   const result = await Lead.insertLead(lead);

@@ -102,6 +102,10 @@ const LeadSchema = new mongoose.Schema({
     type: [NoteSchema],
     default: []
   },
+  createdBy: {
+    name: { type: String, default: '' },
+    email: { type: String, default: '' }
+  },
   status: {
     type: String,
     enum: ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'],
