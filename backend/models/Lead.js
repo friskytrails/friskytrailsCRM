@@ -80,7 +80,6 @@ const LeadSchema = new mongoose.Schema({
   mailId: {
     type: String,
     required: false,
-    default: '',
     unique: true,
     sparse: true
   },
@@ -176,9 +175,17 @@ module.exports = {
     if (agentIdCondition !== undefined) {
       query.agentIds = agentIdCondition;
     }
+    const updateDoc = { ...data };
+    const unsetDoc = updateDoc.$unset;
+    delete updateDoc.$unset;
+    const finalUpdate = { $set: updateDoc };
+    if (unsetDoc) {
+      finalUpdate.$unset = unsetDoc;
+    }
+
     return Lead.findOneAndUpdate(
       query,
-      { $set: data },
+      finalUpdate,
       { new: true }
     );
   },
