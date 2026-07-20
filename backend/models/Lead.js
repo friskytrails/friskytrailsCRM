@@ -55,7 +55,8 @@ const LeadSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   age: {
     type: Number,
@@ -79,7 +80,9 @@ const LeadSchema = new mongoose.Schema({
   mailId: {
     type: String,
     required: false,
-    default: ''
+    default: '',
+    unique: true,
+    sparse: true
   },
   product: {
     type: String,
