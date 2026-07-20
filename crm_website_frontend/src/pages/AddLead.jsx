@@ -200,6 +200,7 @@ export default function AddLead({ addLead, user }) {
                     <option value="Rishikesh Activities">Rishikesh Activities</option>
                     <option value="Spiti Package">Spiti Package</option>
                     <option value="Ladakh Package">Ladakh Package</option>
+                    <option value="Kerala Trip">Kerala Trip</option>
                   </select>
                 </div>
               </div>

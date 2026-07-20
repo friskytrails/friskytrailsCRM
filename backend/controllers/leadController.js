@@ -13,7 +13,7 @@ async function getLeads(req, res) {
 async function createLead(req, res) {
   try {
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
-    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product);
+    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product, req.user);
     
     res.status(201).json(result);
   } catch (error) {
