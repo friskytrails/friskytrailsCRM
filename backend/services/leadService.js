@@ -49,12 +49,15 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
     origin: origin || '',
     destination: destination || '',
     leadSource: leadSource || '',
-    mailId: mailId || '',
     product: product || '',
     agentIds: [],
     notes: [],
     createdBy
   };
+
+  if (mailId && mailId.trim() !== '') {
+    lead.mailId = mailId.trim();
+  }
 
   let result;
   try {
@@ -84,16 +87,23 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     throw new Error("Phone number must be exactly 10 digits with no spaces");
   }
 
-  const result = await Lead.updateLead(id, {
+  const updatePayload = {
     name: name || '',
     phone: cleanPhone,
     age: age ? Number(age) : undefined,
     origin: origin || '',
     destination: destination || '',
     leadSource: leadSource || '',
-    mailId: mailId || '',
     product: product || ''
-  }, agentIdCondition);
+  };
+
+  if (mailId && mailId.trim() !== '') {
+    updatePayload.mailId = mailId.trim();
+  } else {
+    updatePayload.$unset = { mailId: 1 };
+  }
+
+  const result = await Lead.updateLead(id, updatePayload, agentIdCondition);
 
   if (!result) {
     throw new Error("Lead not found or unauthorized");
