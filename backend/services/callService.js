@@ -20,8 +20,11 @@ async function logCall(data) {
   return callLog;
 }
 
-async function getHistoricalReports(startDate, endDate, team) {
+async function getHistoricalReports(startDate, endDate, team, agentIdCondition) {
   let matchQuery = {};
+  if (agentIdCondition) {
+    matchQuery.agentId = agentIdCondition;
+  }
   if (startDate && endDate) {
     matchQuery.timestamp = {
       $gte: new Date(startDate),
@@ -73,8 +76,14 @@ async function getHistoricalReports(startDate, endDate, team) {
   return formattedReports;
 }
 
-async function getLiveStatus() {
+async function getLiveStatus(agentIdCondition) {
+  let matchQuery = {};
+  if (agentIdCondition) {
+    matchQuery.agentId = agentIdCondition;
+  }
+
   const recentCalls = await CallLog.aggregate([
+    { $match: matchQuery },
     {
       $group: {
         _id: "$agentId",
@@ -106,12 +115,17 @@ async function getLiveStatus() {
   return liveStatus;
 }
 
-async function getLiveActivity() {
+async function getLiveActivity(agentIdCondition) {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
+  let matchQuery = { timestamp: { $gte: startOfDay } };
+  if (agentIdCondition) {
+    matchQuery.agentId = agentIdCondition;
+  }
+
   const activity = await CallLog.aggregate([
-    { $match: { timestamp: { $gte: startOfDay } } },
+    { $match: matchQuery },
     {
       $group: {
         _id: "$agentId",
