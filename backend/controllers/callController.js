@@ -26,12 +26,16 @@ const logCall = async (req, res) => {
 // @route   GET /api/calls/historical
 // @access  Private (Admin only)
 const getHistoricalReports = async (req, res) => {
-  if (!req.user || !req.user.isAdmin) {
+  if (!req.user) {
     return res.status(403).json({ error: "Access denied" });
+  }
+  if (!req.user.isAdmin && !req.user.userId) {
+    return res.status(403).json({ error: "User ID missing for non-admin request" });
   }
   try {
     const { startDate, endDate, team } = req.query;
-    const reports = await callService.getHistoricalReports(startDate, endDate, team);
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const reports = await callService.getHistoricalReports(startDate, endDate, team, agentIdCondition);
     res.json(reports);
   } catch (error) {
     console.error("Error generating historical report:", error);
@@ -43,11 +47,15 @@ const getHistoricalReports = async (req, res) => {
 // @route   GET /api/calls/live-status
 // @access  Private (Admin only)
 const getLiveStatus = async (req, res) => {
-  if (!req.user || !req.user.isAdmin) {
+  if (!req.user) {
     return res.status(403).json({ error: "Access denied" });
   }
+  if (!req.user.isAdmin && !req.user.userId) {
+    return res.status(403).json({ error: "User ID missing for non-admin request" });
+  }
   try {
-    const liveStatus = await callService.getLiveStatus();
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const liveStatus = await callService.getLiveStatus(agentIdCondition);
     res.json(liveStatus);
   } catch (error) {
     console.error("Error generating live status:", error);
@@ -59,11 +67,15 @@ const getLiveStatus = async (req, res) => {
 // @route   GET /api/calls/live-activity
 // @access  Private (Admin only)
 const getLiveActivity = async (req, res) => {
-  if (!req.user || !req.user.isAdmin) {
+  if (!req.user) {
     return res.status(403).json({ error: "Access denied" });
   }
+  if (!req.user.isAdmin && !req.user.userId) {
+    return res.status(403).json({ error: "User ID missing for non-admin request" });
+  }
   try {
-    const activity = await callService.getLiveActivity();
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const activity = await callService.getLiveActivity(agentIdCondition);
     res.json(activity);
   } catch (error) {
     console.error("Error generating live activity:", error);
