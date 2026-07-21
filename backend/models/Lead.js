@@ -113,6 +113,19 @@ const LeadSchema = new mongoose.Schema({
     enum: ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'],
     default: 'Fresh Leads'
   },
+  bookingDetails: {
+    fullName: { type: String, default: '' },
+    emailId: { type: String, default: '' },
+    contactNumber: { type: String, default: '' },
+    emergencyContactNumber: { type: String, default: '' },
+    packageName: { type: String, default: '' },
+    totalAmount: { type: Number, default: 0 },
+    paidAmount: { type: Number, default: 0 },
+    dueAmount: { type: Number, default: 0 },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+    noOfPax: { type: Number, default: 0 }
+  },
   booking: {
     totalDial: { type: Number, default: 0 },
     dailyDial: { type: Number, default: 0 },

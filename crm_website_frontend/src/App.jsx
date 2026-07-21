@@ -13,6 +13,7 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Reports from './pages/Reports';
+import GlobalSettings from './pages/GlobalSettings';
 import './index.css';
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
@@ -20,6 +21,7 @@ const API_URL = `${import.meta.env.VITE_API_URL}`;
 function App() {
   const [leads, setLeads] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [products, setProducts] = useState([]);
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user');
@@ -58,19 +60,24 @@ function App() {
     async function fetchData() {
       setLoadingData(true);
       try {
-        const [leadsRes, agentsRes] = await Promise.all([
+        const [leadsRes, agentsRes, configRes] = await Promise.all([
           fetch(`${API_URL}/leads`, {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
           fetch(`${API_URL}/agents`, {
             headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch(`${API_URL}/config`, {
+            headers: { 'Authorization': `Bearer ${token}` }
           })
         ]);
-        if (leadsRes.ok && agentsRes.ok) {
+        if (leadsRes.ok && agentsRes.ok && configRes.ok) {
           const leadsData = await leadsRes.json();
           const agentsData = await agentsRes.json();
+          const configData = await configRes.json();
           setLeads(leadsData);
           setAgents(agentsData);
+          setProducts(configData.products || []);
         } else {
           // If token expired or invalid
           if (leadsRes.status === 401 || agentsRes.status === 401) {
@@ -245,6 +252,30 @@ function App() {
     }
   };
 
+  const bookLeadAPI = async (leadId, bookingDetails) => {
+    try {
+      const response = await fetch(`${API_URL}/leads/${leadId}/book`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ bookingDetails }),
+      });
+      if (response.ok) {
+        const updatedLead = await response.json();
+        setLeads((prev) => prev.map(lead => lead.id === leadId ? updatedLead : lead));
+        toast.success("Lead booked successfully.");
+        return updatedLead;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to book lead: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   const updateLeadBooking = async (leadId, bookingData) => {
     try {
       const response = await fetch(`${API_URL}/leads/${leadId}/booking`, {
@@ -380,7 +411,11 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={<AddLead addLead={addLead} user={user} />}
+              element={<AddLead addLead={addLead} user={user} products={products} />}
+            />
+            <Route
+              path="/settings"
+              element={user?.isAdmin ? <GlobalSettings products={products} setProducts={setProducts} API_URL={API_URL} token={token} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents"
@@ -397,7 +432,18 @@ function App() {
 
             <Route
               path="/leads/:id"
-              element={<LeadDetail API_URL={API_URL} token={token} user={user} setLeads={setLeads} leads={leads} agents={agents} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} assignAgent={assignAgent} />} />
+              element={<LeadDetail 
+                      API_URL={API_URL} 
+                      token={token} 
+                      user={user} 
+                      setLeads={setLeads} 
+                      leads={leads} 
+                      agents={agents} 
+                      updateLeadStatus={updateLeadStatus} 
+                      bookLeadAPI={bookLeadAPI}
+                      updateLeadBooking={updateLeadBooking}
+                      assignAgent={assignAgent}
+                    />} />
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} handleLogout={handleLogout} />} />

@@ -135,6 +135,21 @@ async function updateStatus(req, res) {
   }
 }
 
+async function bookLead(req, res) {
+  try {
+    const { id } = req.params;
+    const { bookingDetails } = req.body;
+    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const result = await leadService.bookLead(id, bookingDetails, agentIdCondition);
+    res.json(result);
+  } catch (error) {
+    if (error.message === "Lead not found or unauthorized") {
+      return res.status(403).json({ error: "Forbidden: Not assigned to you" });
+    }
+    res.status(400).json({ error: error.message });
+  }
+}
+
 async function updateBooking(req, res) {
   try {
     const { id } = req.params;
@@ -161,5 +176,6 @@ module.exports = {
   updateLabels,
   updateDates,
   updateStatus,
+  bookLead,
   updateBooking
 };

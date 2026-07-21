@@ -43,7 +43,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   }
 
   const lead = {
-    name: name || '',
+    name: name ? name.trim() || 'NA' : 'NA',
     phone: cleanPhone,
     age: age ? Number(age) : undefined,
     origin: origin || '',
@@ -88,7 +88,7 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
   }
 
   const updatePayload = {
-    name: name || '',
+    name: name ? name.trim() || 'NA' : 'NA',
     phone: cleanPhone,
     age: age ? Number(age) : undefined,
     origin: origin || '',
@@ -276,6 +276,21 @@ async function updateStatus(id, status, agentIdCondition) {
   return formatDoc(result);
 }
 
+async function bookLead(id, bookingDetails, agentIdCondition) {
+  const updateData = { status: 'Booked', bookingDetails };
+  
+  if (bookingDetails.fullName) updateData.name = bookingDetails.fullName;
+  if (bookingDetails.contactNumber) updateData.phone = bookingDetails.contactNumber;
+  if (bookingDetails.emailId) updateData.mailId = bookingDetails.emailId;
+  if (bookingDetails.packageName) updateData.product = bookingDetails.packageName;
+
+  const result = await Lead.updateLead(id, updateData, agentIdCondition);
+  if (!result) {
+    throw new Error("Lead not found or unauthorized");
+  }
+  return formatDoc(result);
+}
+
 async function updateBooking(id, bookingData, agentIdCondition) {
   const lead = await Lead.findById(id);
   if (!lead) {
@@ -396,5 +411,6 @@ module.exports = {
   updateLabels,
   updateDates,
   updateStatus,
+  bookLead,
   updateBooking
 };

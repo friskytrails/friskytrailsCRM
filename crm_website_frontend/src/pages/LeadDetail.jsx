@@ -13,7 +13,7 @@ const STATUS_OPTIONS = [
   { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
 
-export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent }) {
+export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [lead, setLead] = useState(null);
@@ -23,6 +23,22 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [selectedImage, setSelectedImage] = useState(null); // base64 preview
   const [imageFile, setImageFile] = useState(null); // actual file to upload
   const [isUploading, setIsUploading] = useState(false);
+
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+    fullName: '',
+    emailId: '',
+    contactNumber: '',
+    emergencyContactNumber: '',
+    packageName: '',
+    totalAmount: '',
+    paidAmount: '',
+    dueAmount: '',
+    startDate: '',
+    endDate: '',
+    noOfPax: ''
+  });
+  const [isBooking, setIsBooking] = useState(false);
 
   const getAgentLeadCount = (agentId) => {
     return leads?.filter((l) => (l.agentIds || []).includes(agentId)).length || 0;
@@ -196,6 +212,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const handleStatusChange = async (newStatus) => {
     if (!lead || lead.status === newStatus) return;
+    
+    if (newStatus === 'Booked') {
+      setShowBookingModal(true);
+      return;
+    }
+
     const previousLead = { ...lead };
     setLead({ ...lead, status: newStatus });
     const updated = await updateLeadStatus(lead.id, newStatus);
@@ -204,6 +226,25 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       syncLeadToParent(updated);
     } else {
       setLead(previousLead);
+    }
+  };
+
+  const submitBooking = async (e) => {
+    e.preventDefault();
+    if (!bookLeadAPI) return;
+    setIsBooking(true);
+    const updated = await bookLeadAPI(lead.id, {
+      ...bookingForm,
+      totalAmount: Number(bookingForm.totalAmount) || 0,
+      paidAmount: Number(bookingForm.paidAmount) || 0,
+      dueAmount: Number(bookingForm.dueAmount) || 0,
+      noOfPax: Number(bookingForm.noOfPax) || 0,
+    });
+    setIsBooking(false);
+    if (updated) {
+      setLead(updated);
+      syncLeadToParent(updated);
+      setShowBookingModal(false);
     }
   };
 
@@ -338,72 +379,126 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       </div>
 
       {/* Booking Status & Info Block */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
-        <div className="flex flex-col md:flex-row md:items-start gap-6">
-          {/* Status Block */}
-          <div className="flex flex-col items-start gap-3 min-w-[200px]">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
-              <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Lead Status
-            </h2>
-            <select
-              value={lead.status || 'Fresh Leads'}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id))}
-              className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color}`}
-            >
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.value}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Booking Info Block */}
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col xl:flex-row gap-6 mb-6">
+        
+        {/* Left Side: Status & Call Metrics */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 w-full">
+          <div className="flex flex-col md:flex-row md:items-start gap-6 h-full">
+            {/* Status Block */}
+            <div className="flex flex-col items-start gap-3 min-w-[200px]">
               <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
-                <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                Booking Info
+                <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Lead Status
               </h2>
+              <select
+                value={lead.status || 'Fresh Leads'}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) || lead.status === 'Booked'}
+                className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color} ${lead.status === 'Booked' ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.value}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
+            {/* Call Metrics Block */}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                  Call Metrics
+                </h2>
               </div>
-              <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
-                <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Dial</span>
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyDial || 0}</span>
-              </div>
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
-              </div>
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
-              </div>
-              <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
-                <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Talk Time</span>
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyTalkTime || '0:0'}</span>
-              </div>
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
-                <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
-              </div>
-              <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
-              </div>
-              <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
+                </div>
+                <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
+                  <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Dial</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyDial || 0}</span>
+                </div>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
+                </div>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
+                </div>
+                <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
+                  <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Talk Time</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyTalkTime || '0:0'}</span>
+                </div>
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
+                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
+                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
+                </div>
+                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
+                </div>
+                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
       </div>
+
+      {/* Confirmed Booking Details - Full Width Row */}
+      {lead.status === 'Booked' && lead.bookingDetails && (
+        <div className="bg-green-50/80 dark:bg-green-900/20 rounded-xl shadow-md border-2 border-green-400 dark:border-green-600 p-6 mb-6 relative overflow-hidden">
+          <h2 className="text-base font-extrabold text-green-900 dark:text-green-300 uppercase tracking-wider flex items-center mb-5">
+            <svg className="w-5 h-5 mr-2 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Confirmed Booking Details
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            
+            {/* Package & Pax */}
+            <div className="flex flex-col space-y-4">
+              <div className="bg-white/60 dark:bg-slate-800/60 p-3 rounded-lg border border-green-200/50 dark:border-green-700/50 flex-1">
+                <label className="block text-[11px] font-bold text-green-700/70 dark:text-green-400/70 uppercase tracking-wider mb-1">Package</label>
+                <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{lead.bookingDetails.packageName || '—'}</div>
+              </div>
+              <div className="bg-white/60 dark:bg-slate-800/60 p-3 rounded-lg border border-green-200/50 dark:border-green-700/50 flex-1">
+                <label className="block text-[11px] font-bold text-green-700/70 dark:text-green-400/70 uppercase tracking-wider mb-1">Pax</label>
+                <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{lead.bookingDetails.noOfPax || '0'}</div>
+              </div>
+            </div>
+
+            {/* Financials */}
+            <div className="flex flex-col space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg border border-blue-200 dark:border-blue-700/50 flex-1">
+                <label className="block text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Total Amount</label>
+                <div className="text-base font-black text-blue-700 dark:text-blue-300">₹{lead.bookingDetails.totalAmount || '0'}</div>
+              </div>
+              <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-lg border border-red-200 dark:border-red-700/50 flex-1">
+                <label className="block text-[11px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-1">Due Amount</label>
+                <div className="text-base font-black text-red-700 dark:text-red-300">₹{lead.bookingDetails.dueAmount || '0'}</div>
+              </div>
+            </div>
+
+            {/* Dates */}
+            <div className="flex flex-col space-y-4">
+              <div className="bg-white/60 dark:bg-slate-800/60 p-3 rounded-lg border border-green-200/50 dark:border-green-700/50 flex-1">
+                <label className="block text-[11px] font-bold text-green-700/70 dark:text-green-400/70 uppercase tracking-wider mb-1">Start Date</label>
+                <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{lead.bookingDetails.startDate ? new Date(lead.bookingDetails.startDate).toLocaleDateString() : '—'}</div>
+              </div>
+              <div className="bg-white/60 dark:bg-slate-800/60 p-3 rounded-lg border border-green-200/50 dark:border-green-700/50 flex-1">
+                <label className="block text-[11px] font-bold text-green-700/70 dark:text-green-400/70 uppercase tracking-wider mb-1">End Date</label>
+                <div className="text-sm font-bold text-gray-900 dark:text-gray-100">{lead.bookingDetails.endDate ? new Date(lead.bookingDetails.endDate).toLocaleDateString() : '—'}</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Historical Call Logs */}
       {lead.callLogs && lead.callLogs.length > 0 && (
@@ -558,6 +653,87 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
           </div>
         </div>
       </div>
+      
+      {/* Booking Form Modal */}
+      {showBookingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/50">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Booking Details</h3>
+              <button onClick={() => setShowBookingModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <form onSubmit={submitBooking} className="p-6 overflow-y-auto flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+                  <input type="text" required value={bookingForm.fullName} onChange={e => setBookingForm({...bookingForm, fullName: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email ID</label>
+                  <input type="email" required value={bookingForm.emailId} onChange={e => setBookingForm({...bookingForm, emailId: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Contact Number</label>
+                  <input type="text" required value={bookingForm.contactNumber} onChange={e => setBookingForm({...bookingForm, contactNumber: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Emergency Contact Number</label>
+                  <input type="text" required value={bookingForm.emergencyContactNumber} onChange={e => setBookingForm({...bookingForm, emergencyContactNumber: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+              </div>
+
+              <hr className="border-gray-200 dark:border-slate-700 mb-6" />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Package Name</label>
+                  <input type="text" required value={bookingForm.packageName} onChange={e => setBookingForm({...bookingForm, packageName: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">No. of Pax</label>
+                  <input type="number" required value={bookingForm.noOfPax} onChange={e => setBookingForm({...bookingForm, noOfPax: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
+                  <input type="date" required value={bookingForm.startDate} onChange={e => setBookingForm({...bookingForm, startDate: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">End Date</label>
+                  <input type="date" required value={bookingForm.endDate} onChange={e => setBookingForm({...bookingForm, endDate: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+              </div>
+
+              <hr className="border-gray-200 dark:border-slate-700 mb-6" />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Total Amount (₹)</label>
+                  <input type="number" required value={bookingForm.totalAmount} onChange={e => setBookingForm({...bookingForm, totalAmount: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Paid Amount (₹)</label>
+                  <input type="number" required value={bookingForm.paidAmount} onChange={e => setBookingForm({...bookingForm, paidAmount: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Due Amount (₹)</label>
+                  <input type="number" required value={bookingForm.dueAmount} onChange={e => setBookingForm({...bookingForm, dueAmount: e.target.value})} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowBookingModal(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-semibold text-sm transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={isBooking} className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold text-sm shadow transition-colors disabled:opacity-50">
+                  {isBooking ? 'Saving...' : 'Confirm Booking'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

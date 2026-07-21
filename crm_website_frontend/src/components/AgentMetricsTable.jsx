@@ -21,6 +21,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const [form, setForm] = useState({
     monthlyTarget: agent?.monthlyTarget || 0,
     targetCompleted: agent?.targetCompleted || 0,
+    bookingCount: agent?.bookingCount || 0,
     attendance: agent?.attendance || ''
   });
 
@@ -30,6 +31,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
       setForm({
         monthlyTarget: agent?.monthlyTarget || 0,
         targetCompleted: agent?.targetCompleted || 0,
+        bookingCount: agent?.bookingCount || 0,
         attendance: agent?.attendance || ''
       });
     }
@@ -64,6 +66,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
       const payload = {
         monthlyTarget: form.monthlyTarget,
         targetCompleted: form.targetCompleted,
+        bookingCount: form.bookingCount,
       };
       
       if (selectedMonth === currentMonthPrefix) {
@@ -90,8 +93,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const monthlyTarget = selectedMonth === currentMonthPrefix ? (agent?.monthlyTarget || 0) : (historicalMetric?.monthlyTarget || 0);
   const targetCompleted = selectedMonth === currentMonthPrefix ? (agent?.targetCompleted || 0) : (historicalMetric?.targetCompleted || 0);
 
-  // Calculate Bookings
-  const bookedLeads = agentLeads.filter(lead => lead.status === 'Booked' || lead.status === 'Closed').length;
+  const bookingCount = selectedMonth === currentMonthPrefix ? (agent?.bookingCount || 0) : (historicalMetric?.bookingCount || 0);
   const totalLeads = agentLeads.length;
 
   let todayDisplay = '-';
@@ -104,7 +106,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   const metrics = [
     { label: 'Monthly Target', value: `${targetCompleted} / ${monthlyTarget}` },
-    { label: 'Booking Count', value: `${bookedLeads} / ${totalLeads}` },
+    { label: 'Booking Count', value: `${bookingCount} / ${totalLeads}` },
     { label: 'Today\'s Attendance', value: todayDisplay },
     { label: 'Monthly Attendance', value: monthlyAttendanceDisplay },
   ];
@@ -139,6 +141,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 setForm({
                   monthlyTarget: monthlyTarget,
                   targetCompleted: targetCompleted,
+                  bookingCount: bookingCount,
                   attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                 });
               }}
@@ -155,6 +158,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                   setForm({
                     monthlyTarget: monthlyTarget,
                     targetCompleted: targetCompleted,
+                    bookingCount: bookingCount,
                     attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                   });
                 }}
@@ -192,6 +196,15 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 type="number"
                 value={form.targetCompleted}
                 onChange={e => setForm({ ...form, targetCompleted: e.target.value })}
+                className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
+              />
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Booking Count</span>
+              <input
+                type="number"
+                value={form.bookingCount}
+                onChange={e => setForm({ ...form, bookingCount: e.target.value })}
                 className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
               />
             </div>

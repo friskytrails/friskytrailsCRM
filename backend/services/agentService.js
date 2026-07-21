@@ -91,7 +91,7 @@ async function updateAgentVerification(id, isVerified) {
   return formatDoc(user);
 }
 
-async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate) {
+async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate, bookingCount) {
   const user = await User.findById(id);
   if (!user) {
     throw createError("Agent not found", "NotFoundError");
@@ -105,7 +105,8 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
   const originalState = {
     monthlyTarget: user.monthlyTarget,
     targetCompleted: user.targetCompleted,
-    attendance: user.attendance
+    attendance: user.attendance,
+    bookingCount: user.bookingCount
   };
 
   // Get today's date in YYYY-MM-DD format using IST
@@ -132,12 +133,20 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
       user.historicalMetrics.push({ 
         month: monthPrefix, 
         monthlyTarget: user.monthlyTarget || 0, 
-        targetCompleted: user.targetCompleted || 0 
+        targetCompleted: user.targetCompleted || 0,
+        bookingCount: user.bookingCount || 0
       });
       histIdx = user.historicalMetrics.length - 1;
     }
     if (monthlyTarget !== undefined) user.historicalMetrics[histIdx].monthlyTarget = Number(monthlyTarget);
     if (targetCompleted !== undefined) user.historicalMetrics[histIdx].targetCompleted = Number(targetCompleted);
+    if (bookingCount !== undefined) user.historicalMetrics[histIdx].bookingCount = Number(bookingCount);
+  }
+
+  if (bookingCount !== undefined) {
+    const num = Number(bookingCount);
+    if (!Number.isFinite(num) || num < 0) throw createError("Invalid bookingCount");
+    if (monthPrefix === todayStr.substring(0, 7)) user.bookingCount = num;
   }
 
   // Only overwrite current attendance if it is today
