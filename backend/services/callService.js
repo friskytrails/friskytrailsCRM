@@ -22,7 +22,7 @@ async function logCall(data) {
 
 async function getHistoricalReports(startDate, endDate, team, agentIdCondition) {
   let matchQuery = {};
-  if (agentIdCondition) {
+  if (agentIdCondition !== undefined) {
     matchQuery.agentId = agentIdCondition;
   }
   if (startDate && endDate) {
@@ -78,7 +78,7 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
 
 async function getLiveStatus(agentIdCondition) {
   let matchQuery = {};
-  if (agentIdCondition) {
+  if (agentIdCondition !== undefined) {
     matchQuery.agentId = agentIdCondition;
   }
 
@@ -120,7 +120,7 @@ async function getLiveActivity(agentIdCondition) {
   startOfDay.setHours(0, 0, 0, 0);
 
   let matchQuery = { timestamp: { $gte: startOfDay } };
-  if (agentIdCondition) {
+  if (agentIdCondition !== undefined) {
     matchQuery.agentId = agentIdCondition;
   }
 
