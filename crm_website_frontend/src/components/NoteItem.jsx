@@ -49,26 +49,37 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
             )}
           </div>
         </div>
-        {note.text && <p className="text-gray-700 dark:text-slate-200 mt-0.5">{note.text}</p>}
-        {note.imageUrl && (
-          <div className="mt-1.5 rounded overflow-hidden max-w-[200px] border border-gray-200/50 dark:border-slate-800 inline-block">
-            {note.imageUrl.match(/\.(pdf|doc|docx)$/i) || (!note.imageUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) && note.imageUrl.includes('/raw/upload/')) ? (
-              <div
-                className="p-3 bg-gray-100 dark:bg-slate-800 text-sm font-semibold flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-                onClick={() => window.open(note.imageUrl, '_blank')}
-              >
-                📄 {decodeURIComponent(note.imageUrl.split('/').pop())}
-              </div>
-            ) : (
-              <img
-                src={note.imageUrl}
-                alt="Attachment"
-                className="w-full h-auto max-h-[120px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => window.open(note.imageUrl, '_blank')}
-              />
-            )}
-          </div>
-        )}
+        {note.text && <p className="text-gray-700 dark:text-slate-200 mt-0.5 whitespace-pre-wrap break-words">{note.text}</p>}
+        {note.imageUrl && (() => {
+          const isDoc = note.imageUrl.match(/\.(pdf|doc|docx)$/i) || note.imageUrl.includes('/raw/upload/');
+          const fileName = decodeURIComponent(note.imageUrl.split('/').pop() || 'file');
+          return (
+            <div className="mt-1.5 rounded overflow-hidden max-w-[240px] border border-gray-200/50 dark:border-slate-800 inline-block">
+              {isDoc ? (
+                <div
+                  className="p-3 bg-gray-100 dark:bg-slate-800 text-sm font-semibold flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors gap-2"
+                  onClick={() => window.open(note.imageUrl, '_blank')}
+                  title="Click to view/download"
+                >
+                  <span className="text-base">📄</span>
+                  <span className="truncate max-w-[180px]">{fileName}</span>
+                </div>
+              ) : (
+                <img
+                  src={note.imageUrl}
+                  alt="Attachment preview"
+                  className="w-full h-auto max-h-[140px] object-cover cursor-pointer hover:opacity-95 transition-opacity rounded"
+                  onClick={() => window.open(note.imageUrl, '_blank')}
+                  onError={(e) => {
+                    // Fallback if image fails to render as an img tag
+                    e.target.onerror = null;
+                    e.target.parentNode.innerHTML = `<div class="p-3 bg-gray-100 dark:bg-slate-800 text-xs font-semibold flex items-center cursor-pointer" onclick="window.open('${note.imageUrl}', '_blank')">🖼️ View Image (${fileName})</div>`;
+                  }}
+                />
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

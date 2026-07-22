@@ -1,30 +1,36 @@
 const callService = require('../services/callService');
 
-// @desc    Log a call from the mobile app
+// @desc    Log a call from the app / CRM
 // @route   POST /api/calls
 // @access  Private
 const logCall = async (req, res) => {
   try {
-    const { status } = req.body;
-    const agentId = req.user.userId;
+    const { status, leadId, duration, timestamp, contactNumber } = req.body;
+    const agentId = req.user.userId || req.user.id;
 
     if (!agentId || !status) {
       return res.status(400).json({ error: "agentId and status are required" });
     }
 
-    const callLog = await callService.logCall({ ...req.body, agentId });
+    const callLog = await callService.logCall({ 
+      agentId,
+      leadId: leadId || undefined,
+      duration,
+      timestamp,
+      status,
+      contactNumber
+    });
+    
     res.status(201).json(callLog);
   } catch (error) {
     console.error("Error saving call log:", error);
-    // Now any error caught here is a true 500 Server Error
-    res.status(500).json({ error: "Server error" });
+    res.status(400).json({ error: error.message || "Failed to log call" });
   }
 };
 
-
 // @desc    Get historical performance report
 // @route   GET /api/calls/historical
-// @access  Private (Admin only)
+// @access  Private (Admin only / Agent restricted)
 const getHistoricalReports = async (req, res) => {
   if (!req.user) {
     return res.status(403).json({ error: "Access denied" });

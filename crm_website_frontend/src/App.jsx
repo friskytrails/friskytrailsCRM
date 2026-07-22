@@ -439,6 +439,7 @@ function App() {
                       setLeads={setLeads} 
                       leads={leads} 
                       agents={agents} 
+                      products={products}
                       updateLeadStatus={updateLeadStatus} 
                       bookLeadAPI={bookLeadAPI}
                       updateLeadBooking={updateLeadBooking}

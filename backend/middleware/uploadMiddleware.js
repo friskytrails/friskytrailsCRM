@@ -17,15 +17,12 @@ const storage = new CloudinaryStorage({
     // Explicitly define if it is an image or raw document
     const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
 
-    // For raw files (like .docx, .pdf), Cloudinary requires the extension in the public_id to preserve it
-    const publicId = isImage 
-      ? `${sanitized}_${uniqueSuffix}` 
-      : `${sanitized}_${uniqueSuffix}${ext}`;
+    // Ensure extension is included in public_id so Cloudinary URLs preserve format and preview properly
+    const publicId = `${sanitized}_${uniqueSuffix}${ext}`;
 
     return {
       folder: 'crm_attachments',
-      resource_type: 'auto', // Fix: Use 'auto' so Cloudinary correctly handles images, PDFs, and raw files
-      allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'], // explicitly pass formats to avoid strict configuration rejections
+      resource_type: isImage ? 'image' : 'raw',
       public_id: publicId
     };
   }
@@ -33,7 +30,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'webp'];
     const dotIndex = file.originalname.lastIndexOf('.');

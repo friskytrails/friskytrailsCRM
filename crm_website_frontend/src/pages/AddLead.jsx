@@ -42,20 +42,16 @@ export default function AddLead({ addLead, user, products = [] }) {
     try {
       const success = await addLead(formData);
       if (success) {
-        if (user?.isAdmin) {
-          navigate('/');
-        } else {
-          setFormData({
-            name: '',
-            phone: '',
-            age: '',
-            origin: '',
-            destination: '',
-            leadSource: '',
-            product: '',
-            mailId: ''
-          });
-        }
+        setFormData({
+          name: '',
+          phone: '',
+          age: '',
+          origin: '',
+          destination: '',
+          leadSource: '',
+          product: '',
+          mailId: ''
+        });
       }
     } finally {
       setSubmitting(false);

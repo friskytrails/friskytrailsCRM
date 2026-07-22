@@ -4,7 +4,7 @@ const callController = require('../controllers/callController');
 const auth = require('../middleware/auth');
 
 // POST /api/calls
-// Endpoint for the app to log calls
+// Endpoint for logging calls with optional leadId
 router.post('/', auth, callController.logCall);
 
 // GET /api/calls/historical
@@ -12,7 +12,7 @@ router.post('/', auth, callController.logCall);
 router.get('/historical', auth, callController.getHistoricalReports);
 
 // GET /api/calls/live-status
-// Main Page Live Status Panel (Legacy Polling)
+// Main Page Live Status Panel
 router.get('/live-status', auth, callController.getLiveStatus);
 
 // GET /api/calls/live-activity

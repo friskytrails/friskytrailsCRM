@@ -2,20 +2,25 @@ const CallLog = require('../models/CallLog');
 const User = require('../models/User');
 
 async function logCall(data) {
-  const { agentId, duration, timestamp, status, contactNumber } = data;
+  const { agentId, leadId, duration, timestamp, status, contactNumber } = data;
   
   if (!agentId || !status) {
     throw new Error('agentId and status are required');
   }
 
-  const callLog = new CallLog({
+  const callLogData = {
     agentId,
     duration: duration || 0,
     timestamp: timestamp || new Date(),
     status,
-    contactNumber
-  });
+    contactNumber: contactNumber ? contactNumber.replace(/\s+/g, '') : ''
+  };
 
+  if (leadId) {
+    callLogData.leadId = leadId;
+  }
+
+  const callLog = new CallLog(callLogData);
   await callLog.save();
   return callLog;
 }
@@ -40,7 +45,7 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
         talkTime: { $sum: "$duration" },
         totalDials: { $sum: 1 },
         uniqueContacts: { $addToSet: "$contactNumber" },
-        connectedCalls: {
+        connectedCalls: { 
           $sum: { $cond: [{ $eq: ["$status", "Connected"] }, 1, 0] }
         },
         longCalls: {
