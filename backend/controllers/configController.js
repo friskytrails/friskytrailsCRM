@@ -21,8 +21,8 @@ const updateProducts = async (req, res) => {
     }
     
     const { products } = req.body;
-    if (!Array.isArray(products)) {
-      return res.status(400).json({ error: 'Products must be an array of strings' });
+    if (!Array.isArray(products) || !products.every(p => typeof p === 'string' && p.trim().length > 0)) {
+      return res.status(400).json({ error: 'Products must be an array of non-empty strings' });
     }
 
     let config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });

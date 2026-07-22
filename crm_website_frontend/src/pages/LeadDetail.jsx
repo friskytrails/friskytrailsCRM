@@ -620,7 +620,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               <div className="space-y-3">
                 {(lead.trips && lead.trips.length > 0 ? lead.trips : [lead.bookingDetails]).map((trip, idx) => {
                   if (!trip) return null;
-                  const originalIndex = lead.trips && lead.trips.length > 0 ? idx : null;
+                  const originalIndex = lead.trips && lead.trips.length > 0 ? idx : 0;
                   return (
                     <div 
                       key={trip._id || trip.tripId || idx} 

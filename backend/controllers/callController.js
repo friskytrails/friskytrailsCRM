@@ -24,7 +24,10 @@ const logCall = async (req, res) => {
     res.status(201).json(callLog);
   } catch (error) {
     console.error("Error saving call log:", error);
-    res.status(400).json({ error: error.message || "Failed to log call" });
+    if (error.name === 'ValidationError' || error.name === 'CastError' || error.message.includes('required')) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: "Failed to log call" });
   }
 };
 

@@ -106,7 +106,8 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     monthlyTarget: user.monthlyTarget,
     targetCompleted: user.targetCompleted,
     attendance: user.attendance,
-    bookingCount: user.bookingCount
+    bookingCount: user.bookingCount,
+    historicalMetrics: JSON.parse(JSON.stringify(user.historicalMetrics || []))
   };
 
   // Get today's date in YYYY-MM-DD format using IST
@@ -174,6 +175,8 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     user.monthlyTarget = originalState.monthlyTarget;
     user.targetCompleted = originalState.targetCompleted;
     user.attendance = originalState.attendance;
+    user.bookingCount = originalState.bookingCount;
+    user.historicalMetrics = originalState.historicalMetrics;
     await user.save();
     throw new Error("Failed to persist attendance log, update rolled back. " + error.message);
   }

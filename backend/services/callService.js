@@ -82,9 +82,12 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
 }
 
 async function getLiveStatus(agentIdCondition) {
+  const mongoose = require('mongoose');
   let matchQuery = {};
   if (agentIdCondition) {
-    matchQuery.agentId = agentIdCondition;
+    matchQuery.agentId = typeof agentIdCondition === 'string' && mongoose.Types.ObjectId.isValid(agentIdCondition)
+      ? new mongoose.Types.ObjectId(agentIdCondition)
+      : agentIdCondition;
   }
 
   const recentCalls = await CallLog.aggregate([
@@ -121,12 +124,15 @@ async function getLiveStatus(agentIdCondition) {
 }
 
 async function getLiveActivity(agentIdCondition) {
+  const mongoose = require('mongoose');
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
   let matchQuery = { timestamp: { $gte: startOfDay } };
   if (agentIdCondition) {
-    matchQuery.agentId = agentIdCondition;
+    matchQuery.agentId = typeof agentIdCondition === 'string' && mongoose.Types.ObjectId.isValid(agentIdCondition)
+      ? new mongoose.Types.ObjectId(agentIdCondition)
+      : agentIdCondition;
   }
 
   const activity = await CallLog.aggregate([
