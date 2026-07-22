@@ -178,11 +178,14 @@ export default function Reports() {
                   {aggregate.longCalls > 0 ? (
                     <button
                       onClick={() => handleOpenLongCallsModal('all', 'All Agents')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 transition-all shadow-sm cursor-pointer"
+                      className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-500 font-bold hover:underline group cursor-pointer focus:outline-none"
                       title="Click to view all long calls"
                     >
                       <span>{aggregate.longCalls}</span>
-                      <span className="text-[10px] opacity-80">🔍 Details</span>
+                      <svg className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
                     </button>
                   ) : (
                     <span>0</span>
@@ -212,11 +215,14 @@ export default function Reports() {
                     {report.longCalls > 0 ? (
                       <button
                         onClick={() => handleOpenLongCallsModal(report.agentId, report.name)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900 border border-orange-200 dark:border-orange-800/50 transition-all cursor-pointer shadow-xs"
+                        className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-500 font-bold hover:underline group cursor-pointer focus:outline-none"
                         title={`Click to view long call details for ${report.name}`}
                       >
                         <span>{report.longCalls}</span>
-                        <span className="text-[10px] opacity-75">🔍 Details</span>
+                        <svg className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
                       </button>
                     ) : (
                       <span className="text-gray-400 dark:text-slate-500">0</span>
