@@ -159,9 +159,93 @@ async function getLiveActivity(agentIdCondition) {
   return formattedActivity;
 }
 
+async function getLongCallsDetails(agentId, startDate, endDate) {
+  const mongoose = require('mongoose');
+  let matchQuery = {
+    duration: { $gte: 300 }
+  };
+
+  if (agentId && agentId !== 'all') {
+    if (mongoose.Types.ObjectId.isValid(agentId)) {
+      matchQuery.agentId = new mongoose.Types.ObjectId(agentId);
+    }
+  }
+
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    matchQuery.timestamp = {
+      $gte: start,
+      $lte: end
+    };
+  }
+
+  const longCalls = await CallLog.aggregate([
+    { $match: matchQuery },
+    { $sort: { timestamp: -1 } },
+    {
+      $lookup: {
+        from: "users",
+        localField: "agentId",
+        foreignField: "_id",
+        as: "agentInfo"
+      }
+    },
+    {
+      $unwind: {
+        path: "$agentInfo",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $lookup: {
+        from: "leads",
+        let: { logLeadId: "$leadId", phone: "$contactNumber" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $or: [
+                  { $and: [{ $ne: ["$$logLeadId", null] }, { $eq: ["$_id", "$$logLeadId"] }] },
+                  { $and: [{ $ne: ["$$phone", ""] }, { $eq: ["$phone", "$$phone"] }] }
+                ]
+              }
+            }
+          }
+        ],
+        as: "leadInfo"
+      }
+    },
+    {
+      $unwind: {
+        path: "$leadInfo",
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        agentId: 1,
+        agentName: "$agentInfo.name",
+        leadId: { $ifNull: ["$leadInfo._id", "$leadId"] },
+        leadNumberId: "$leadInfo.leadId",
+        leadName: { $ifNull: ["$leadInfo.name", "Unknown Lead"] },
+        contactNumber: { $ifNull: ["$contactNumber", "$leadInfo.phone"] },
+        duration: 1,
+        timestamp: 1,
+        status: 1
+      }
+    }
+  ]);
+
+  return longCalls;
+}
+
 module.exports = {
   logCall,
   getHistoricalReports,
   getLiveStatus,
-  getLiveActivity
+  getLiveActivity,
+  getLongCallsDetails
 };

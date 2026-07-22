@@ -80,9 +80,28 @@ const getLiveActivity = async (req, res) => {
   }
 };
 
+// @desc    Get detailed long calls breakdown for an agent
+// @route   GET /api/calls/long-calls
+// @access  Private
+const getLongCallsDetails = async (req, res) => {
+  if (!req.user) {
+    return res.status(403).json({ error: "Access denied" });
+  }
+  try {
+    const { agentId, startDate, endDate } = req.query;
+    const targetAgentId = req.user.isAdmin ? agentId : req.user.userId;
+    const details = await callService.getLongCallsDetails(targetAgentId, startDate, endDate);
+    res.json(details);
+  } catch (error) {
+    console.error("Error fetching long call details:", error);
+    res.status(500).json({ error: "Server error fetching long calls" });
+  }
+};
+
 module.exports = {
   logCall,
   getHistoricalReports,
   getLiveStatus,
-  getLiveActivity
+  getLiveActivity,
+  getLongCallsDetails
 };
