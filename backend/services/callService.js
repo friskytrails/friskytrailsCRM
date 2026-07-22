@@ -181,65 +181,69 @@ async function getLongCallsDetails(agentId, startDate, endDate) {
     };
   }
 
-  const longCalls = await CallLog.aggregate([
-    { $match: matchQuery },
-    { $sort: { timestamp: -1 } },
-    {
-      $lookup: {
-        from: "users",
-        localField: "agentId",
-        foreignField: "_id",
-        as: "agentInfo"
-      }
-    },
-    {
-      $unwind: {
-        path: "$agentInfo",
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $lookup: {
-        from: "leads",
-        let: { logLeadId: "$leadId", phone: "$contactNumber" },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $or: [
-                  { $and: [{ $ne: ["$$logLeadId", null] }, { $eq: ["$_id", "$$logLeadId"] }] },
-                  { $and: [{ $ne: ["$$phone", ""] }, { $eq: ["$phone", "$$phone"] }] }
-                ]
-              }
-            }
-          }
-        ],
-        as: "leadInfo"
-      }
-    },
-    {
-      $unwind: {
-        path: "$leadInfo",
-        preserveNullAndEmptyArrays: true
-      }
-    },
-    {
-      $project: {
-        _id: 1,
-        agentId: 1,
-        agentName: "$agentInfo.name",
-        leadId: { $ifNull: ["$leadInfo._id", "$leadId"] },
-        leadNumberId: "$leadInfo.leadId",
-        leadName: { $ifNull: ["$leadInfo.name", "Unknown Lead"] },
-        contactNumber: { $ifNull: ["$contactNumber", "$leadInfo.phone"] },
-        duration: 1,
-        timestamp: 1,
-        status: 1
+  // Fetch call logs matching filter
+  const longCalls = await CallLog.find(matchQuery)
+    .populate('agentId', 'name email')
+    .sort({ timestamp: -1 })
+    .lean();
+
+  if (longCalls.length === 0) return [];
+
+  // Extract leadIds and 10-digit normalized phone numbers
+  const leadIds = longCalls.map(c => c.leadId).filter(Boolean);
+  const rawPhones = longCalls.map(c => c.contactNumber).filter(Boolean);
+  const cleanPhones = rawPhones.map(p => p.replace(/[^0-9]/g, '').slice(-10)).filter(p => p.length === 10);
+
+  const LeadObj = require('../models/Lead');
+  const LeadModel = LeadObj.Model || mongoose.model('Lead');
+
+  const phoneRegexes = cleanPhones.map(p => new RegExp(p + '$'));
+
+  const leadQuery = { $or: [] };
+  if (leadIds.length > 0) leadQuery.$or.push({ _id: { $in: leadIds } });
+  if (phoneRegexes.length > 0) leadQuery.$or.push({ phone: { $in: phoneRegexes } });
+
+  const leads = leadQuery.$or.length > 0 ? await LeadModel.find(leadQuery).lean() : [];
+
+  const leadByIdMap = new Map();
+  const leadByPhoneMap = new Map();
+
+  leads.forEach(l => {
+    if (l._id) leadByIdMap.set(l._id.toString(), l);
+    if (l.phone) {
+      const cleanP = l.phone.replace(/[^0-9]/g, '').slice(-10);
+      if (cleanP) leadByPhoneMap.set(cleanP, l);
+    }
+  });
+
+  return longCalls.map(c => {
+    let matchedLead = null;
+    if (c.leadId && leadByIdMap.has(c.leadId.toString())) {
+      matchedLead = leadByIdMap.get(c.leadId.toString());
+    } else if (c.contactNumber) {
+      const cleanCallPhone = c.contactNumber.replace(/[^0-9]/g, '').slice(-10);
+      if (cleanCallPhone && leadByPhoneMap.has(cleanCallPhone)) {
+        matchedLead = leadByPhoneMap.get(cleanCallPhone);
       }
     }
-  ]);
 
-  return longCalls;
+    const leadNameDisplay = matchedLead 
+      ? matchedLead.name 
+      : (c.contactNumber ? `Call (${c.contactNumber})` : 'Direct Call');
+
+    return {
+      _id: c._id,
+      agentId: c.agentId?._id || c.agentId,
+      agentName: c.agentId?.name || 'Agent',
+      leadId: matchedLead ? matchedLead._id : c.leadId,
+      leadNumberId: matchedLead ? matchedLead.leadId : null,
+      leadName: leadNameDisplay,
+      contactNumber: c.contactNumber || (matchedLead ? matchedLead.phone : 'N/A'),
+      duration: c.duration,
+      timestamp: c.timestamp,
+      status: c.status
+    };
+  });
 }
 
 module.exports = {
