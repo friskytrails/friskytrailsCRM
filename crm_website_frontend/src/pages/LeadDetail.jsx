@@ -52,8 +52,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [isSavingDates, setIsSavingDates] = useState(false);
 
   const handleStartEditingDates = () => {
-    const rawStartDate = lead?.dates?.startDate || lead?.bookingDetails?.startDate || (lead?.trips && lead?.trips.length > 0 ? lead.trips[lead.trips.length - 1]?.startDate : null);
-    const rawDueDate = lead?.dates?.dueDate || lead?.dates?.endDate || lead?.bookingDetails?.endDate || (lead?.trips && lead?.trips.length > 0 ? lead.trips[lead.trips.length - 1]?.endDate : null);
+    const rawStartDate = lead?.dates?.startDate || null;
+    const rawDueDate = lead?.dates?.dueDate || lead?.dates?.endDate || null;
 
     setDateForm({
       startDate: formatDate(rawStartDate),
@@ -794,11 +794,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   />
                 ) : (
                   <div className="text-sm font-medium text-gray-800 dark:text-slate-200 bg-gray-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700">
-                    {formatDisplayDate(
-                      lead.dates?.startDate || 
-                      lead.bookingDetails?.startDate || 
-                      (lead.trips && lead.trips.length > 0 ? lead.trips[lead.trips.length - 1]?.startDate : null)
-                    )}
+                    {formatDisplayDate(lead.dates?.startDate)}
                   </div>
                 )}
               </div>
@@ -814,12 +810,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   />
                 ) : (
                   <div className="text-sm font-medium text-gray-800 dark:text-slate-200 bg-gray-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700">
-                    {formatDisplayDate(
-                      lead.dates?.dueDate || 
-                      lead.dates?.endDate || 
-                      lead.bookingDetails?.endDate || 
-                      (lead.trips && lead.trips.length > 0 ? lead.trips[lead.trips.length - 1]?.endDate : null)
-                    )}
+                    {formatDisplayDate(lead.dates?.dueDate || lead.dates?.endDate)}
                   </div>
                 )}
               </div>

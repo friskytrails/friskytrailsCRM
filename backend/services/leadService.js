@@ -318,10 +318,6 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   const updateData = {
     status: 'Booked',
     bookingDetails: bookingDetails,
-    dates: {
-      startDate: bookingDetails.startDate ? new Date(bookingDetails.startDate) : null,
-      dueDate: bookingDetails.endDate ? new Date(bookingDetails.endDate) : null
-    },
     trips: tripsList
   };
 
