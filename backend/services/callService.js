@@ -28,7 +28,10 @@ async function logCall(data) {
 async function getHistoricalReports(startDate, endDate, team, agentIdCondition) {
   let matchQuery = {};
   if (agentIdCondition) {
-    matchQuery.agentId = agentIdCondition;
+    const mongoose = require('mongoose');
+    matchQuery.agentId = typeof agentIdCondition === 'string' && mongoose.Types.ObjectId.isValid(agentIdCondition)
+      ? new mongoose.Types.ObjectId(agentIdCondition)
+      : agentIdCondition;
   }
   if (startDate && endDate) {
     matchQuery.timestamp = {
