@@ -30,7 +30,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'webp'];
     const dotIndex = file.originalname.lastIndexOf('.');
