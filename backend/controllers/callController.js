@@ -38,6 +38,9 @@ const getHistoricalReports = async (req, res) => {
   if (!req.user) {
     return res.status(403).json({ error: "Access denied" });
   }
+  if (!req.user.isAdmin && !req.user.userId) {
+    return res.status(403).json({ error: "User ID missing for non-admin request" });
+  }
   try {
     const { startDate, endDate, team } = req.query;
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
@@ -56,6 +59,9 @@ const getLiveStatus = async (req, res) => {
   if (!req.user) {
     return res.status(403).json({ error: "Access denied" });
   }
+  if (!req.user.isAdmin && !req.user.userId) {
+    return res.status(403).json({ error: "User ID missing for non-admin request" });
+  }
   try {
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
     const liveStatus = await callService.getLiveStatus(agentIdCondition);
@@ -72,6 +78,9 @@ const getLiveStatus = async (req, res) => {
 const getLiveActivity = async (req, res) => {
   if (!req.user) {
     return res.status(403).json({ error: "Access denied" });
+  }
+  if (!req.user.isAdmin && !req.user.userId) {
+    return res.status(403).json({ error: "User ID missing for non-admin request" });
   }
   try {
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
