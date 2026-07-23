@@ -19,4 +19,8 @@ router.get('/live-status', auth, callController.getLiveStatus);
 // Enhanced Live Activity Dashboard
 router.get('/live-activity', auth, callController.getLiveActivity);
 
+// GET /api/calls/long-calls
+// Get detailed long calls breakdown for an agent
+router.get('/long-calls', auth, callController.getLongCallsDetails);
+
 module.exports = router;

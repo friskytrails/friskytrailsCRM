@@ -34,9 +34,14 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
       : agentIdCondition;
   }
   if (startDate && endDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
     matchQuery.timestamp = {
-      $gte: new Date(startDate),
-      $lte: new Date(endDate)
+      $gte: start,
+      $lte: end
     };
   }
 
@@ -168,9 +173,98 @@ async function getLiveActivity(agentIdCondition) {
   return formattedActivity;
 }
 
+async function getLongCallsDetails(agentId, startDate, endDate) {
+  const mongoose = require('mongoose');
+  let matchQuery = {
+    duration: { $gte: 300 }
+  };
+
+  if (agentId && agentId !== 'all') {
+    if (mongoose.Types.ObjectId.isValid(agentId)) {
+      matchQuery.agentId = new mongoose.Types.ObjectId(agentId);
+    }
+  }
+
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    matchQuery.timestamp = {
+      $gte: start,
+      $lte: end
+    };
+  }
+
+  // Fetch call logs matching filter
+  const longCalls = await CallLog.find(matchQuery)
+    .populate('agentId', 'name email')
+    .sort({ timestamp: -1 })
+    .lean();
+
+  if (longCalls.length === 0) return [];
+
+  // Extract leadIds and 10-digit normalized phone numbers
+  const leadIds = longCalls.map(c => c.leadId).filter(Boolean);
+  const rawPhones = longCalls.map(c => c.contactNumber).filter(Boolean);
+  const cleanPhones = rawPhones.map(p => p.replace(/[^0-9]/g, '').slice(-10)).filter(p => p.length === 10);
+
+  const LeadObj = require('../models/Lead');
+  const LeadModel = LeadObj.Model || mongoose.model('Lead');
+
+  const phoneRegexes = cleanPhones.map(p => new RegExp(p + '$'));
+
+  const leadQuery = { $or: [] };
+  if (leadIds.length > 0) leadQuery.$or.push({ _id: { $in: leadIds } });
+  if (phoneRegexes.length > 0) leadQuery.$or.push({ phone: { $in: phoneRegexes } });
+
+  const leads = leadQuery.$or.length > 0 ? await LeadModel.find(leadQuery).lean() : [];
+
+  const leadByIdMap = new Map();
+  const leadByPhoneMap = new Map();
+
+  leads.forEach(l => {
+    if (l._id) leadByIdMap.set(l._id.toString(), l);
+    if (l.phone) {
+      const cleanP = l.phone.replace(/[^0-9]/g, '').slice(-10);
+      if (cleanP) leadByPhoneMap.set(cleanP, l);
+    }
+  });
+
+  return longCalls.map(c => {
+    let matchedLead = null;
+    if (c.leadId && leadByIdMap.has(c.leadId.toString())) {
+      matchedLead = leadByIdMap.get(c.leadId.toString());
+    } else if (c.contactNumber) {
+      const cleanCallPhone = c.contactNumber.replace(/[^0-9]/g, '').slice(-10);
+      if (cleanCallPhone && leadByPhoneMap.has(cleanCallPhone)) {
+        matchedLead = leadByPhoneMap.get(cleanCallPhone);
+      }
+    }
+
+    const leadNameDisplay = matchedLead 
+      ? matchedLead.name 
+      : (c.contactNumber ? `Call (${c.contactNumber})` : 'Direct Call');
+
+    return {
+      _id: c._id,
+      agentId: c.agentId?._id || c.agentId,
+      agentName: c.agentId?.name || 'Agent',
+      leadId: matchedLead ? matchedLead._id : c.leadId,
+      leadNumberId: matchedLead ? matchedLead.leadId : null,
+      leadName: leadNameDisplay,
+      contactNumber: c.contactNumber || (matchedLead ? matchedLead.phone : 'N/A'),
+      duration: c.duration,
+      timestamp: c.timestamp,
+      status: c.status
+    };
+  });
+}
+
 module.exports = {
   logCall,
   getHistoricalReports,
   getLiveStatus,
-  getLiveActivity
+  getLiveActivity,
+  getLongCallsDetails
 };
