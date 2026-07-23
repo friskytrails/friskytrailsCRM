@@ -17,8 +17,8 @@ const storage = new CloudinaryStorage({
     // Explicitly define if it is an image or raw document
     const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
 
-    // Ensure extension is included in public_id so Cloudinary URLs preserve format and preview properly
-    const publicId = `${sanitized}_${uniqueSuffix}${ext}`;
+    // Ensure extension is included in public_id for raw assets but omitted for images so Cloudinary handles formats properly
+    const publicId = `${sanitized}_${uniqueSuffix}${isImage ? '' : ext}`;
 
     return {
       folder: 'crm_attachments',

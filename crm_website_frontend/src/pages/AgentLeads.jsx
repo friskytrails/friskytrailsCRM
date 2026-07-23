@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import AgentMetricsTable from '../components/AgentMetricsTable';
 
 export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
   const { id } = useParams();
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
+  });
+  
+  useEffect(() => {
+    sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
+  }, [filterStatus]);
+
   const agent = agents.find(a => a.id === id);
   
   if (!agent) {

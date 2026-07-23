@@ -20,11 +20,41 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [imageFiles, setImageFiles] = useState({}); // { [leadId]: File }
   const [isUploading, setIsUploading] = useState({}); // { [leadId]: boolean }
   const [expandedNotes, setExpandedNotes] = useState({}); // { [leadId]: true/false }
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterAgent, setFilterAgent] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterProduct, setFilterProduct] = useState('all');
+  const userId = user?.id || user?._id || 'guest';
+
+  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
+  const [filterAgent, setFilterAgent] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || 'all');
+  const [sortBy, setSortBy] = useState(() => sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
+  const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
+  const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
+
+  useEffect(() => {
+    setSearchQuery(sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
+    setFilterAgent(sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || 'all');
+    setSortBy(sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
+    setFilterStatus(sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
+    setFilterProduct(sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
+  }, [userId]);
+
+  useEffect(() => {
+    sessionStorage.setItem(`dashboard_${userId}_searchQuery`, searchQuery);
+  }, [searchQuery, userId]);
+
+  useEffect(() => {
+    sessionStorage.setItem(`dashboard_${userId}_filterAgent`, filterAgent);
+  }, [filterAgent, userId]);
+
+  useEffect(() => {
+    sessionStorage.setItem(`dashboard_${userId}_sortBy`, sortBy);
+  }, [sortBy, userId]);
+
+  useEffect(() => {
+    sessionStorage.setItem(`dashboard_${userId}_filterStatus`, filterStatus);
+  }, [filterStatus, userId]);
+
+  useEffect(() => {
+    sessionStorage.setItem(`dashboard_${userId}_filterProduct`, filterProduct);
+  }, [filterProduct, userId]);
 
   const [liveStatus, setLiveStatus] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
@@ -160,7 +190,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("File size must be less than 10MB");
+      toast.error("File size must be 10MB or smaller");
       return;
     }
 

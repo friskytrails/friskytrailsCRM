@@ -2,7 +2,7 @@ const CallLog = require('../models/CallLog');
 const User = require('../models/User');
 
 async function logCall(data) {
-  const { agentId, leadId, duration, timestamp, status, contactNumber } = data;
+  const { agentId, leadId, clientCallId, duration, timestamp, status, contactNumber } = data;
   
   if (!agentId || !status) {
     throw new Error('agentId and status are required');
@@ -16,12 +16,28 @@ async function logCall(data) {
     contactNumber: contactNumber ? contactNumber.replace(/\s+/g, '') : ''
   };
 
+  if (clientCallId) {
+    callLogData.clientCallId = clientCallId;
+  }
+
   if (leadId) {
     callLogData.leadId = leadId;
   }
 
-  const callLog = new CallLog(callLogData);
-  await callLog.save();
+  const matchQuery = { agentId };
+  if (clientCallId) {
+    matchQuery.clientCallId = clientCallId;
+  } else {
+    matchQuery.timestamp = callLogData.timestamp;
+    matchQuery.contactNumber = callLogData.contactNumber;
+    matchQuery.status = callLogData.status;
+  }
+
+  const callLog = await CallLog.findOneAndUpdate(
+    matchQuery,
+    { $setOnInsert: callLogData },
+    { upsert: true, new: true }
+  );
   return callLog;
 }
 
@@ -33,17 +49,24 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
       ? new mongoose.Types.ObjectId(agentIdCondition)
       : agentIdCondition;
   }
+  let start, end;
   if (startDate && endDate) {
-    const start = new Date(startDate);
+    start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
+    end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
-
-    matchQuery.timestamp = {
-      $gte: start,
-      $lte: end
-    };
+  } else {
+    // Default to last 30 days if no explicit date range is provided (Fixes F2)
+    end = new Date();
+    start = new Date();
+    start.setDate(start.getDate() - 30);
+    start.setHours(0, 0, 0, 0);
   }
+
+  matchQuery.timestamp = {
+    $gte: start,
+    $lte: end
+  };
 
   const reports = await CallLog.aggregate([
     { $match: matchQuery },
@@ -73,11 +96,10 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
   ]);
 
   const formattedReports = reports.map(r => {
-    const tenureDays = Math.floor((new Date() - new Date(r.agent.createdAt)) / (1000 * 60 * 60 * 24));
     return {
       agentId: r._id,
       name: r.agent.name,
-      tenure: tenureDays,
+      tenure: Math.floor((new Date() - new Date(r.agent.createdAt)) / (1000 * 60 * 60 * 24)),
       talkTime: r.talkTime,
       totalDials: r.totalDials,
       uniqueCalls: r.uniqueContacts.filter(Boolean).length,

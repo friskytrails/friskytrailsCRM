@@ -13,6 +13,11 @@ const CallLogSchema = new mongoose.Schema({
     required: false,
     index: true
   },
+  clientCallId: {
+    type: String,
+    required: false,
+    index: true
+  },
   duration: { 
     type: Number, // duration in seconds
     required: true,
@@ -39,5 +44,10 @@ const CallLogSchema = new mongoose.Schema({
 // Compound indexes for high-performance reporting & lead history queries
 CallLogSchema.index({ agentId: 1, timestamp: -1 });
 CallLogSchema.index({ leadId: 1, timestamp: -1 });
+// Unique index to prevent duplicates from the app based on clientCallId
+CallLogSchema.index(
+  { agentId: 1, clientCallId: 1 },
+  { unique: true, partialFilterExpression: { clientCallId: { $exists: true } } }
+);
 
 module.exports = mongoose.model('CallLog', CallLogSchema);

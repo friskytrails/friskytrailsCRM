@@ -5,7 +5,7 @@ const callService = require('../services/callService');
 // @access  Private
 const logCall = async (req, res) => {
   try {
-    const { status, leadId, duration, timestamp, contactNumber } = req.body;
+    const { status, leadId, duration, timestamp, contactNumber, clientCallId } = req.body;
     const agentId = req.user.userId || req.user.id;
 
     if (!agentId || !status) {
@@ -18,7 +18,8 @@ const logCall = async (req, res) => {
       duration,
       timestamp,
       status,
-      contactNumber
+      contactNumber,
+      clientCallId
     });
     
     res.status(201).json(callLog);
