@@ -2,11 +2,11 @@ const GlobalConfig = require('../models/GlobalConfig');
 
 const getConfig = async (req, res) => {
   try {
-    let config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
-    if (!config) {
-      config = new GlobalConfig({ key: 'GLOBAL_SETTINGS' });
-      await config.save();
-    }
+    const config = await GlobalConfig.findOneAndUpdate(
+      { key: 'GLOBAL_SETTINGS' },
+      { $setOnInsert: { key: 'GLOBAL_SETTINGS' } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
     res.json(config);
   } catch (error) {
     console.error('Error fetching global config:', error);
@@ -25,13 +25,31 @@ const updateProducts = async (req, res) => {
       return res.status(400).json({ error: 'Products must be an array of strings' });
     }
 
-    let config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
-    if (!config) {
-      config = new GlobalConfig({ key: 'GLOBAL_SETTINGS' });
+    const validProducts = [];
+    const seen = new Set();
+    for (const p of products) {
+      if (typeof p !== 'string') {
+        return res.status(400).json({ error: 'All products must be strings' });
+      }
+      const trimmed = p.trim();
+      if (!trimmed) {
+        return res.status(400).json({ error: 'Product names cannot be blank' });
+      }
+      if (seen.has(trimmed.toLowerCase())) {
+        return res.status(400).json({ error: 'Duplicate products are not allowed' });
+      }
+      seen.add(trimmed.toLowerCase());
+      validProducts.push(trimmed);
     }
-    
-    config.products = products;
-    await config.save();
+
+    const config = await GlobalConfig.findOneAndUpdate(
+      { key: 'GLOBAL_SETTINGS' },
+      { 
+        $setOnInsert: { key: 'GLOBAL_SETTINGS' },
+        $set: { products: validProducts } 
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
     
     res.json(config);
   } catch (error) {

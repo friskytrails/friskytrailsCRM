@@ -56,8 +56,9 @@ async function updateAgentMetrics(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const { id } = req.params;
-    const { monthlyTarget, targetCompleted, attendance, attendanceDate, bookingCount } = req.body;
-    const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate, bookingCount);
+    const { monthlyTarget, targetCompleted, attendance, attendanceDate, date, bookingCount } = req.body;
+    const finalDate = date || attendanceDate;
+    const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, finalDate, bookingCount);
     res.json(agent);
   } catch (error) {
     return handleAgentServiceError(error, res);

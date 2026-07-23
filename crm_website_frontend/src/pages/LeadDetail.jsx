@@ -324,9 +324,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       setLead(updated);
       syncLeadToParent(updated);
       setShowBookingModal(false);
-      toast.success("Booking confirmed successfully!");
-    } else {
-      toast.error("Failed to confirm booking.");
     }
   };
 

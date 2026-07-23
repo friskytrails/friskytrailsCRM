@@ -45,6 +45,9 @@ const CallLogSchema = new mongoose.Schema({
 CallLogSchema.index({ agentId: 1, timestamp: -1 });
 CallLogSchema.index({ leadId: 1, timestamp: -1 });
 // Unique index to prevent duplicates from the app based on clientCallId
-CallLogSchema.index({ agentId: 1, clientCallId: 1 }, { unique: true, sparse: true });
+CallLogSchema.index(
+  { agentId: 1, clientCallId: 1 },
+  { unique: true, partialFilterExpression: { clientCallId: { $exists: true } } }
+);
 
 module.exports = mongoose.model('CallLog', CallLogSchema);

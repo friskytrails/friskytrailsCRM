@@ -322,8 +322,6 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   };
 
   if (bookingDetails.fullName) updateData.name = bookingDetails.fullName;
-  if (bookingDetails.contactNumber) updateData.phone = bookingDetails.contactNumber;
-  if (bookingDetails.emailId) updateData.mailId = bookingDetails.emailId;
   if (bookingDetails.packageName) updateData.product = bookingDetails.packageName;
 
   const result = await Lead.updateLead(id, updateData, agentIdCondition);
