@@ -2,20 +2,25 @@ const CallLog = require('../models/CallLog');
 const User = require('../models/User');
 
 async function logCall(data) {
-  const { agentId, duration, timestamp, status, contactNumber } = data;
+  const { agentId, leadId, duration, timestamp, status, contactNumber } = data;
   
   if (!agentId || !status) {
     throw new Error('agentId and status are required');
   }
 
-  const callLog = new CallLog({
+  const callLogData = {
     agentId,
     duration: duration || 0,
     timestamp: timestamp || new Date(),
     status,
-    contactNumber
-  });
+    contactNumber: contactNumber ? contactNumber.replace(/\s+/g, '') : ''
+  };
 
+  if (leadId) {
+    callLogData.leadId = leadId;
+  }
+
+  const callLog = new CallLog(callLogData);
   await callLog.save();
   return callLog;
 }
@@ -23,7 +28,10 @@ async function logCall(data) {
 async function getHistoricalReports(startDate, endDate, team, agentIdCondition) {
   let matchQuery = {};
   if (agentIdCondition !== undefined) {
-    matchQuery.agentId = agentIdCondition;
+    const mongoose = require('mongoose');
+    matchQuery.agentId = typeof agentIdCondition === 'string' && mongoose.Types.ObjectId.isValid(agentIdCondition)
+      ? new mongoose.Types.ObjectId(agentIdCondition)
+      : agentIdCondition;
   }
   if (startDate && endDate) {
     matchQuery.timestamp = {
@@ -40,7 +48,7 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
         talkTime: { $sum: "$duration" },
         totalDials: { $sum: 1 },
         uniqueContacts: { $addToSet: "$contactNumber" },
-        connectedCalls: {
+        connectedCalls: { 
           $sum: { $cond: [{ $eq: ["$status", "Connected"] }, 1, 0] }
         },
         longCalls: {
@@ -77,9 +85,12 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
 }
 
 async function getLiveStatus(agentIdCondition) {
+  const mongoose = require('mongoose');
   let matchQuery = {};
   if (agentIdCondition !== undefined) {
-    matchQuery.agentId = agentIdCondition;
+    matchQuery.agentId = typeof agentIdCondition === 'string' && mongoose.Types.ObjectId.isValid(agentIdCondition)
+      ? new mongoose.Types.ObjectId(agentIdCondition)
+      : agentIdCondition;
   }
 
   const recentCalls = await CallLog.aggregate([
@@ -116,12 +127,15 @@ async function getLiveStatus(agentIdCondition) {
 }
 
 async function getLiveActivity(agentIdCondition) {
+  const mongoose = require('mongoose');
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
   let matchQuery = { timestamp: { $gte: startOfDay } };
   if (agentIdCondition !== undefined) {
-    matchQuery.agentId = agentIdCondition;
+    matchQuery.agentId = typeof agentIdCondition === 'string' && mongoose.Types.ObjectId.isValid(agentIdCondition)
+      ? new mongoose.Types.ObjectId(agentIdCondition)
+      : agentIdCondition;
   }
 
   const activity = await CallLog.aggregate([

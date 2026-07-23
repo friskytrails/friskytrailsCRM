@@ -43,7 +43,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   }
 
   const lead = {
-    name: name || '',
+    name: name ? name.trim() || 'NA' : 'NA',
     phone: cleanPhone,
     age: age ? Number(age) : undefined,
     origin: origin || '',
@@ -78,32 +78,53 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
 }
 
 async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition) {
-  if (!phone) {
+  const existingLead = await Lead.findById(id);
+  if (!existingLead) {
+    throw new Error("Lead not found or unauthorized");
+  }
+
+  const finalPhone = phone !== undefined ? phone : existingLead.phone;
+  if (!finalPhone) {
     throw new Error("Phone number is required");
   }
 
-  const cleanPhone = phone.replace(/\s+/g, '');
+  const cleanPhone = finalPhone.replace(/\s+/g, '');
   if (!/^\d{10}$/.test(cleanPhone)) {
     throw new Error("Phone number must be exactly 10 digits with no spaces");
   }
 
   const updatePayload = {
-    name: name || '',
+    name: name !== undefined ? (name ? name.trim() || 'NA' : 'NA') : (existingLead.name || 'NA'),
     phone: cleanPhone,
-    age: age ? Number(age) : undefined,
-    origin: origin || '',
-    destination: destination || '',
-    leadSource: leadSource || '',
-    product: product || ''
+    age: age !== undefined ? (age ? Number(age) : undefined) : existingLead.age,
+    origin: origin !== undefined ? origin : (existingLead.origin || ''),
+    destination: destination !== undefined ? destination : (existingLead.destination || ''),
+    leadSource: leadSource !== undefined ? leadSource : (existingLead.leadSource || ''),
+    product: product !== undefined ? product : (existingLead.product || '')
   };
 
-  if (mailId && mailId.trim() !== '') {
-    updatePayload.mailId = mailId.trim();
-  } else {
+  const finalMailId = mailId !== undefined ? mailId : existingLead.mailId;
+  if (finalMailId && finalMailId.trim() !== '') {
+    updatePayload.mailId = finalMailId.trim();
+  } else if (mailId !== undefined && (!finalMailId || finalMailId.trim() === '')) {
     updatePayload.$unset = { mailId: 1 };
   }
 
-  const result = await Lead.updateLead(id, updatePayload, agentIdCondition);
+  let result;
+  try {
+    result = await Lead.updateLead(id, updatePayload, agentIdCondition);
+  } catch (error) {
+    if (error.code === 11000) {
+      if (error.keyPattern && error.keyPattern.phone) {
+        throw new Error("A lead with this phone number already exists.");
+      }
+      if (error.keyPattern && error.keyPattern.mailId) {
+        throw new Error("A lead with this email already exists.");
+      }
+      throw new Error("A lead with this phone number or email already exists.");
+    }
+    throw error;
+  }
 
   if (!result) {
     throw new Error("Lead not found or unauthorized");
@@ -276,6 +297,68 @@ async function updateStatus(id, status, agentIdCondition) {
   return formatDoc(result);
 }
 
+async function bookLead(id, bookingDetails, agentIdCondition) {
+  const existingLead = await Lead.findById(id);
+  if (!existingLead) {
+    throw new Error("Lead not found or unauthorized");
+  }
+
+  const tripObj = {
+    tripId: bookingDetails.tripId || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
+    packageName: bookingDetails.packageName || '',
+    startDate: bookingDetails.startDate ? new Date(bookingDetails.startDate) : null,
+    endDate: bookingDetails.endDate ? new Date(bookingDetails.endDate) : null,
+    totalAmount: Number(bookingDetails.totalAmount) || 0,
+    paidAmount: Number(bookingDetails.paidAmount) || 0,
+    dueAmount: Number(bookingDetails.dueAmount) || 0,
+    noOfPax: Number(bookingDetails.noOfPax) || 1,
+    fullName: bookingDetails.fullName || '',
+    contactNumber: bookingDetails.contactNumber || '',
+    emailId: bookingDetails.emailId || '',
+    emergencyContactNumber: bookingDetails.emergencyContactNumber || '',
+    bookedAt: new Date(),
+    status: 'Booked'
+  };
+
+  let tripsList = existingLead.trips ? [...existingLead.trips] : [];
+  
+  if (bookingDetails.tripIndex !== undefined && bookingDetails.tripIndex !== null && Number(bookingDetails.tripIndex) >= 0 && Number(bookingDetails.tripIndex) < tripsList.length) {
+    const idx = Number(bookingDetails.tripIndex);
+    tripsList[idx] = { ...tripsList[idx], ...tripObj, tripId: tripsList[idx].tripId || tripObj.tripId };
+  } else {
+    tripsList.push(tripObj);
+  }
+
+  const updateData = {
+    status: 'Booked',
+    bookingDetails: bookingDetails,
+    trips: tripsList
+  };
+
+  if (bookingDetails.fullName) updateData.name = bookingDetails.fullName;
+  if (bookingDetails.packageName) updateData.product = bookingDetails.packageName;
+
+  let result;
+  try {
+    result = await Lead.updateLead(id, updateData, agentIdCondition);
+  } catch (error) {
+    if (error.code === 11000) {
+      if (error.keyPattern && error.keyPattern.phone) {
+        throw new Error("A lead with this phone number already exists.");
+      }
+      if (error.keyPattern && error.keyPattern.mailId) {
+        throw new Error("A lead with this email already exists.");
+      }
+      throw new Error("A lead with this phone number or email already exists.");
+    }
+    throw error;
+  }
+  if (!result) {
+    throw new Error("Lead not found or unauthorized");
+  }
+  return formatDoc(result);
+}
+
 async function updateBooking(id, bookingData, agentIdCondition) {
   const lead = await Lead.findById(id);
   if (!lead) {
@@ -396,5 +479,6 @@ module.exports = {
   updateLabels,
   updateDates,
   updateStatus,
+  bookLead,
   updateBooking
 };

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from "react-hot-toast";
 
-export default function AddLead({ addLead, user }) {
+export default function AddLead({ addLead, user, products = [] }) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -42,20 +42,16 @@ export default function AddLead({ addLead, user }) {
     try {
       const success = await addLead(formData);
       if (success) {
-        if (user?.isAdmin) {
-          navigate('/');
-        } else {
-          setFormData({
-            name: '',
-            phone: '',
-            age: '',
-            origin: '',
-            destination: '',
-            leadSource: '',
-            product: '',
-            mailId: ''
-          });
-        }
+        setFormData({
+          name: '',
+          phone: '',
+          age: '',
+          origin: '',
+          destination: '',
+          leadSource: '',
+          product: '',
+          mailId: ''
+        });
       }
     } finally {
       setSubmitting(false);
@@ -195,12 +191,9 @@ export default function AddLead({ addLead, user }) {
                     className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border cursor-pointer focus:outline-none"
                   >
                     <option value="">Select a product...</option>
-                    <option value="Meghalaya Package">Meghalaya Package</option>
-                    <option value="Hampta Pass Trek">Hampta Pass Trek</option>
-                    <option value="Rishikesh Activities">Rishikesh Activities</option>
-                    <option value="Spiti Package">Spiti Package</option>
-                    <option value="Ladakh Package">Ladakh Package</option>
-                    <option value="Kerala Trip">Kerala Trip</option>
+                    {products.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
                   </select>
                 </div>
               </div>

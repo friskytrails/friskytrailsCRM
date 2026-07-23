@@ -53,6 +53,9 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                     <Link to="/reports" className={getLinkClass('/reports')}>
                       Reports
                     </Link>
+                    <Link to="/settings" className={getLinkClass('/settings')}>
+                      Settings
+                    </Link>
                   </>
                 )}
               </div>
@@ -154,6 +157,9 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                 </Link>
                 <Link to="/reports" onClick={() => setIsOpen(false)} className={getLinkClass('/reports', true)}>
                   Reports
+                </Link>
+                <Link to="/settings" onClick={() => setIsOpen(false)} className={getLinkClass('/settings', true)}>
+                  Settings
                 </Link>
               </>
             )}

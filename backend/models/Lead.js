@@ -113,6 +113,19 @@ const LeadSchema = new mongoose.Schema({
     enum: ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'],
     default: 'Fresh Leads'
   },
+  bookingDetails: {
+    fullName: { type: String, default: '' },
+    emailId: { type: String, default: '' },
+    contactNumber: { type: String, default: '' },
+    emergencyContactNumber: { type: String, default: '' },
+    packageName: { type: String, default: '' },
+    totalAmount: { type: Number, default: 0 },
+    paidAmount: { type: Number, default: 0 },
+    dueAmount: { type: Number, default: 0 },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+    noOfPax: { type: Number, default: 0 }
+  },
   booking: {
     totalDial: { type: Number, default: 0 },
     dailyDial: { type: Number, default: 0 },
@@ -124,6 +137,26 @@ const LeadSchema = new mongoose.Schema({
   },
   callLogs: {
     type: [CallLogSchema],
+    default: []
+  },
+  trips: {
+    type: [{
+      tripId: { type: String, default: '' },
+      packageName: { type: String, default: '' },
+      startDate: { type: Date, default: null },
+      endDate: { type: Date, default: null },
+      totalAmount: { type: Number, default: 0 },
+      paidAmount: { type: Number, default: 0 },
+      dueAmount: { type: Number, default: 0 },
+      noOfPax: { type: Number, default: 1 },
+      fullName: { type: String, default: '' },
+      contactNumber: { type: String, default: '' },
+      emailId: { type: String, default: '' },
+      emergencyContactNumber: { type: String, default: '' },
+      bookedAt: { type: Date, default: Date.now },
+      bookedBy: { type: String, default: '' },
+      status: { type: String, default: 'Booked' }
+    }],
     default: []
   }
 }, { timestamps: true });
@@ -176,9 +209,17 @@ module.exports = {
       query.agentIds = agentIdCondition;
     }
     const updateDoc = { ...data };
+    const pushDoc = updateDoc.$push;
+    delete updateDoc.$push;
     const unsetDoc = updateDoc.$unset;
     delete updateDoc.$unset;
-    const finalUpdate = { $set: updateDoc };
+    const finalUpdate = {};
+    if (Object.keys(updateDoc).length > 0) {
+      finalUpdate.$set = updateDoc;
+    }
+    if (pushDoc) {
+      finalUpdate.$push = pushDoc;
+    }
     if (unsetDoc) {
       finalUpdate.$unset = unsetDoc;
     }
