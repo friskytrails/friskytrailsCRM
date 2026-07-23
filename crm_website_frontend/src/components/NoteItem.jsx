@@ -1,3 +1,5 @@
+import React, { useState } from 'react';
+
 const getNoteDisplayDate = (note) => {
   if (!note || !note.timestamp) return 'Unknown time';
   if (note.timestamp.includes(',')) return note.timestamp;
@@ -26,6 +28,7 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
   }, [note.imageUrl]);
 
   const isMyNote = note.authorId ? note.authorId === currentUser?.id : note.author === currentUser?.name;
+  const [imgError, setImgError] = useState(false);
 
   return (
     <div className={`flex items-start space-x-3 ${isMyNote ? '' : ''}`}>
@@ -66,32 +69,35 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                   href={note.imageUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-3 bg-gray-100 dark:bg-slate-800 text-sm font-semibold flex items-center hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors gap-2 block"
+                  className="p-3 bg-gray-100 dark:bg-slate-800 text-sm font-semibold flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors gap-2 block"
                   title="Click to view/download"
                 >
                   <span className="text-base">📄</span>
                   <span className="truncate max-w-[180px]">{fileName}</span>
                 </a>
+              ) : imgError ? (
+                <a
+                  href={note.imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-3 bg-gray-100 dark:bg-slate-800 text-xs font-semibold flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors gap-1.5 block"
+                >
+                  <span>🖼️</span> View Image ({fileName})
+                </a>
               ) : (
-                imgError ? (
-                  <a
-                    href={note.imageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-3 bg-gray-100 dark:bg-slate-800 text-xs font-semibold flex items-center hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors block"
-                  >
-                    🖼️ View Image ({fileName})
-                  </a>
-                ) : (
-                  <a href={note.imageUrl} target="_blank" rel="noopener noreferrer" className="block">
-                    <img
-                      src={note.imageUrl}
-                      alt="Attachment preview"
-                      className="w-full h-auto max-h-[140px] object-cover hover:opacity-95 transition-opacity rounded"
-                      onError={() => setImgError(true)}
-                    />
-                  </a>
-                )
+                <a
+                  href={note.imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block cursor-pointer"
+                >
+                  <img
+                    src={note.imageUrl}
+                    alt="Attachment preview"
+                    className="w-full h-auto max-h-[140px] object-cover hover:opacity-95 transition-opacity rounded"
+                    onError={() => setImgError(true)}
+                  />
+                </a>
               )}
             </div>
           );

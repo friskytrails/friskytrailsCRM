@@ -110,7 +110,21 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     updatePayload.$unset = { mailId: 1 };
   }
 
-  const result = await Lead.updateLead(id, updatePayload, agentIdCondition);
+  let result;
+  try {
+    result = await Lead.updateLead(id, updatePayload, agentIdCondition);
+  } catch (error) {
+    if (error.code === 11000) {
+      if (error.keyPattern && error.keyPattern.phone) {
+        throw new Error("A lead with this phone number already exists.");
+      }
+      if (error.keyPattern && error.keyPattern.mailId) {
+        throw new Error("A lead with this email already exists.");
+      }
+      throw new Error("A lead with this phone number or email already exists.");
+    }
+    throw error;
+  }
 
   if (!result) {
     throw new Error("Lead not found or unauthorized");
@@ -324,7 +338,21 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   if (bookingDetails.fullName) updateData.name = bookingDetails.fullName;
   if (bookingDetails.packageName) updateData.product = bookingDetails.packageName;
 
-  const result = await Lead.updateLead(id, updateData, agentIdCondition);
+  let result;
+  try {
+    result = await Lead.updateLead(id, updateData, agentIdCondition);
+  } catch (error) {
+    if (error.code === 11000) {
+      if (error.keyPattern && error.keyPattern.phone) {
+        throw new Error("A lead with this phone number already exists.");
+      }
+      if (error.keyPattern && error.keyPattern.mailId) {
+        throw new Error("A lead with this email already exists.");
+      }
+      throw new Error("A lead with this phone number or email already exists.");
+    }
+    throw error;
+  }
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
