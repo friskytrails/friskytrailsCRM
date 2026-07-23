@@ -20,11 +20,31 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [imageFiles, setImageFiles] = useState({}); // { [leadId]: File }
   const [isUploading, setIsUploading] = useState({}); // { [leadId]: boolean }
   const [expandedNotes, setExpandedNotes] = useState({}); // { [leadId]: true/false }
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterAgent, setFilterAgent] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterProduct, setFilterProduct] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem('dashboard_searchQuery') || '');
+  const [filterAgent, setFilterAgent] = useState(() => sessionStorage.getItem('dashboard_filterAgent') || 'all');
+  const [sortBy, setSortBy] = useState(() => sessionStorage.getItem('dashboard_sortBy') || 'newest');
+  const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem('dashboard_filterStatus') || 'all');
+  const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem('dashboard_filterProduct') || 'all');
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard_searchQuery', searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard_filterAgent', filterAgent);
+  }, [filterAgent]);
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard_sortBy', sortBy);
+  }, [sortBy]);
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard_filterStatus', filterStatus);
+  }, [filterStatus]);
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard_filterProduct', filterProduct);
+  }, [filterProduct]);
 
   const [liveStatus, setLiveStatus] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
