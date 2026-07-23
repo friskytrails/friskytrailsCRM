@@ -20,6 +20,11 @@ const getNoteDisplayDate = (note) => {
 
 export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
   const [imgError, setImgError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImgError(false);
+  }, [note.imageUrl]);
+
   const isMyNote = note.authorId ? note.authorId === currentUser?.id : note.author === currentUser?.name;
 
   return (

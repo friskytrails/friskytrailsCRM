@@ -127,7 +127,7 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
   }
   
   // Historical metrics update
-  if (monthlyTarget !== undefined || targetCompleted !== undefined) {
+  if (monthlyTarget !== undefined || targetCompleted !== undefined || bookingCount !== undefined) {
     let histIdx = user.historicalMetrics.findIndex(m => m.month === monthPrefix);
     if (histIdx === -1) {
       user.historicalMetrics.push({ 
