@@ -28,7 +28,6 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
   }, [note.imageUrl]);
 
   const isMyNote = note.authorId ? note.authorId === currentUser?.id : note.author === currentUser?.name;
-  const [imgError, setImgError] = useState(false);
 
   return (
     <div className={`flex items-start space-x-3 ${isMyNote ? '' : ''}`}>
