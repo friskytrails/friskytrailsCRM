@@ -65,7 +65,7 @@ const updateStatuses = async (req, res) => {
     }
     
     const { statuses } = req.body;
-    if (!Array.isArray(statuses) || !statuses.every(s => typeof s === 'string' && s.trim().length > 0)) {
+    if (!Array.isArray(statuses) || statuses.length === 0 || !statuses.every(s => typeof s === 'string' && s.trim().length > 0)) {
       return res.status(400).json({ error: 'Statuses must be an array of non-empty strings' });
     }
 

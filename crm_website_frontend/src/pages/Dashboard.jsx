@@ -296,11 +296,9 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   // Sync current filtered/sorted lead IDs to sessionStorage for lead detail next/prev navigation
   useEffect(() => {
-    if (sortedLeads && sortedLeads.length > 0) {
-      const activeIds = sortedLeads.map(l => l.id || l._id);
-      sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
-    }
-  }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, leads]);
+    const activeIds = (sortedLeads || []).map(l => l.id || l._id);
+    sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+  }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, leads, agents]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

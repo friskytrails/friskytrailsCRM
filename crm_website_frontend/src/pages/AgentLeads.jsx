@@ -21,6 +21,15 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     encodeURIComponent(a.name) === id
   );
   
+  const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).includes(agent.id)) : [];
+  const filteredAgentLeads = agentLeads.filter(lead => filterStatus === 'all' || (lead.status || 'Fresh Leads') === filterStatus);
+
+  // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
+  useEffect(() => {
+    const activeIds = (filteredAgentLeads || []).map(l => l.id || l._id);
+    sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+  }, [filteredAgentLeads]);
+
   if (!agent) {
     return <div className="p-8 text-center text-gray-500">Agent not found</div>;
   }
@@ -29,19 +38,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const prevAgent = currentAgentIndex > 0 ? agents[currentAgentIndex - 1] : null;
   const nextAgent = currentAgentIndex >= 0 && currentAgentIndex < (agents || []).length - 1 ? agents[currentAgentIndex + 1] : null;
 
-  const agentLeads = leads.filter(lead => (lead.agentIds || []).includes(agent.id));
-  const filteredAgentLeads = agentLeads.filter(lead => filterStatus === 'all' || (lead.status || 'Fresh Leads') === filterStatus);
-  
   const defaultStatusList = ["Fresh Leads", "Interested Leads", "Pre Prospect Leads", "Prospect Leads", "Booked", "Rejected Leads"];
-  const availableStatuses = Array.from(new Set([...(statuses || []), ...defaultStatusList]));
-
-  // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
-  useEffect(() => {
-    if (filteredAgentLeads && filteredAgentLeads.length > 0) {
-      const activeIds = filteredAgentLeads.map(l => l.id || l._id);
-      sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
-    }
-  }, [filteredAgentLeads]);
+  const availableStatuses = (statuses && statuses.length > 0) ? statuses : defaultStatusList;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">

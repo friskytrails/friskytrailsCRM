@@ -51,6 +51,7 @@ CallLogSchema.pre('validate', function(next) {
     } else if (s === 'voicemail') {
       this.status = 'Voicemail';
     } else {
+      console.warn(`Unrecognized call status '${this.status}', defaulting to 'Failed'`);
       this.status = 'Failed';
     }
   }

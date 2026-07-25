@@ -78,6 +78,14 @@ export default function Reports() {
           data = data.filter(c => (c.status || '').toLowerCase() === 'connected');
         } else if (metric === 'longCalls') {
           data = data.filter(c => (c.duration || 0) >= 300);
+        } else if (metric === 'unique') {
+          const seen = new Set();
+          data = data.filter(c => {
+            const key = c.contactNumber || (typeof c.leadId === 'object' ? c.leadId?._id : c.leadId) || c._id;
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
         }
         setLongCallsDetails(data);
       } else {
