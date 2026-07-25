@@ -13,7 +13,7 @@ const STATUS_OPTIONS = [
   { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
 
-export default function Dashboard({ leads, agents, assignAgent, addNote, deleteNote, updateLead, user, loading }) {
+export default function Dashboard({ leads, agents, products = [], statuses = [], assignAgent, addNote, deleteNote, updateLead, user, loading }) {
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
   const [noteInputs, setNoteInputs] = useState({}); // { [leadId]: 'comment text' }
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -23,14 +23,14 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const userId = user?.id || user?._id || 'guest';
 
   const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
-  const [filterAgent, setFilterAgent] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || 'all');
+  const [filterAgent, setFilterAgent] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || 'unassigned');
   const [sortBy, setSortBy] = useState(() => sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
   const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
   const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
 
   useEffect(() => {
     setSearchQuery(sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
-    setFilterAgent(sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || 'all');
+    setFilterAgent(sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || 'unassigned');
     setSortBy(sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
     setFilterStatus(sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
     setFilterProduct(sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
@@ -73,7 +73,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const [modalData, setModalData] = useState({
     name: '',
     phone: '',
-    age: '',
     origin: '',
     destination: '',
     leadSource: '',
@@ -87,7 +86,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       setModalData({
         name: editingLead.name || '',
         phone: editingLead.phone || '',
-        age: editingLead.age || '',
         origin: editingLead.origin || '',
         destination: editingLead.destination || '',
         leadSource: editingLead.leadSource || '',
@@ -252,8 +250,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
   const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => a.id === id))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
-
-
   // Filter logic
   const filteredLeads = leads.filter((lead) => {
     const agentNames = (lead.agentIds || []).map(id => agents.find((a) => a.id === id)?.name || "").join(" ");
@@ -264,9 +260,12 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       agentNames.toLowerCase().includes(searchQuery.toLowerCase());
 
+    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => a.id === id));
+
     const matchesAgent =
       filterAgent === 'all' ||
-      (filterAgent === 'unassigned' && (!(lead.agentIds && lead.agentIds.length > 0) || !(lead.agentIds || []).some(id => agents.some(a => a.id === id)))) ||
+      (filterAgent === 'unassigned' && !isLeadAssigned) ||
+      (filterAgent === 'assigned' && isLeadAssigned) ||
       (lead.agentIds || []).includes(filterAgent);
 
     const matchesStatus =
@@ -289,15 +288,19 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
         return (a.name || '').localeCompare(b.name || '');
       case 'name-desc':
         return (b.name || '').localeCompare(a.name || '');
-      case 'age-asc':
-        return Number(a.age) - Number(b.age);
-      case 'age-desc':
-        return Number(b.age) - Number(a.age);
       case 'newest':
       default:
         return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
     }
   });
+
+  // Sync current filtered/sorted lead IDs to sessionStorage for lead detail next/prev navigation
+  useEffect(() => {
+    if (sortedLeads && sortedLeads.length > 0) {
+      const activeIds = sortedLeads.map(l => l.id || l._id);
+      sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+    }
+  }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, leads]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -437,24 +440,36 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
                   <tr>
                     <th className="px-4 py-2 rounded-l-lg">Agent</th>
                     <th className="px-4 py-2">First Call</th>
-                    <th className="px-4 py-2 rounded-r-lg">Last Call</th>
+                    <th className="px-4 py-2">Last Call</th>
+                    <th className="px-4 py-2 rounded-r-lg">Talk Time</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...liveActivity].sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall)).map(act => (
-                    <tr key={act.agentId} className="border-b dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{act.name}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {new Date(act.firstCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {new Date(act.lastCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                    </tr>
-                  ))}
+                  {[...liveActivity].sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall)).map(act => {
+                    const sec = act.talkTime || 0;
+                    const h = Math.floor(sec / 3600);
+                    const m = Math.floor((sec % 3600) / 60);
+                    const s = Math.floor(sec % 60);
+                    const formattedTalkTime = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+
+                    return (
+                      <tr key={act.agentId} className="border-b dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
+                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{act.name}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {new Date(act.firstCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {new Date(act.lastCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-orange-600 dark:text-orange-400">
+                          {formattedTalkTime}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {liveActivity.length === 0 && (
                     <tr>
-                      <td colSpan="3" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
+                      <td colSpan="4" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
                     </tr>
                   )}
                 </tbody>
@@ -489,8 +504,9 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               onChange={(e) => setFilterAgent(e.target.value)}
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
-              <option value="all">All Agents</option>
-              <option value="unassigned">Unassigned Only</option>
+              <option value="unassigned">Unassigned Only (Default)</option>
+              <option value="assigned">Assigned Only</option>
+              <option value="all">Unassigned & Assigned (All)</option>
               {agents.map((agent) => {
                 const count = getAgentLeadCount(agent.id);
                 return (
@@ -513,8 +529,6 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               <option value="oldest">Oldest First</option>
               <option value="name-asc">Name (A-Z)</option>
               <option value="name-desc">Name (Z-A)</option>
-              <option value="age-asc">Age (Youngest First)</option>
-              <option value="age-desc">Age (Oldest First)</option>
             </select>
           </div>
 
@@ -526,7 +540,7 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
               <option value="all">All Packages</option>
-              {[...new Set(leads.map(l => l.product).filter(Boolean))].map(prod => (
+              {Array.from(new Set([...(products || []), ...leads.map(l => l.product).filter(Boolean)])).map(prod => (
                 <option key={prod} value={prod}>{prod}</option>
               ))}
             </select>
@@ -540,8 +554,8 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
               <option value="all">All Statuses</option>
-              {STATUS_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.value}</option>
+              {Array.from(new Set([...(statuses || []), ...STATUS_OPTIONS.map(s => s.value)])).map(st => (
+                <option key={st} value={st}>{st}</option>
               ))}
             </select>
           </div>
@@ -949,25 +963,14 @@ export default function Dashboard({ leads, agents, assignAgent, addNote, deleteN
               </button>
             </div>
             <form onSubmit={handleModalSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    value={modalData.name}
-                    onChange={(e) => setModalData({ ...modalData, name: e.target.value })}
-                    className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
-                  />
-                </div>
-                <div className="col-span-1">
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Age</label>
-                  <input
-                    type="number"
-                    value={modalData.age}
-                    onChange={(e) => setModalData({ ...modalData, age: e.target.value })}
-                    className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={modalData.name}
+                  onChange={(e) => setModalData({ ...modalData, name: e.target.value })}
+                  className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-4">

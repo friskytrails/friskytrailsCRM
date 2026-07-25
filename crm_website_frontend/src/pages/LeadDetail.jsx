@@ -13,10 +13,10 @@ const STATUS_OPTIONS = [
   { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
 
-export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI }) {
-  const availableProducts = products && products.length > 0
-    ? products
-    : ["Meghalaya Package", "Hampta Pass Trek", "Rishikesh Activities", "Spiti Package", "Ladakh Package", "Kerala Trip"];
+export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], statuses = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI }) {
+  const defaultProducts = ["Meghalaya Package", "Hampta Pass Trek", "Rishikesh Activities", "Spiti Package", "Ladakh Package", "Kerala Trip"];
+  const availableProducts = Array.from(new Set([...(products || []), ...defaultProducts]));
+  const availableStatuses = Array.from(new Set([...(statuses || []), ...STATUS_OPTIONS.map(s => s.value)]));
   const { id } = useParams();
   const navigate = useNavigate();
   const [lead, setLead] = useState(null);
@@ -370,20 +370,71 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     );
   }
 
+  // Retrieve active filtered lead sequence from sessionStorage (synced from Dashboard / AgentLeads)
+  const getNavLeads = () => {
+    try {
+      const stored = sessionStorage.getItem('activeLeadIds');
+      if (stored) {
+        const activeIds = JSON.parse(stored);
+        if (Array.isArray(activeIds) && activeIds.length > 0) {
+          const leadMap = new Map((leads || []).map(l => [String(l.id || l._id), l]));
+          const filteredNav = activeIds.map(idStr => leadMap.get(String(idStr))).filter(Boolean);
+          if (filteredNav.length > 0 && filteredNav.some(l => String(l.id || l._id) === String(lead?.id || lead?._id || id))) {
+            return filteredNav;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse activeLeadIds:", e);
+    }
+    return leads || [];
+  };
+
+  const navLeads = getNavLeads();
+  const currentLeadIndex = navLeads.findIndex(l => String(l.id || l._id) === String(lead?.id || lead?._id || id));
+  const prevLead = currentLeadIndex > 0 ? navLeads[currentLeadIndex - 1] : null;
+  const nextLead = currentLeadIndex >= 0 && currentLeadIndex < navLeads.length - 1 ? navLeads[currentLeadIndex + 1] : null;
   const assignedAgents = (lead.agentIds || []).map(id => agents?.find(a => a.id === id)).filter(Boolean);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back button */}
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 font-medium mb-6 transition-colors cursor-pointer"
-      >
-        <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back
-      </button>
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => navigate('/')}
+          className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
+        >
+          <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Dashboard
+        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => prevLead && navigate(`/leads/${prevLead.id || prevLead._id}`)}
+            disabled={!prevLead}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+            title={prevLead ? `Previous Lead: ${prevLead.name || ''}` : 'First lead'}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Previous Lead
+          </button>
+          <button
+            onClick={() => nextLead && navigate(`/leads/${nextLead.id || nextLead._id}`)}
+            disabled={!nextLead}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+            title={nextLead ? `Next Lead: ${nextLead.name || ''}` : 'Last lead'}
+          >
+            Next Lead
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {/* Header */}
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
@@ -418,7 +469,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 {lead.mailId}
               </span>
             )}
-            {lead.age && <span className="text-sm font-semibold text-gray-600 dark:text-gray-300">Age: {lead.age}</span>}
           </div>
         </div>
         <div className="flex flex-wrap gap-3 mt-5">
@@ -514,8 +564,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) || (lead.status === 'Booked' && !user?.isAdmin)}
                 className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color} ${(lead.status === 'Booked' && !user?.isAdmin) ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.value}</option>
+                {availableStatuses.map(st => (
+                  <option key={st} value={st}>{st}</option>
                 ))}
               </select>
             </div>

@@ -58,7 +58,52 @@ const updateProducts = async (req, res) => {
   }
 };
 
+const updateStatuses = async (req, res) => {
+  try {
+    if (!req.user || !req.user.isAdmin) {
+      return res.status(403).json({ error: 'Access denied. Admins only.' });
+    }
+    
+    const { statuses } = req.body;
+    if (!Array.isArray(statuses) || !statuses.every(s => typeof s === 'string' && s.trim().length > 0)) {
+      return res.status(400).json({ error: 'Statuses must be an array of non-empty strings' });
+    }
+
+    const validStatuses = [];
+    const seen = new Set();
+    for (const s of statuses) {
+      if (typeof s !== 'string') {
+        return res.status(400).json({ error: 'All statuses must be strings' });
+      }
+      const trimmed = s.trim();
+      if (!trimmed) {
+        return res.status(400).json({ error: 'Status names cannot be blank' });
+      }
+      if (seen.has(trimmed.toLowerCase())) {
+        return res.status(400).json({ error: 'Duplicate statuses are not allowed' });
+      }
+      seen.add(trimmed.toLowerCase());
+      validStatuses.push(trimmed);
+    }
+
+    const config = await GlobalConfig.findOneAndUpdate(
+      { key: 'GLOBAL_SETTINGS' },
+      { 
+        $setOnInsert: { key: 'GLOBAL_SETTINGS' },
+        $set: { statuses: validStatuses } 
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    
+    res.json(config);
+  } catch (error) {
+    console.error('Error updating statuses:', error);
+    res.status(500).json({ error: 'Failed to update statuses' });
+  }
+};
+
 module.exports = {
   getConfig,
-  updateProducts
+  updateProducts,
+  updateStatuses
 };

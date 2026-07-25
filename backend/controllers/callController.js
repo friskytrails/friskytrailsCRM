@@ -101,9 +101,9 @@ const getLongCallsDetails = async (req, res) => {
     return res.status(403).json({ error: "Access denied" });
   }
   try {
-    const { agentId, startDate, endDate } = req.query;
+    const { agentId, startDate, endDate, metric } = req.query;
     const targetAgentId = req.user.isAdmin ? agentId : req.user.userId;
-    const details = await callService.getLongCallsDetails(targetAgentId, startDate, endDate);
+    const details = await callService.getLongCallsDetails(targetAgentId, startDate, endDate, metric);
     res.json(details);
   } catch (error) {
     console.error("Error fetching long call details:", error);

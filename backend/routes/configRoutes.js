@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.get('/', auth, configController.getConfig);
 router.put('/products', auth, configController.updateProducts);
+router.put('/statuses', auth, configController.updateStatuses);
 
 module.exports = router;

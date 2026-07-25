@@ -8,7 +8,6 @@ export default function AddLead({ addLead, user, products = [] }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    age: '',
     origin: '',
     destination: '',
     leadSource: '',
@@ -45,7 +44,6 @@ export default function AddLead({ addLead, user, products = [] }) {
         setFormData({
           name: '',
           phone: '',
-          age: '',
           origin: '',
           destination: '',
           leadSource: '',
@@ -70,36 +68,19 @@ export default function AddLead({ addLead, user, products = [] }) {
 
         <div className="px-6 py-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Row 1: Full Name & Age */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="sm:col-span-2">
-                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Full Name</label>
-                <div className="mt-1">
-                  <input
-                    type="text"
-                    name="name"
-                    id="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border"
-                    placeholder="John Doe"
-                  />
-                </div>
-              </div>
-
-              <div className="sm:col-span-1">
-                <label htmlFor="age" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Age</label>
-                <div className="mt-1">
-                  <input
-                    type="number"
-                    name="age"
-                    id="age"
-                    value={formData.age}
-                    onChange={handleChange}
-                    className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border"
-                    placeholder="30"
-                  />
-                </div>
+            {/* Row 1: Full Name */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Full Name</label>
+              <div className="mt-1">
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border"
+                  placeholder="John Doe"
+                />
               </div>
             </div>
 

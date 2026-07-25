@@ -17,6 +17,17 @@ const GlobalConfigSchema = new mongoose.Schema({
       "Ladakh Package",
       "Kerala Trip",
     ]
+  },
+  statuses: {
+    type: [String],
+    default: [
+      "Fresh Leads",
+      "Interested Leads",
+      "Pre Prospect Leads",
+      "Prospect Leads",
+      "Booked",
+      "Rejected Leads"
+    ]
   }
 }, { timestamps: true });
 
