@@ -1,11 +1,13 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, assignAgentsToManager }) {
   const [loadingAction, setLoadingAction] = useState({});
   const [processedAgents, setProcessedAgents] = useState({});
   const [assignModalManager, setAssignModalManager] = useState(null); // manager object or null
+  const [viewTeamManager, setViewTeamManager] = useState(null);
   const [selectedAgentIds, setSelectedAgentIds] = useState([]);
+  const [assignSearchQuery, setAssignSearchQuery] = useState('');
   const [assignLoading, setAssignLoading] = useState(false);
 
   const pendingAgentsList = agents.filter(a => a.status === 'Pending');
@@ -54,6 +56,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     const currentAgentIds = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).map(a => a.id);
     setSelectedAgentIds(currentAgentIds);
     setAssignModalManager(manager);
+    setAssignSearchQuery('');
   };
 
   const handleAssign = async () => {
@@ -74,7 +77,13 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   };
 
   // Agents eligible to be assigned (non-managers, non-pending)
-  const assignableAgents = agents.filter(a => !a.isManager && a.status !== 'Pending');
+  const baseAssignableAgents = agents.filter(a => !a.isManager && a.status !== 'Pending');
+  const assignableAgents = assignSearchQuery.trim() === '' 
+    ? baseAssignableAgents 
+    : baseAssignableAgents.filter(a => 
+        a.name.toLowerCase().includes(assignSearchQuery.toLowerCase()) || 
+        a.email.toLowerCase().includes(assignSearchQuery.toLowerCase())
+      );
 
   const statusColors = {
     'Active': 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400',
@@ -206,7 +215,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               </div>
               <div className="grid grid-cols-1 gap-3.5">
                 {managersList.map(manager => {
-                  const teamCount = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).length;
+                  const teamMembers = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id);
+                  const teamCount = teamMembers.length;
                   const count = agentLeadCounts[manager.id] || 0;
                   const status = manager.status || 'Active';
                   return (
@@ -227,9 +237,12 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                         </div>
                       </div>
                       <div className="flex items-center gap-3 sm:ml-auto">
-                        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/40">
+                        <button 
+                          onClick={() => setViewTeamManager(manager)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/60 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/40 transition-colors"
+                        >
                           {teamCount} agent{teamCount !== 1 ? 's' : ''} in team
-                        </span>
+                        </button>
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
                           {count} {count === 1 ? 'Lead' : 'Leads'}
                         </span>
@@ -245,7 +258,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                           title="Remove Manager role"
                           className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40"
                         >
-                          {loadingAction[`mgr_${manager.id}`] ? '...' : 'âˆ’ Manager'}
+                          {loadingAction[`mgr_${manager.id}`] ? '...' : 'Remove Manager'}
                         </button>
                       </div>
                     </div>
@@ -311,6 +324,57 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
         </div>
       </div>
 
+      {/* View Team Modal */}
+      {viewTeamManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 w-full max-w-sm flex flex-col overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                Team Members
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Agents assigned to {viewTeamManager.name}</p>
+            </div>
+            <div className="p-6 max-h-[50vh] overflow-y-auto">
+              {(() => {
+                const teamMembers = agents.filter(a => a.managerId === viewTeamManager.id || a.managerId === viewTeamManager._id);
+                if (teamMembers.length === 0) {
+                  return <p className="text-sm text-gray-500">No agents assigned.</p>;
+                }
+                return (
+                  <ul className="space-y-2">
+                    {teamMembers.map(member => (
+                      <li key={member.id}>
+                        <Link 
+                          to={`/agents/${member.id}`}
+                          onClick={() => setViewTeamManager(null)}
+                          className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-violet-50 dark:bg-slate-800/50 dark:hover:bg-slate-700/80 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-violet-200 dark:hover:border-violet-900/50 transition-all group cursor-pointer"
+                        >
+                          <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 flex items-center justify-center font-bold text-xs shrink-0 group-hover:scale-105 transition-transform">
+                            {(member.name || '').split(' ').map(n => n?.[0] || '').join('')}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">{member.name}</span>
+                            <span className="text-[10px] font-mono text-gray-500">{member.email}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+            <div className="px-6 py-4 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-700 flex justify-end">
+              <button
+                onClick={() => setViewTeamManager(null)}
+                className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Assign Agents Modal */}
       {assignModalManager && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
@@ -325,6 +389,23 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               </h3>
               <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Select agents to assign under this manager. Previously assigned agents will be replaced.</p>
             </div>
+            
+            {/* Search Input */}
+            <div className="px-6 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/30">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search agents by name or email..."
+                  value={assignSearchQuery}
+                  onChange={(e) => setAssignSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-white transition-shadow shadow-sm"
+                />
+              </div>
+            </div>
+
             {/* Agent list */}
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
               {assignableAgents.length === 0 ? (

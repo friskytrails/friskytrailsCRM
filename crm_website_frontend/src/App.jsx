@@ -401,7 +401,18 @@ function App() {
       });
       if (response.ok) {
         const updatedAgent = await response.json();
-        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        
+        // If demoted, refresh the agents list to show that their team members are unassigned
+        if (!isManager) {
+          const agentsRes = await fetch(`${API_URL}/agents`, { headers: getAuthHeaders() });
+          if (agentsRes.ok) {
+            const fetchedAgents = await agentsRes.json();
+            setAgents(fetchedAgents);
+          }
+        } else {
+          setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        }
+        
         toast.success(isManager ? `${updatedAgent.name} is now a Manager.` : `${updatedAgent.name} has been demoted to Agent.`);
         return updatedAgent;
       } else {
