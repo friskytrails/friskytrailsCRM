@@ -16,9 +16,12 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
   }, [user, navigate]);
 
   useEffect(() => {
-    if (!token || !user?.isManager) return;
+    if (!token || !user?.isManager) {
+      setLoading(false);
+      return;
+    }
     fetchTeam();
-  }, [token]);
+  }, [token, user]);
 
   async function fetchTeam() {
     setLoading(true);
@@ -39,6 +42,13 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
     }
   }
 
+  const getLocalDateString = (d) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handleAttendanceUpdate = async (agentId, newAttendance) => {
     try {
       const res = await fetch(`${API_URL}/agents/${agentId}/metrics`, {
@@ -47,10 +57,10 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ attendance: newAttendance, attendanceDate: new Date().toISOString().split('T')[0] })
+        body: JSON.stringify({ attendance: newAttendance, attendanceDate: getLocalDateString(new Date()) })
       });
       if (res.ok) {
-        setTeam(team.map(a => a.id === agentId ? { ...a, attendance: newAttendance } : a));
+        setTeam(prevTeam => prevTeam.map(a => a.id === agentId ? { ...a, attendance: newAttendance } : a));
         toast.success('Attendance updated');
       } else {
         toast.error('Failed to update attendance');
@@ -86,7 +96,7 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>} />
         <StatCard label="Total Leads" value={team.reduce((sum, agent) => sum + (agentLeadCounts[agent.id] || 0), 0)} color="emerald"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>} />
-        <StatCard label="Active Members today" value={team.filter(a => a.status === 'Active' || a.isVerified).length} color="emerald"
+        <StatCard label="Active Members today (Present)" value={team.filter(a => a.attendance === 'P').length} color="emerald"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>} />
       </div>
 

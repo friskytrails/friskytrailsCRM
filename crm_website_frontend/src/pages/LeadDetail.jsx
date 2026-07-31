@@ -15,8 +15,8 @@ const STATUS_OPTIONS = [
 
 export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], statuses = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI }) {
   const defaultProducts = ["Meghalaya Package", "Hampta Pass Trek", "Rishikesh Activities", "Spiti Package", "Ladakh Package", "Kerala Trip"];
-  const availableProducts = Array.from(new Set([...(products || []), ...defaultProducts]));
-  const availableStatuses = Array.from(new Set([...(statuses || []), ...STATUS_OPTIONS.map(s => s.value)]));
+  const availableProducts = (products && products.length > 0) ? products : defaultProducts;
+  const availableStatuses = (statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value);
   const { id } = useParams();
   const navigate = useNavigate();
   const [lead, setLead] = useState(null);

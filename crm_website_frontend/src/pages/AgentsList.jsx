@@ -63,8 +63,10 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     if (!assignModalManager) return;
     setAssignLoading(true);
     try {
-      await assignAgentsToManager(assignModalManager.id, selectedAgentIds);
-      setAssignModalManager(null);
+      const result = await assignAgentsToManager(assignModalManager.id, selectedAgentIds);
+      if (result) {
+        setAssignModalManager(null);
+      }
     } finally {
       setAssignLoading(false);
     }
@@ -77,13 +79,14 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   };
 
   // Agents eligible to be assigned (non-managers, non-pending)
-  const baseAssignableAgents = agents.filter(a => !a.isManager && a.status !== 'Pending');
+  const baseAssignableAgents = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
   const assignableAgents = assignSearchQuery.trim() === '' 
     ? baseAssignableAgents 
-    : baseAssignableAgents.filter(a => 
-        a.name.toLowerCase().includes(assignSearchQuery.toLowerCase()) || 
-        a.email.toLowerCase().includes(assignSearchQuery.toLowerCase())
-      );
+    : baseAssignableAgents.filter(a => {
+        const nameMatch = (a.name || '').toLowerCase().includes(assignSearchQuery.toLowerCase());
+        const emailMatch = (a.email || '').toLowerCase().includes(assignSearchQuery.toLowerCase());
+        return nameMatch || emailMatch;
+      });
 
   const statusColors = {
     'Active': 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400',
@@ -145,7 +148,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             </p>
             <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
               <span className="font-mono">{agent.email}</span>
-              <span className="text-gray-300 dark:text-slate-600">â€¢</span>
+              <span className="text-gray-300 dark:text-slate-600">&bull;</span>
               {agent.isVerified ? (
                 <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>Verified
@@ -296,7 +299,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
         </div>
 
-        {/* Right Sidebar â€” Pending Approvals */}
+        {/* Right Sidebar - Pending Approvals */}
         <div className="lg:w-1/4">
           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl shadow-xl rounded-2xl p-5 border border-orange-200 dark:border-orange-900/50 relative overflow-hidden sticky top-24">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-red-500"></div>
