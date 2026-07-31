@@ -150,9 +150,9 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     if (monthPrefix === todayStr.substring(0, 7)) user.bookingCount = num;
   }
 
-  // Only overwrite current attendance if it is today
-  if (attendance !== undefined && (!attendanceDate || attendanceDate === todayStr)) {
+  if (attendance !== undefined) {
     user.attendance = attendance;
+    user.attendanceDate = attendanceDate || todayStr;
   }
 
   await user.save();

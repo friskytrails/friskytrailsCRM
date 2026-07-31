@@ -39,6 +39,27 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
     }
   }
 
+  const handleAttendanceUpdate = async (agentId, newAttendance) => {
+    try {
+      const res = await fetch(`${API_URL}/agents/${agentId}/metrics`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ attendance: newAttendance, attendanceDate: new Date().toISOString().split('T')[0] })
+      });
+      if (res.ok) {
+        setTeam(team.map(a => a.id === agentId ? { ...a, attendance: newAttendance } : a));
+        toast.success('Attendance updated');
+      } else {
+        toast.error('Failed to update attendance');
+      }
+    } catch {
+      toast.error('Network error');
+    }
+  };
+
   const agentLeadCounts = leads.reduce((acc, lead) => {
     (lead.agentIds || []).forEach(agentId => {
       acc[agentId] = (acc[agentId] || 0) + 1;
@@ -142,9 +163,19 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-gray-800 dark:text-slate-200 font-medium">
-                          {agent.attendance === 'P' ? 'Present' : agent.attendance === 'A' ? 'Absent' : 'Present'}
-                        </span>
+                        <select
+                          value={agent.attendance || ''}
+                          onChange={(e) => handleAttendanceUpdate(agent.id, e.target.value)}
+                          className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border border-transparent cursor-pointer focus:ring-2 focus:ring-violet-500 outline-none transition-colors ${
+                            agent.attendance === 'P' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                            agent.attendance === 'A' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400' :
+                            'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-400'
+                          }`}
+                        >
+                          <option value="">Not marked</option>
+                          <option value="P">Present</option>
+                          <option value="A">Absent</option>
+                        </select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
