@@ -189,6 +189,7 @@ async function updateProfile(userId, name, email) {
     name: user.name,
     email: user.email,
     isAdmin: !!user.isAdmin,
+    isManager: !!user.isManager,
     isVerified: user.isVerified
   };
 }
