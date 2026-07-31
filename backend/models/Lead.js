@@ -206,7 +206,11 @@ module.exports = {
       }
     }
     if (agentIdCondition !== undefined) {
-      query.agentIds = agentIdCondition;
+      if (Array.isArray(agentIdCondition)) {
+        query.agentIds = { $in: agentIdCondition };
+      } else {
+        query.agentIds = agentIdCondition;
+      }
     }
     const updateDoc = { ...data };
     const pushDoc = updateDoc.$push;
@@ -243,7 +247,11 @@ module.exports = {
       }
     }
     if (agentIdCondition !== undefined) {
-      query.agentIds = agentIdCondition;
+      if (Array.isArray(agentIdCondition)) {
+        query.agentIds = { $in: agentIdCondition };
+      } else {
+        query.agentIds = agentIdCondition;
+      }
     }
     return Lead.findOneAndUpdate(
       query,
@@ -264,7 +272,11 @@ module.exports = {
       }
     }
     if (agentIdCondition !== undefined) {
-      query.agentIds = agentIdCondition;
+      if (Array.isArray(agentIdCondition)) {
+        query.agentIds = { $in: agentIdCondition };
+      } else {
+        query.agentIds = agentIdCondition;
+      }
     }
 
     let noteObjectId;

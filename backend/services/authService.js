@@ -103,7 +103,7 @@ async function login(email, password) {
   }
 
   const token = jwt.sign(
-    { userId: user._id.toString(), isAdmin: !!user.isAdmin },
+    { userId: user._id.toString(), isAdmin: !!user.isAdmin, isManager: !!user.isManager },
     config.JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -115,6 +115,7 @@ async function login(email, password) {
       name: user.name,
       email: user.email,
       isAdmin: !!user.isAdmin,
+      isManager: !!user.isManager,
       isVerified: user.isVerified,
       status: user.status
     }
@@ -132,6 +133,7 @@ async function getProfile(userId) {
     name: user.name,
     email: user.email,
     isAdmin: !!user.isAdmin,
+    isManager: !!user.isManager,
     isVerified: user.isVerified
   };
 }

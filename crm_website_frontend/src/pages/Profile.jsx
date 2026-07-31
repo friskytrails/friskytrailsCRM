@@ -143,8 +143,8 @@ export default function Profile({ user, setUser, token, API_URL, handleLogout })
               />
             </div>
             <div className="pt-2 flex items-center justify-between">
-              <span className={`inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold ${user.isAdmin ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'}`}>
-                Role: {user.isAdmin ? 'Administrator' : 'Agent'}
+              <span className={`inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold ${user.isAdmin ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300' : user.isManager ? 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'}`}>
+                Role: {user.isAdmin ? 'Administrator' : user.isManager ? 'Manager' : 'Agent'}
               </span>
               {user.isVerified && (
                 <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">

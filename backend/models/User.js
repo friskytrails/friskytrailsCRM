@@ -20,6 +20,15 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isManager: {
+    type: Boolean,
+    default: false
+  },
+  managerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   status: {
     type: String,
     enum: ['Active', 'Inactive', 'Former Employee', 'Pending'],
@@ -108,7 +117,17 @@ module.exports = {
     await user.save();
     return { insertedId: user._id };
   },
+  // Returns all non-admin users (agents + managers)
   findAgents: async () => {
     return User.find({ isAdmin: false });
+  },
+  // Returns only users promoted to manager role
+  findManagers: async () => {
+    return User.find({ isAdmin: false, isManager: true });
+  },
+  // Returns agents assigned to a specific manager
+  findAgentsByManager: async (managerId) => {
+    return User.find({ managerId: managerId });
   }
 };
+

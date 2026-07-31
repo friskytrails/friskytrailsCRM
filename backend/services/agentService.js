@@ -245,5 +245,77 @@ module.exports = {
   getAgentMetrics,
   updateAgentMetrics,
   getAgentAttendance,
-  getAgentMonthlyAttendance
+  getAgentMonthlyAttendance,
+  toggleManagerRole,
+  assignAgentsToManager,
+  getMyTeam
 };
+
+async function toggleManagerRole(id, isManager) {
+  const user = await User.findById(id);
+  if (!user) throw createError("Agent not found", "NotFoundError");
+  if (user.isAdmin) throw createError("Cannot change role of an admin user");
+
+  if (typeof isManager !== 'boolean') {
+    if (isManager === 'true') isManager = true;
+    else if (isManager === 'false') isManager = false;
+    else throw createError("isManager must be a boolean value");
+  }
+
+  // On demotion: clear managerId from all agents under this manager
+  if (!isManager && user.isManager) {
+    await User.Model.updateMany(
+      { managerId: user._id },
+      { $set: { managerId: null } }
+    );
+  }
+
+  user.isManager = isManager;
+  await user.save();
+  return formatDoc(user);
+}
+
+async function assignAgentsToManager(managerId, agentIds) {
+  const manager = await User.findById(managerId);
+  if (!manager) throw createError("Manager not found", "NotFoundError");
+  if (!manager.isManager) throw createError("Target user is not a manager");
+
+  if (!Array.isArray(agentIds)) throw createError("agentIds must be an array");
+
+  // Validate each agentId and ensure they are non-admin, non-manager agents
+  for (const agentId of agentIds) {
+    const agent = await User.findById(agentId);
+    if (!agent) throw createError(`Agent ${agentId} not found`, "NotFoundError");
+    if (agent.isAdmin) throw createError("Cannot assign admin users to a manager");
+    if (agent.isManager) throw createError(`User ${agent.name} is a manager and cannot be assigned under another manager`);
+  }
+
+  // Clear any agents previously assigned to this manager
+  await User.Model.updateMany(
+    { managerId: manager._id },
+    { $set: { managerId: null } }
+  );
+
+  // Assign new agents (one manager at a time — override previous manager)
+  if (agentIds.length > 0) {
+    await User.Model.updateMany(
+      { _id: { $in: agentIds } },
+      { $set: { managerId: manager._id } }
+    );
+  }
+
+  const updatedAgents = await User.findAgentsByManager(manager._id);
+  return {
+    manager: formatDoc(manager),
+    agents: updatedAgents.map(formatDoc)
+  };
+}
+
+async function getMyTeam(managerId) {
+  const manager = await User.findById(managerId);
+  if (!manager) throw createError("Manager not found", "NotFoundError");
+  if (!manager.isManager) throw createError("User is not a manager");
+
+  const agents = await User.findAgentsByManager(manager._id);
+  return agents.map(formatDoc);
+}

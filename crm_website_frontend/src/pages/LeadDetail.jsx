@@ -363,9 +363,9 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   if (!lead) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-        <h2 className="text-xl font-bold text-gray-900">Lead not found</h2>
-        <Link to="/" className="text-orange-600 hover:text-orange-700 text-sm font-semibold mt-2 inline-block">← Back to Dashboard</Link>
+      <div className="flex flex-col items-center justify-center h-[50vh]">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-200">Lead not found</h2>
+        <button onClick={() => navigate(-1)} className="text-orange-600 hover:text-orange-700 text-sm font-semibold mt-2 inline-block cursor-pointer">  Go Back</button>
       </div>
     );
   }
@@ -401,13 +401,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between mb-6">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Dashboard
+          Back
         </button>
 
         <div className="flex items-center gap-2">
