@@ -24,9 +24,10 @@ export default function Reports() {
   const [sortBy, setSortBy] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
 
-  // Long calls drilldown modal state
+  // Call drilldown modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [modalTitle, setModalTitle] = useState('Call Details');
   const [longCallsDetails, setLongCallsDetails] = useState([]);
   const [loadingLongCalls, setLoadingLongCalls] = useState(false);
 
@@ -55,8 +56,9 @@ export default function Reports() {
     }
   };
 
-  const handleOpenLongCallsModal = async (agentId, agentName) => {
+  const handleOpenDrilldownModal = async (agentId, agentName, metric = 'longCalls', title = 'Call Details') => {
     setSelectedAgent({ agentId, name: agentName });
+    setModalTitle(title);
     setShowModal(true);
     setLoadingLongCalls(true);
     try {
@@ -64,20 +66,34 @@ export default function Reports() {
       const params = new URLSearchParams({
         agentId: agentId || 'all',
         startDate,
-        endDate
+        endDate,
+        metric
       });
       const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/long-calls?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
+        let data = await res.json();
+        if (metric === 'connected') {
+          data = data.filter(c => (c.status || '').toLowerCase() === 'connected');
+        } else if (metric === 'longCalls') {
+          data = data.filter(c => (c.duration || 0) >= 300);
+        } else if (metric === 'unique') {
+          const seen = new Set();
+          data = data.filter(c => {
+            const key = c.contactNumber || (typeof c.leadId === 'object' ? c.leadId?._id : c.leadId) || c._id;
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
         setLongCallsDetails(data);
       } else {
-        toast.error('Failed to load long call details');
+        toast.error('Failed to load call details');
       }
     } catch (err) {
       console.error(err);
-      toast.error('Error fetching long call details');
+      toast.error('Error fetching call details');
     } finally {
       setLoadingLongCalls(false);
     }
@@ -89,10 +105,14 @@ export default function Reports() {
   }, []);
 
   const formatTime = (seconds) => {
+    if (!seconds || seconds <= 0) return '0m 0s';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    if (h > 0) {
+      return `${h}h ${m}m ${s}s`;
+    }
+    return `${m}m ${s}s`;
   };
 
   const aggregate = reports.reduce((acc, curr) => {
@@ -170,14 +190,30 @@ export default function Reports() {
               <tr className="bg-orange-50/50 dark:bg-orange-900/10 font-bold border-b-2 border-gray-200 dark:border-slate-600">
                 <td className="px-6 py-4 text-orange-800 dark:text-orange-300">TOTAL</td>
                 <td className="px-6 py-4 text-orange-800 dark:text-orange-300">-</td>
-                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">{formatTime(aggregate.talkTime)}</td>
-                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">{aggregate.totalDials}</td>
-                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">{aggregate.uniqueCalls}</td>
-                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">{aggregate.connectedCalls}</td>
+                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">
+                  <button onClick={() => handleOpenDrilldownModal('all', 'All Agents', 'talkTime', 'All Agents - Talk Time Breakdown')} className="hover:underline cursor-pointer">
+                    {formatTime(aggregate.talkTime)}
+                  </button>
+                </td>
+                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">
+                  <button onClick={() => handleOpenDrilldownModal('all', 'All Agents', 'dials', 'All Agents - Total Dials Breakdown')} className="hover:underline cursor-pointer">
+                    {aggregate.totalDials}
+                  </button>
+                </td>
+                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">
+                  <button onClick={() => handleOpenDrilldownModal('all', 'All Agents', 'unique', 'All Agents - Unique Contact Calls')} className="hover:underline cursor-pointer">
+                    {aggregate.uniqueCalls}
+                  </button>
+                </td>
+                <td className="px-6 py-4 text-orange-800 dark:text-orange-300">
+                  <button onClick={() => handleOpenDrilldownModal('all', 'All Agents', 'connected', 'All Agents - Connected Calls')} className="hover:underline cursor-pointer">
+                    {aggregate.connectedCalls}
+                  </button>
+                </td>
                 <td className="px-6 py-4 text-orange-800 dark:text-orange-300">
                   {aggregate.longCalls > 0 ? (
                     <button
-                      onClick={() => handleOpenLongCallsModal('all', 'All Agents')}
+                      onClick={() => handleOpenDrilldownModal('all', 'All Agents', 'longCalls', 'All Agents - Long Calls Breakdown (5m+)')}
                       className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-500 font-bold hover:underline group cursor-pointer focus:outline-none"
                       title="Click to view all long calls"
                     >
@@ -205,16 +241,36 @@ export default function Reports() {
                 return sortOrder === 'asc' ? valA - valB : valB - valA;
               }).map(report => (
                 <tr key={report.agentId} className="border-b dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{report.name}</td>
+                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                    <Link to={`/agents/${report.agentId}`} className="text-orange-600 dark:text-orange-400 hover:underline font-bold">
+                      {report.name}
+                    </Link>
+                  </td>
                   <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{report.tenure}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{formatTime(report.talkTime)}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{report.totalDials}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{report.uniqueCalls}</td>
-                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{report.connectedCalls}</td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                    <button onClick={() => handleOpenDrilldownModal(report.agentId, report.name, 'talkTime', `${report.name} - Talk Time Breakdown`)} className="hover:underline text-orange-600 dark:text-orange-400 font-medium cursor-pointer">
+                      {formatTime(report.talkTime)}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                    <button onClick={() => handleOpenDrilldownModal(report.agentId, report.name, 'dials', `${report.name} - Total Dials`)} className="hover:underline text-orange-600 dark:text-orange-400 font-medium cursor-pointer">
+                      {report.totalDials}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                    <button onClick={() => handleOpenDrilldownModal(report.agentId, report.name, 'unique', `${report.name} - Unique Contact Calls`)} className="hover:underline text-orange-600 dark:text-orange-400 font-medium cursor-pointer">
+                      {report.uniqueCalls}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
+                    <button onClick={() => handleOpenDrilldownModal(report.agentId, report.name, 'connected', `${report.name} - Connected Calls`)} className="hover:underline text-orange-600 dark:text-orange-400 font-medium cursor-pointer">
+                      {report.connectedCalls}
+                    </button>
+                  </td>
                   <td className="px-6 py-4 text-gray-600 dark:text-gray-400">
                     {report.longCalls > 0 ? (
                       <button
-                        onClick={() => handleOpenLongCallsModal(report.agentId, report.name)}
+                        onClick={() => handleOpenDrilldownModal(report.agentId, report.name, 'longCalls', `${report.name} - Long Calls (5m+)`)}
                         className="inline-flex items-center gap-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-500 font-bold hover:underline group cursor-pointer focus:outline-none"
                         title={`Click to view long call details for ${report.name}`}
                       >
@@ -240,7 +296,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Long Calls Drilldown Modal */}
+      {/* Drilldown Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-200 dark:border-slate-700">
@@ -248,7 +304,7 @@ export default function Reports() {
             <div className="p-4 px-6 bg-gradient-to-r from-orange-500 to-amber-600 dark:from-slate-900 dark:to-slate-800 border-b border-orange-600 dark:border-slate-700 flex justify-between items-center text-white">
               <div>
                 <h3 className="text-lg font-bold flex items-center gap-2">
-                  <span>📞</span> Long Calls Breakdown (5m+)
+                  <span>📞</span> {modalTitle}
                 </h3>
                 <p className="text-xs text-orange-100 dark:text-slate-400 mt-0.5">
                   Agent: <strong className="text-white font-semibold">{selectedAgent?.name}</strong> • Range: {startDate} to {endDate}
@@ -272,7 +328,7 @@ export default function Reports() {
                 </div>
               ) : longCallsDetails.length === 0 ? (
                 <div className="py-12 text-center text-gray-500 dark:text-slate-400 text-sm">
-                  No long calls (&gt;= 5 mins) recorded for this agent in the selected date range.
+                  No call logs recorded for this metric in the selected date range.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -294,7 +350,7 @@ export default function Reports() {
                             <td className="px-4 py-3 font-semibold text-gray-900 dark:text-slate-100">
                               {leadTargetId ? (
                                 <Link
-                                  to={`/lead/${leadTargetId}`}
+                                  to={`/leads/${leadTargetId}`}
                                   className="text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1.5"
                                   title="View Lead Details"
                                 >
@@ -337,7 +393,7 @@ export default function Reports() {
 
             {/* Modal Footer */}
             <div className="p-4 bg-gray-50 dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 flex justify-between items-center text-xs text-gray-500 dark:text-slate-400">
-              <span>Showing <strong>{longCallsDetails.length}</strong> long call(s) (&gt;= 5 minutes)</span>
+              <span>Showing <strong>{longCallsDetails.length}</strong> call record(s)</span>
               <button
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 text-gray-800 dark:text-slate-200 rounded-lg font-semibold text-xs transition-colors cursor-pointer"

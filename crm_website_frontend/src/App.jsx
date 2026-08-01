@@ -22,6 +22,7 @@ function App() {
   const [leads, setLeads] = useState([]);
   const [agents, setAgents] = useState([]);
   const [products, setProducts] = useState([]);
+  const [statuses, setStatuses] = useState([]);
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('user');
@@ -78,6 +79,7 @@ function App() {
           setLeads(leadsData);
           setAgents(agentsData);
           setProducts(configData.products || []);
+          setStatuses(configData.statuses || []);
         } else {
           // If token expired or invalid
           if (leadsRes.status === 401 || agentsRes.status === 401) {
@@ -406,7 +408,7 @@ function App() {
           <Routes>
             <Route
               path="/"
-              element={<Dashboard leads={leads} agents={agents} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
+              element={<Dashboard leads={leads} agents={agents} products={products} statuses={statuses} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
             />
 
             <Route
@@ -415,7 +417,7 @@ function App() {
             />
             <Route
               path="/settings"
-              element={user?.isAdmin ? <GlobalSettings products={products} setProducts={setProducts} API_URL={API_URL} token={token} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <GlobalSettings products={products} setProducts={setProducts} statuses={statuses} setStatuses={setStatuses} API_URL={API_URL} token={token} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents"
@@ -423,11 +425,11 @@ function App() {
             />
             <Route
               path="/agents/:id"
-              element={user?.isAdmin ? <AgentLeads leads={leads} agents={agents} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/reports"
-              element={user?.isAdmin ? <Reports /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <Reports leads={leads} agents={agents} /> : <Navigate to="/" replace />}
             />
 
             <Route
@@ -440,6 +442,7 @@ function App() {
                       leads={leads} 
                       agents={agents} 
                       products={products}
+                      statuses={statuses}
                       updateLeadStatus={updateLeadStatus} 
                       bookLeadAPI={bookLeadAPI}
                       updateLeadBooking={updateLeadBooking}

@@ -41,6 +41,23 @@ const CallLogSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+CallLogSchema.pre('validate', function(next) {
+  if (this.status && typeof this.status === 'string') {
+    const s = this.status.trim().toLowerCase();
+    if (s === 'connected' || s === 'success' || s === 'answered') {
+      this.status = 'Connected';
+    } else if (s === 'missed' || s === 'no answer' || s === 'no_answer') {
+      this.status = 'Missed';
+    } else if (s === 'voicemail') {
+      this.status = 'Voicemail';
+    } else {
+      console.warn(`Unrecognized call status '${this.status}', defaulting to 'Failed'`);
+      this.status = 'Failed';
+    }
+  }
+  next();
+});
+
 // Compound indexes for high-performance reporting & lead history queries
 CallLogSchema.index({ agentId: 1, timestamp: -1 });
 CallLogSchema.index({ leadId: 1, timestamp: -1 });

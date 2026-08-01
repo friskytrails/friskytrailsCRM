@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import AgentMetricsTable from '../components/AgentMetricsTable';
 
-export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
+export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics }) {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [filterStatus, setFilterStatus] = useState(() => {
     return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
   });
@@ -12,17 +13,73 @@ export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
     sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
   }, [filterStatus]);
 
-  const agent = agents.find(a => a.id === id);
+  const decodedParam = decodeURIComponent(id || '');
+  const agent = agents.find(a => 
+    a.id === id || 
+    a.name === decodedParam || 
+    a.name?.toLowerCase() === decodedParam.toLowerCase() ||
+    encodeURIComponent(a.name) === id
+  );
   
+  const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).includes(agent.id)) : [];
+  const filteredAgentLeads = agentLeads.filter(lead => filterStatus === 'all' || (lead.status || 'Fresh Leads') === filterStatus);
+
+  // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
+  useEffect(() => {
+    const activeIds = (filteredAgentLeads || []).map(l => l.id || l._id);
+    sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+  }, [filteredAgentLeads]);
+
   if (!agent) {
     return <div className="p-8 text-center text-gray-500">Agent not found</div>;
   }
   
-  const agentLeads = leads.filter(lead => (lead.agentIds || []).includes(id));
-  const filteredAgentLeads = agentLeads.filter(lead => filterStatus === 'all' || (lead.status || 'Fresh Leads') === filterStatus);
-  
+  const currentAgentIndex = (agents || []).findIndex(a => a.id === agent.id);
+  const prevAgent = currentAgentIndex > 0 ? agents[currentAgentIndex - 1] : null;
+  const nextAgent = currentAgentIndex >= 0 && currentAgentIndex < (agents || []).length - 1 ? agents[currentAgentIndex + 1] : null;
+
+  const defaultStatusList = ["Fresh Leads", "Interested Leads", "Pre Prospect Leads", "Prospect Leads", "Booked", "Rejected Leads"];
+  const availableStatuses = (statuses && statuses.length > 0) ? statuses : defaultStatusList;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => navigate('/')}
+          className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
+        >
+          <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Dashboard
+        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => prevAgent && navigate(`/agents/${prevAgent.id}`)}
+            disabled={!prevAgent}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+            title={prevAgent ? `Previous Agent: ${prevAgent.name}` : 'First agent'}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Previous Agent
+          </button>
+          <button
+            onClick={() => nextAgent && navigate(`/agents/${nextAgent.id}`)}
+            disabled={!nextAgent}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+            title={nextAgent ? `Next Agent: ${nextAgent.name}` : 'Last agent'}
+          >
+            Next Agent
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-2xl border border-orange-200 dark:border-orange-800/50">
@@ -49,12 +106,9 @@ export default function AgentLeads({ leads, agents, updateAgentMetrics }) {
           className="text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow"
         >
           <option value="all">All Statuses</option>
-          <option value="Fresh Leads">Fresh Leads</option>
-          <option value="Interested Leads">Interested Leads</option>
-          <option value="Pre Prospect Leads">Pre Prospect Leads</option>
-          <option value="Prospect Leads">Prospect Leads</option>
-          <option value="Booked">Booked</option>
-          <option value="Rejected Leads">Rejected Leads</option>
+          {availableStatuses.map(st => (
+            <option key={st} value={st}>{st}</option>
+          ))}
         </select>
       </div>
       

@@ -51,10 +51,8 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
   }
   let start, end;
   if (startDate && endDate) {
-    start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    start = new Date(startDate.includes('T') ? startDate : `${startDate}T00:00:00.000`);
+    end = new Date(endDate.includes('T') ? endDate : `${endDate}T23:59:59.999`);
   } else {
     // Default to last 30 days if no explicit date range is provided (Fixes F2)
     end = new Date();
@@ -171,7 +169,8 @@ async function getLiveActivity(agentIdCondition) {
       $group: {
         _id: "$agentId",
         firstCall: { $min: "$timestamp" },
-        lastCall: { $max: "$timestamp" }
+        lastCall: { $max: "$timestamp" },
+        talkTime: { $sum: "$duration" }
       }
     },
     {
@@ -189,17 +188,22 @@ async function getLiveActivity(agentIdCondition) {
     agentId: a._id,
     name: a.agent.name,
     firstCall: a.firstCall,
-    lastCall: a.lastCall
+    lastCall: a.lastCall,
+    talkTime: a.talkTime || 0
   }));
 
   return formattedActivity;
 }
 
-async function getLongCallsDetails(agentId, startDate, endDate) {
+async function getLongCallsDetails(agentId, startDate, endDate, metric = 'longCalls') {
   const mongoose = require('mongoose');
-  let matchQuery = {
-    duration: { $gte: 300 }
-  };
+  let matchQuery = {};
+
+  if (metric === 'longCalls') {
+    matchQuery.duration = { $gte: 300 };
+  } else if (metric === 'connected') {
+    matchQuery.status = 'Connected';
+  }
 
   if (agentId && agentId !== 'all') {
     if (mongoose.Types.ObjectId.isValid(agentId)) {
@@ -208,10 +212,8 @@ async function getLongCallsDetails(agentId, startDate, endDate) {
   }
 
   if (startDate && endDate) {
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    const start = new Date(startDate.includes('T') ? startDate : `${startDate}T00:00:00.000`);
+    const end = new Date(endDate.includes('T') ? endDate : `${endDate}T23:59:59.999`);
     matchQuery.timestamp = {
       $gte: start,
       $lte: end
