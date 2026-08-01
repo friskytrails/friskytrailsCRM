@@ -299,7 +299,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
         </div>
 
-        {/* Right Sidebar - Pending Approvals */}
+        {/* Right Sidebar — Pending Approvals */}
         <div className="lg:w-1/4">
           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl shadow-xl rounded-2xl p-5 border border-orange-200 dark:border-orange-900/50 relative overflow-hidden sticky top-24">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-red-500"></div>

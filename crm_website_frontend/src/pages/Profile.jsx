@@ -116,7 +116,7 @@ export default function Profile({ user, setUser, token, API_URL, handleLogout })
           </span>
           <h1 className="text-2xl font-bold text-white">{user.name}</h1>
           <p className="text-orange-100 font-medium uppercase tracking-wider text-xs mt-1">
-            {user.isAdmin ? 'Administrator' : 'Agent'}
+            {user.isAdmin ? 'Administrator' : user.isManager ? 'Manager' : 'Agent'}
           </p>
         </div>
         <div className="p-6 sm:p-8">
