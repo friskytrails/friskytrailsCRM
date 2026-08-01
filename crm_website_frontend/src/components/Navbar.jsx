@@ -40,6 +40,12 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                   Add Lead
                 </Link>
                 
+                {user.isManager && !user.isAdmin && (
+                  <Link to="/manager-dashboard" className={getLinkClass('/manager-dashboard')}>
+                    My Team
+                  </Link>
+                )}
+
                 {user.isAdmin && (
                   <>
                     <Link to="/agents" className={getLinkClass('/agents')}>
@@ -88,7 +94,7 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                     {user.name}
                   </span>
                   <span className="text-[9px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-500">
-                    {user.isAdmin ? 'Admin' : 'Agent'}
+                    {user.isAdmin ? 'Admin' : user.isManager ? 'Manager' : 'Agent'}
                   </span>
                 </div>
                 <Link to="/profile" className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400 font-bold border border-orange-200/50 dark:border-orange-900/50 shadow-sm text-sm hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer">
@@ -145,6 +151,12 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
               Add Lead
             </Link>
 
+            {user.isManager && !user.isAdmin && (
+              <Link to="/manager-dashboard" onClick={() => setIsOpen(false)} className={getLinkClass('/manager-dashboard', true)}>
+                My Team
+              </Link>
+            )}
+
             {user.isAdmin && (
               <>
                 <Link to="/agents" onClick={() => setIsOpen(false)} className={`${getLinkClass('/agents', true)} flex justify-between items-center`}>
@@ -175,7 +187,7 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                     {user.name}
                   </span>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-500">
-                    {user.isAdmin ? 'Admin' : 'Agent'}
+                    {user.isAdmin ? 'Admin' : user.isManager ? 'Manager' : 'Agent'}
                   </span>
                 </div>
               </Link>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -30,6 +30,7 @@ export default function Reports() {
   const [modalTitle, setModalTitle] = useState('Call Details');
   const [longCallsDetails, setLongCallsDetails] = useState([]);
   const [loadingLongCalls, setLoadingLongCalls] = useState(false);
+  const abortControllerRef = useRef(null);
 
   const fetchReports = async () => {
     setLoading(true);
@@ -57,10 +58,17 @@ export default function Reports() {
   };
 
   const handleOpenDrilldownModal = async (agentId, agentName, metric = 'longCalls', title = 'Call Details') => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setSelectedAgent({ agentId, name: agentName });
     setModalTitle(title);
     setShowModal(true);
     setLoadingLongCalls(true);
+    setLongCallsDetails([]); // clear previous modal's data
     try {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams({
@@ -70,7 +78,8 @@ export default function Reports() {
         metric
       });
       const res = await fetch(`${import.meta.env.VITE_API_URL}/calls/long-calls?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: abortController.signal
       });
       if (res.ok) {
         let data = await res.json();
@@ -92,10 +101,14 @@ export default function Reports() {
         toast.error('Failed to load call details');
       }
     } catch (err) {
-      console.error(err);
-      toast.error('Error fetching call details');
+      if (err.name !== 'AbortError') {
+        console.error(err);
+        toast.error('Error fetching call details');
+      }
     } finally {
-      setLoadingLongCalls(false);
+      if (abortControllerRef.current === abortController) {
+        setLoadingLongCalls(false);
+      }
     }
   };
 

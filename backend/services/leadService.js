@@ -6,7 +6,11 @@ const mongoose = require('mongoose');
 async function getLeads(agentIdCondition = undefined) {
   let leads = await Lead.findAll();
   if (agentIdCondition !== undefined) {
-    leads = leads.filter(lead => lead.agentIds && lead.agentIds.includes(agentIdCondition));
+    if (Array.isArray(agentIdCondition)) {
+      leads = leads.filter(lead => lead.agentIds && lead.agentIds.some(id => agentIdCondition.includes(id)));
+    } else {
+      leads = leads.filter(lead => lead.agentIds && lead.agentIds.includes(agentIdCondition));
+    }
   }
   return leads.map(formatDoc);
 }
@@ -179,8 +183,13 @@ async function addNote(id, text, userId, imageUrl, agentIdCondition) {
     throw new Error("Lead not found");
   }
   
-  if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
-    throw new Error("Lead not found or unauthorized");
+  if (agentIdCondition !== undefined) {
+    const isAuthorized = Array.isArray(agentIdCondition)
+      ? (lead.agentIds || []).some(id => agentIdCondition.includes(id))
+      : (lead.agentIds || []).includes(agentIdCondition);
+    if (!isAuthorized) {
+      throw new Error("Lead not found or unauthorized");
+    }
   }
 
   let author = 'System/Admin';
@@ -213,8 +222,13 @@ async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
     throw new Error("Lead not found");
   }
   
-  if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
-    throw new Error("Lead not found or unauthorized");
+  if (agentIdCondition !== undefined) {
+    const isAuthorized = Array.isArray(agentIdCondition)
+      ? (lead.agentIds || []).some(id => agentIdCondition.includes(id))
+      : (lead.agentIds || []).includes(agentIdCondition);
+    if (!isAuthorized) {
+      throw new Error("Lead not found or unauthorized");
+    }
   }
 
   const note = lead.notes.find(n => n.id === noteId || (n._id && n._id.toString() === noteId));
@@ -239,8 +253,13 @@ async function getLeadById(id, agentIdCondition = undefined) {
     throw new Error("Lead not found");
   }
 
-  if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
-    throw new Error("Lead not found or unauthorized");
+  if (agentIdCondition !== undefined) {
+    const isAuthorized = Array.isArray(agentIdCondition)
+      ? (lead.agentIds || []).some(id => agentIdCondition.includes(id))
+      : (lead.agentIds || []).includes(agentIdCondition);
+    if (!isAuthorized) {
+      throw new Error("Lead not found or unauthorized");
+    }
   }
 
   return formatDoc(lead);

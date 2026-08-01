@@ -14,6 +14,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Reports from './pages/Reports';
 import GlobalSettings from './pages/GlobalSettings';
+import ManagerDashboard from './pages/ManagerDashboard';
 import './index.css';
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
@@ -61,7 +62,7 @@ function App() {
     async function fetchData() {
       setLoadingData(true);
       try {
-        const [leadsRes, agentsRes, configRes] = await Promise.all([
+        const [leadsRes, agentsRes, configRes, profileRes] = await Promise.all([
           fetch(`${API_URL}/leads`, {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
@@ -69,6 +70,9 @@ function App() {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
           fetch(`${API_URL}/config`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch(`${API_URL}/auth/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
         ]);
@@ -80,6 +84,15 @@ function App() {
           setAgents(agentsData);
           setProducts(configData.products || []);
           setStatuses(configData.statuses || []);
+
+          if (profileRes.ok) {
+            const profileData = await profileRes.json();
+            setUser(prev => {
+              const updated = { ...prev, ...profileData };
+              localStorage.setItem('user', JSON.stringify(updated));
+              return updated;
+            });
+          }
         } else {
           // If token expired or invalid
           if (leadsRes.status === 401 || agentsRes.status === 401) {
@@ -379,6 +392,70 @@ function App() {
     }
   };
 
+  const toggleManagerRole = async (agentId, isManager) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${agentId}/toggle-manager`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isManager }),
+      });
+      if (response.ok) {
+        const updatedAgent = await response.json();
+        
+        // If demoted, refresh the agents list to show that their team members are unassigned
+        if (!isManager) {
+          const agentsRes = await fetch(`${API_URL}/agents`, { headers: getAuthHeaders() });
+          if (agentsRes.ok) {
+            const fetchedAgents = await agentsRes.json();
+            setAgents(fetchedAgents);
+          }
+        } else {
+          setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        }
+        
+        toast.success(isManager ? `${updatedAgent.name} is now a Manager.` : `${updatedAgent.name} has been demoted to Agent.`);
+        return updatedAgent;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update role: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
+  const assignAgentsToManager = async (managerId, agentIds) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${managerId}/assign-agents`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ agentIds }),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        // Refresh agents list to reflect new managerId assignments
+        const agentsRes = await fetch(`${API_URL}/agents`, { headers: getAuthHeaders() });
+        if (agentsRes.ok) {
+          const agentsData = await agentsRes.json();
+          setAgents(agentsData);
+        }
+        toast.success(`Team updated: ${result.agents.length} agent(s) assigned.`);
+        return result;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to assign agents: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
   // If not logged in, intercept and show Login Page
   if (!token) {
     return (
@@ -421,11 +498,15 @@ function App() {
             />
             <Route
               path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} assignAgentsToManager={assignAgentsToManager} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents/:id"
-              element={user?.isAdmin ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+              element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/manager-dashboard"
+              element={user?.isManager && !user?.isAdmin ? <ManagerDashboard user={user} token={token} leads={leads} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/reports"

@@ -37,6 +37,7 @@ module.exports = async function (req, res, next) {
     req.user = {
       ...decoded,
       isAdmin: !!user.isAdmin,
+      isManager: !!user.isManager,
       status: user.status
     };
     next();

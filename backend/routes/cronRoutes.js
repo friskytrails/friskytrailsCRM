@@ -12,14 +12,15 @@ router.get('/reset-daily', async (req, res) => {
   }
 
   try {
-    const result = await Lead.updateMany({}, {
+    const leadResult = await Lead.updateMany({}, {
       $set: {
         'booking.dailyDial': 0,
         'booking.dailyTalkTime': '0:0'
       }
     });
-    console.log(`Cron Reset Daily: Successfully reset daily stats for ${result.modifiedCount} leads.`);
-    res.json({ success: true, modifiedCount: result.modifiedCount });
+
+    console.log(`Cron Reset Daily: Successfully reset daily stats for ${leadResult.modifiedCount} leads.`);
+    res.json({ success: true, leadModifiedCount: leadResult.modifiedCount });
   } catch (error) {
     console.error('Error during daily reset cron:', error);
     res.status(500).json({ error: 'Internal server error' });

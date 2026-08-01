@@ -1,12 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification }) {
+export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, assignAgentsToManager }) {
   const [loadingAction, setLoadingAction] = useState({});
   const [processedAgents, setProcessedAgents] = useState({});
+  const [assignModalManager, setAssignModalManager] = useState(null); // manager object or null
+  const [viewTeamManager, setViewTeamManager] = useState(null);
+  const [selectedAgentIds, setSelectedAgentIds] = useState([]);
+  const [assignSearchQuery, setAssignSearchQuery] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
 
   const pendingAgentsList = agents.filter(a => a.status === 'Pending');
-  const activeAgentsList = agents.filter(a => a.status !== 'Pending' && a.status !== 'Rejected');
+  const managersList = agents.filter(a => a.isManager && a.status !== 'Pending');
+  const activeAgentsList = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
 
   const agentLeadCounts = leads.reduce((acc, lead) => {
     (lead.agentIds || []).forEach(agentId => {
@@ -31,6 +37,57 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     }
   };
 
+  const handleToggleManager = async (agent) => {
+    const promoting = !agent.isManager;
+    const confirmMsg = promoting
+      ? `Promote "${agent.name}" to Manager? They will be able to view and manage their assigned team.`
+      : `Remove Manager role from "${agent.name}"? All agents under them will be unassigned.`;
+    if (!window.confirm(confirmMsg)) return;
+    setLoadingAction(prev => ({ ...prev, [`mgr_${agent.id}`]: true }));
+    try {
+      await toggleManagerRole(agent.id, promoting);
+    } finally {
+      setLoadingAction(prev => ({ ...prev, [`mgr_${agent.id}`]: false }));
+    }
+  };
+
+  const openAssignModal = (manager) => {
+    // Pre-select agents currently assigned to this manager
+    const currentAgentIds = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).map(a => a.id);
+    setSelectedAgentIds(currentAgentIds);
+    setAssignModalManager(manager);
+    setAssignSearchQuery('');
+  };
+
+  const handleAssign = async () => {
+    if (!assignModalManager) return;
+    setAssignLoading(true);
+    try {
+      const result = await assignAgentsToManager(assignModalManager.id, selectedAgentIds);
+      if (result) {
+        setAssignModalManager(null);
+      }
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const toggleAgentSelection = (agentId) => {
+    setSelectedAgentIds(prev =>
+      prev.includes(agentId) ? prev.filter(id => id !== agentId) : [...prev, agentId]
+    );
+  };
+
+  // Agents eligible to be assigned (non-managers, non-pending)
+  const baseAssignableAgents = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
+  const assignableAgents = assignSearchQuery.trim() === '' 
+    ? baseAssignableAgents 
+    : baseAssignableAgents.filter(a => {
+        const nameMatch = (a.name || '').toLowerCase().includes(assignSearchQuery.toLowerCase());
+        const emailMatch = (a.email || '').toLowerCase().includes(assignSearchQuery.toLowerCase());
+        return nameMatch || emailMatch;
+      });
+
   const statusColors = {
     'Active': 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400',
     'Inactive': 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400',
@@ -53,12 +110,9 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               <Link to={`/agents/${agent.id}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
                 {agent.name}
               </Link>
-              <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">
-                {agent.email}
-              </p>
+              <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{agent.email}</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2 mt-1">
             <button
               onClick={() => handleAction(agent.id, 'status', 'Active')}
@@ -89,36 +143,42 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
               <Link to={`/agents/${agent.id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
               {status !== 'Active' && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide ${statusColors[status] || statusColors['Inactive']}`}>
-                  {status}
-                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
               )}
             </p>
             <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
               <span className="font-mono">{agent.email}</span>
-              <span className="text-gray-300 dark:text-slate-600">•</span>
+              <span className="text-gray-300 dark:text-slate-600">&bull;</span>
               {agent.isVerified ? (
                 <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                  Verified
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>Verified
                 </span>
               ) : (
                 <span className="text-red-500 font-semibold flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  Unverified
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>Unverified
                 </span>
               )}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center space-x-4 sm:ml-auto bg-gray-50 dark:bg-slate-900/50 p-2 sm:p-1 rounded-xl sm:bg-transparent sm:dark:bg-transparent">
-          <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[11px] font-bold border ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
+        <div className="flex items-center space-x-3 sm:ml-auto">
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
             <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             {count} {count === 1 ? 'Lead' : 'Leads'}
           </span>
 
-          <div className="flex items-center space-x-2 border-l pl-4 border-gray-200 dark:border-slate-700">
+          {/* Make Manager toggle */}
+          <button
+            onClick={() => handleToggleManager(agent)}
+            disabled={!!loadingAction[`mgr_${agent.id}`]}
+            title="Promote to Manager"
+            className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-900/40 dark:hover:bg-violet-900/40"
+          >
+            {loadingAction[`mgr_${agent.id}`] ? '...' : '+ Manager'}
+          </button>
+
+          <div className="flex items-center space-x-2 border-l pl-3 border-gray-200 dark:border-slate-700">
             <select
               id={`status-${agent.id}`}
               value={status}
@@ -138,11 +198,80 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
       <div className="flex flex-col lg:flex-row gap-8">
 
-        {/* Active Team Section (75%) */}
-        <div className="lg:w-3/4">
+        {/* Left Main Column */}
+        <div className="lg:w-3/4 space-y-8">
+
+          {/* Managers Section */}
+          {managersList.length > 0 && (
+            <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl shadow-xl rounded-2xl p-6 md:p-8 border border-violet-200/60 dark:border-violet-900/40">
+              <div className="border-b border-gray-200 dark:border-slate-700 pb-5 mb-6">
+                <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                  <span className="bg-violet-100 dark:bg-violet-900/50 p-2 rounded-xl text-violet-600 dark:text-violet-400">
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                  </span>
+                  Managers
+                  <span className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 text-sm py-0.5 px-2.5 rounded-full font-bold ml-1">{managersList.length}</span>
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-2 font-medium">Agents promoted to manager role. Assign their teams using the button below.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3.5">
+                {managersList.map(manager => {
+                  const teamMembers = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id);
+                  const teamCount = teamMembers.length;
+                  const count = agentLeadCounts[manager.id] || 0;
+                  const status = manager.status || 'Active';
+                  return (
+                    <div key={manager.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-violet-50/50 dark:bg-violet-950/20 rounded-xl border border-violet-200/60 dark:border-violet-900/40 gap-4 shadow-sm hover:shadow-md transition-all group">
+                      <div className="flex items-center space-x-4">
+                        <div className="h-11 w-11 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
+                          {(manager.name || '').split(' ').map(n => n?.[0] || '').join('')}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+                            <Link to={`/agents/${manager.id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
+                            <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-900/50">Manager</span>
+                            {status !== 'Active' && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
+                            )}
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 font-mono">{manager.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 sm:ml-auto">
+                        <button 
+                          onClick={() => setViewTeamManager(manager)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/60 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/40 transition-colors"
+                        >
+                          {teamCount} agent{teamCount !== 1 ? 's' : ''} in team
+                        </button>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
+                          {count} {count === 1 ? 'Lead' : 'Leads'}
+                        </span>
+                        <button
+                          onClick={() => openAssignModal(manager)}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors shadow-sm"
+                        >
+                          Assign Agents
+                        </button>
+                        <button
+                          onClick={() => handleToggleManager(manager)}
+                          disabled={!!loadingAction[`mgr_${manager.id}`]}
+                          title="Remove Manager role"
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40"
+                        >
+                          {loadingAction[`mgr_${manager.id}`] ? '...' : 'Remove Manager'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Active Agents Section */}
           <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl shadow-xl rounded-2xl p-6 md:p-8 border border-gray-200/50 dark:border-slate-700/50">
             <div className="border-b border-gray-200 dark:border-slate-700 pb-5 mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div>
@@ -151,13 +280,9 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                   </span>
                   Active Team
-                  <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm py-0.5 px-2.5 rounded-full font-bold ml-1">
-                    {activeAgentsList.length}
-                  </span>
+                  <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm py-0.5 px-2.5 rounded-full font-bold ml-1">{activeAgentsList.length}</span>
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-2 font-medium">
-                  Manage your travel agents, view their assigned leads, and update account statuses.
-                </p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-2 font-medium">Manage your travel agents and promote them to manager role.</p>
               </div>
             </div>
 
@@ -174,23 +299,18 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
         </div>
 
-        {/* Pending Approvals Section (25%) */}
+        {/* Right Sidebar — Pending Approvals */}
         <div className="lg:w-1/4">
           <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl shadow-xl rounded-2xl p-5 border border-orange-200 dark:border-orange-900/50 relative overflow-hidden sticky top-24">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 via-orange-500 to-red-500"></div>
-
             <div className="border-b border-gray-100 dark:border-slate-700 pb-4 mb-5 flex flex-col gap-1 pt-1">
               <h3 className="text-base font-black text-gray-900 dark:text-white flex items-center justify-between">
                 Pending Approvals
                 {pendingAgentsList.length > 0 && (
-                  <span className="bg-red-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md animate-pulse">
-                    {pendingAgentsList.length}
-                  </span>
+                  <span className="bg-red-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md animate-pulse">{pendingAgentsList.length}</span>
                 )}
               </h3>
-              <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight font-medium mt-1">
-                Agents awaiting admin review.
-              </p>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 leading-tight font-medium mt-1">Agents awaiting admin review.</p>
             </div>
 
             {pendingAgentsList.length === 0 ? (
@@ -205,8 +325,139 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             )}
           </div>
         </div>
-
       </div>
+
+      {/* View Team Modal */}
+      {viewTeamManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 w-full max-w-sm flex flex-col overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                Team Members
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Agents assigned to {viewTeamManager.name}</p>
+            </div>
+            <div className="p-6 max-h-[50vh] overflow-y-auto">
+              {(() => {
+                const teamMembers = agents.filter(a => a.managerId === viewTeamManager.id || a.managerId === viewTeamManager._id);
+                if (teamMembers.length === 0) {
+                  return <p className="text-sm text-gray-500">No agents assigned.</p>;
+                }
+                return (
+                  <ul className="space-y-2">
+                    {teamMembers.map(member => (
+                      <li key={member.id}>
+                        <Link 
+                          to={`/agents/${member.id}`}
+                          onClick={() => setViewTeamManager(null)}
+                          className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-violet-50 dark:bg-slate-800/50 dark:hover:bg-slate-700/80 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-violet-200 dark:hover:border-violet-900/50 transition-all group cursor-pointer"
+                        >
+                          <div className="h-8 w-8 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 flex items-center justify-center font-bold text-xs shrink-0 group-hover:scale-105 transition-transform">
+                            {(member.name || '').split(' ').map(n => n?.[0] || '').join('')}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-violet-700 dark:group-hover:text-violet-400 transition-colors">{member.name}</span>
+                            <span className="text-[10px] font-mono text-gray-500">{member.email}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+            <div className="px-6 py-4 bg-gray-50 dark:bg-slate-800/50 border-t border-gray-100 dark:border-slate-700 flex justify-end">
+              <button
+                onClick={() => setViewTeamManager(null)}
+                className="px-4 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Agents Modal */}
+      {assignModalManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 w-full max-w-md max-h-[80vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-gray-100 dark:border-slate-800">
+              <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                <span className="bg-violet-100 dark:bg-violet-900/50 p-1.5 rounded-lg text-violet-600 dark:text-violet-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                </span>
+                Assign Agents to {assignModalManager.name}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Select agents to assign under this manager. Previously assigned agents will be replaced.</p>
+            </div>
+            
+            {/* Search Input */}
+            <div className="px-6 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/30">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search agents by name or email..."
+                  value={assignSearchQuery}
+                  onChange={(e) => setAssignSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:text-white transition-shadow shadow-sm"
+                />
+              </div>
+            </div>
+
+            {/* Agent list */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-2">
+              {assignableAgents.length === 0 ? (
+                <p className="text-sm text-center text-gray-400 dark:text-slate-500 py-8">No eligible agents available.</p>
+              ) : assignableAgents.map(agent => {
+                const isSelected = selectedAgentIds.includes(agent.id);
+                const currentManager = agents.find(a => a.isManager && (a.id === agent.managerId || a._id === agent.managerId));
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => toggleAgentSelection(agent.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${isSelected ? 'bg-violet-50 dark:bg-violet-950/40 border-violet-300 dark:border-violet-700' : 'bg-gray-50 dark:bg-slate-800/60 border-gray-200 dark:border-slate-700 hover:bg-violet-50/50 dark:hover:bg-violet-950/20'}`}
+                  >
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-violet-600 border-violet-600' : 'border-gray-300 dark:border-slate-600'}`}>
+                      {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{agent.name}</p>
+                      <p className="text-[11px] text-gray-500 dark:text-slate-400 font-mono truncate">{agent.email}</p>
+                    </div>
+                    {currentManager && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400 flex-shrink-0">
+                        {currentManager.id === assignModalManager.id ? 'Current' : currentManager.name}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-800 flex gap-3">
+              <button
+                onClick={() => setAssignModalManager(null)}
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssign}
+                disabled={assignLoading}
+                className="flex-1 py-2.5 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {assignLoading ? 'Saving...' : `Assign ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

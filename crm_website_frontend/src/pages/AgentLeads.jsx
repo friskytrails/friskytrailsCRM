@@ -46,13 +46,13 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between mb-6">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
-          Back to Dashboard
+          Back
         </button>
 
         <div className="flex items-center gap-2">

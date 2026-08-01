@@ -552,7 +552,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
               <option value="all">All Statuses</option>
-              {Array.from(new Set([...(statuses || []), ...STATUS_OPTIONS.map(s => s.value)])).map(st => (
+              {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => (
                 <option key={st} value={st}>{st}</option>
               ))}
             </select>

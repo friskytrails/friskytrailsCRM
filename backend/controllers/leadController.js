@@ -1,8 +1,21 @@
 const leadService = require('../services/leadService');
+const agentService = require('../services/agentService');
+
+async function getAgentIdCondition(user) {
+  if (user.isAdmin) {
+    return undefined;
+  }
+  if (user.isManager) {
+    const team = await agentService.getMyTeam(user.userId);
+    const teamIds = team.map(agent => agent.id || agent._id.toString());
+    return [user.userId, ...teamIds];
+  }
+  return user.userId;
+}
 
 async function getLeads(req, res) {
   try {
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const leads = await leadService.getLeads(agentIdCondition);
     res.json(leads);
   } catch (error) {
@@ -25,7 +38,7 @@ async function updateLead(req, res) {
   try {
     const { id } = req.params;
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -54,7 +67,7 @@ async function addNote(req, res) {
   try {
     const { id } = req.params;
     const { text, imageUrl } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.addNote(id, text, req.user.userId, imageUrl, agentIdCondition);
     res.status(201).json(result);
   } catch (error) {
@@ -65,7 +78,7 @@ async function addNote(req, res) {
 async function deleteNote(req, res) {
   try {
     const { id, noteId } = req.params;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.deleteNote(id, noteId, req.user.userId, req.user.isAdmin, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -82,7 +95,7 @@ async function deleteNote(req, res) {
 async function getLead(req, res) {
   try {
     const { id } = req.params;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const lead = await leadService.getLeadById(id, agentIdCondition);
     res.json(lead);
   } catch (error) {
@@ -94,7 +107,7 @@ async function updateLabels(req, res) {
   try {
     const { id } = req.params;
     const { labels } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateLabels(id, labels, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -109,7 +122,7 @@ async function updateDates(req, res) {
   try {
     const { id } = req.params;
     const { startDate, dueDate } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateDates(id, { startDate, dueDate }, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -124,7 +137,7 @@ async function updateStatus(req, res) {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateStatus(id, status, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -139,7 +152,7 @@ async function bookLead(req, res) {
   try {
     const { id } = req.params;
     const { bookingDetails } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.bookLead(id, bookingDetails, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -154,7 +167,7 @@ async function updateBooking(req, res) {
   try {
     const { id } = req.params;
     const { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall } = req.body;
-    const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
+    const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateBooking(id, { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall }, agentIdCondition);
     res.json(result);
   } catch (error) {
@@ -179,3 +192,4 @@ module.exports = {
   bookLead,
   updateBooking
 };
+

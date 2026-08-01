@@ -52,8 +52,8 @@ async function updateAgentVerification(req, res) {
 
 async function updateAgentMetrics(req, res) {
   try {
-    if (!req.user.isAdmin) {
-      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    if (!req.user.isAdmin && !req.user.isManager) {
+      return res.status(403).json({ error: "Forbidden: Admin or Manager access only" });
     }
     const { id } = req.params;
     const { monthlyTarget, targetCompleted, attendance, attendanceDate, date, bookingCount } = req.body;
@@ -68,7 +68,7 @@ async function updateAgentMetrics(req, res) {
 async function getAgentAttendance(req, res) {
   try {
     const { id } = req.params;
-    if (!req.user.isAdmin && req.user.userId !== id) {
+    if (!req.user.isAdmin && !req.user.isManager && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const logs = await agentService.getAgentAttendance(id);
@@ -81,7 +81,7 @@ async function getAgentAttendance(req, res) {
 async function getAgentMetrics(req, res) {
   try {
     const { id } = req.params;
-    if (!req.user.isAdmin && req.user.userId !== id) {
+    if (!req.user.isAdmin && !req.user.isManager && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const metrics = await agentService.getAgentMetrics(id);
@@ -94,7 +94,7 @@ async function getAgentMetrics(req, res) {
 async function getAgentMonthlyAttendance(req, res) {
   try {
     const { id } = req.params;
-    if (!req.user.isAdmin && req.user.userId !== id) {
+    if (!req.user.isAdmin && !req.user.isManager && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const { month, year } = req.query;
@@ -110,6 +110,50 @@ async function getAgentMonthlyAttendance(req, res) {
   }
 }
 
+async function toggleManagerRole(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params;
+    const { isManager } = req.body;
+    const agent = await agentService.toggleManagerRole(id, isManager);
+    res.json(agent);
+  } catch (error) {
+    return handleAgentServiceError(error, res);
+  }
+}
+
+async function assignAgentsToManager(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params; // manager's id
+    const { agentIds } = req.body;
+    const result = await agentService.assignAgentsToManager(id, agentIds);
+    res.json(result);
+  } catch (error) {
+    return handleAgentServiceError(error, res);
+  }
+}
+
+async function getMyTeam(req, res) {
+  try {
+    if (!req.user.isAdmin && !req.user.isManager) {
+      return res.status(403).json({ error: "Forbidden: Manager access only" });
+    }
+    // Admin can pass a managerId as query param; manager uses their own id
+    const managerId = req.user.isAdmin
+      ? (req.query.managerId || req.user.userId)
+      : req.user.userId;
+    const agents = await agentService.getMyTeam(managerId);
+    res.json(agents);
+  } catch (error) {
+    return handleAgentServiceError(error, res);
+  }
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
@@ -117,5 +161,8 @@ module.exports = {
   getAgentMetrics,
   updateAgentMetrics,
   getAgentAttendance,
-  getAgentMonthlyAttendance
+  getAgentMonthlyAttendance,
+  toggleManagerRole,
+  assignAgentsToManager,
+  getMyTeam
 };
