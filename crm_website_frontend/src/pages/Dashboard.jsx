@@ -269,6 +269,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       agentNames.toLowerCase().includes(searchQuery.toLowerCase());
 
+    // Active search query takes precedence to find any matching lead regardless of dropdown filter selections
+    if (hasSearchQuery) {
+      return matchesSearch;
+    }
+
     const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)));
 
     const matchesAgent =

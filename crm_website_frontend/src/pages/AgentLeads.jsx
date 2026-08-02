@@ -40,6 +40,10 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.product || '').toLowerCase().includes(searchQuery.toLowerCase());
 
+    if (hasSearchQuery) {
+      return matchesSearch;
+    }
+
     const matchesStatus = filterStatus === 'all' || st === filterStatus;
 
     return matchesSearch && matchesStatus;
