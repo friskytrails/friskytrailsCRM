@@ -49,7 +49,31 @@ async function createBugReport(req, res) {
   }
 }
 
+async function updateBugStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const validStatuses = ['Open', 'In Progress', 'Resolved', 'Closed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid status value" });
+    }
+    const report = await BugReport.Model.findByIdAndUpdate(
+      id,
+      { status },
+      { new: true }
+    );
+    if (!report) {
+      return res.status(404).json({ error: "Bug report not found" });
+    }
+    res.json(BugReport.formatDoc(report));
+  } catch (error) {
+    console.error("Error updating bug status:", error);
+    res.status(500).json({ error: "Failed to update bug status" });
+  }
+}
+
 module.exports = {
   getBugReports,
-  createBugReport
+  createBugReport,
+  updateBugStatus
 };

@@ -73,6 +73,32 @@ export default function BugReports({ token, API_URL, user }) {
     }
   };
 
+  const handleToggleStatus = async (reportId, currentStatus) => {
+    const isClosed = currentStatus === 'Closed' || currentStatus === 'Resolved';
+    const newStatus = isClosed ? 'Open' : 'Closed';
+    try {
+      const res = await fetch(`${API_URL}/bugs/${reportId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setReports(prev => prev.map(r => ((r.id || r._id) === reportId ? updated : r)));
+        toast.success(`Bug report marked as ${newStatus}`);
+      } else {
+        const errData = await res.json();
+        toast.error(errData.error || 'Failed to update bug status');
+      }
+    } catch {
+      toast.error('Server error updating status');
+    }
+  };
+
   const formatISTDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -163,15 +189,27 @@ export default function BugReports({ token, API_URL, user }) {
                   <h3 className="text-base font-bold text-gray-900 dark:text-slate-100 break-words">
                     {report.title}
                   </h3>
-                  <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
-                    report.status === 'Resolved' 
-                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30' 
-                      : report.status === 'In Progress' 
-                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
-                      : 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-300 dark:border-orange-500/30'
-                  }`}>
-                    {report.status || 'Open'}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full ${
+                      report.status === 'Closed' || report.status === 'Resolved' 
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30' 
+                        : report.status === 'In Progress' 
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
+                        : 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-300 dark:border-orange-500/30'
+                    }`}>
+                      {report.status || 'Open'}
+                    </span>
+                    <button
+                      onClick={() => handleToggleStatus(report.id || report._id, report.status)}
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors cursor-pointer border ${
+                        report.status === 'Closed' || report.status === 'Resolved'
+                          ? 'border-orange-300 dark:border-orange-500/40 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30'
+                          : 'border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {report.status === 'Closed' || report.status === 'Resolved' ? 'Reopen' : 'Close'}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="text-xs font-medium">

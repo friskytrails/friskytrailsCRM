@@ -6,5 +6,6 @@ const router = express.Router();
 
 router.get('/', auth, bugReportController.getBugReports);
 router.post('/', auth, bugReportController.createBugReport);
+router.put('/:id/status', auth, bugReportController.updateBugStatus);
 
 module.exports = router;
