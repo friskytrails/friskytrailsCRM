@@ -89,7 +89,7 @@ export default function BugReports({ token, API_URL, user }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 pb-12">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100 pb-12 transition-colors">
       {/* Top Bar Header */}
       <div className="bg-orange-500 px-4 sm:px-6 py-4 flex items-center gap-4 shadow-md">
         <button
@@ -108,8 +108,8 @@ export default function BugReports({ token, API_URL, user }) {
 
       <div className="max-w-2xl mx-auto px-4 mt-6 space-y-6">
         {/* Report a Bug Form Card */}
-        <div className="bg-slate-800/90 rounded-2xl border border-slate-700/80 p-5 shadow-lg">
-          <h2 className="text-base font-bold text-white mb-4">Report a bug</h2>
+        <div className="bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-200 dark:border-slate-700/80 p-5 shadow-sm">
+          <h2 className="text-base font-bold text-gray-900 dark:text-white mb-4">Report a bug</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <input
@@ -117,7 +117,7 @@ export default function BugReports({ token, API_URL, user }) {
                 placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full bg-gray-50 dark:bg-slate-900/90 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
             </div>
             <div>
@@ -126,61 +126,61 @@ export default function BugReports({ token, API_URL, user }) {
                 placeholder="What went wrong?"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                className="w-full bg-gray-50 dark:bg-slate-900/90 border border-gray-300 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
               />
             </div>
             <button
               type="submit"
               disabled={submitting || !title.trim() || !description.trim()}
-              className="w-full py-3 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-colors cursor-pointer shadow-sm"
+              className="w-full py-3 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-colors cursor-pointer shadow-sm"
             >
               {submitting ? 'Posting...' : 'Post Report'}
             </button>
           </form>
         </div>
 
-        <p className="text-xs text-slate-400 text-center px-2">
+        <p className="text-xs text-gray-500 dark:text-slate-400 text-center px-2">
           Reports are saved on the server and shared with every agent.
         </p>
 
         {/* Bug Reports Feed */}
         <div className="space-y-4">
           {loading ? (
-            <div className="text-center py-10 text-slate-400 text-sm">
+            <div className="text-center py-10 text-gray-500 dark:text-slate-400 text-sm">
               Loading bug reports...
             </div>
           ) : reports.length === 0 ? (
-            <div className="text-center py-10 text-slate-400 text-sm bg-slate-800/50 rounded-2xl border border-slate-800">
+            <div className="text-center py-10 text-gray-500 dark:text-slate-400 text-sm bg-white dark:bg-slate-800/50 rounded-2xl border border-gray-200 dark:border-slate-800">
               No bug reports submitted yet.
             </div>
           ) : (
             reports.map((report) => (
               <div
                 key={report.id || report._id}
-                className="bg-slate-800/90 rounded-2xl border border-slate-700/80 p-5 space-y-2 shadow-sm"
+                className="bg-white dark:bg-slate-800/90 rounded-2xl border border-gray-200 dark:border-slate-700/80 p-5 space-y-2 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-base font-bold text-slate-100 break-words">
+                  <h3 className="text-base font-bold text-gray-900 dark:text-slate-100 break-words">
                     {report.title}
                   </h3>
-                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                  <span className={`text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
                     report.status === 'Resolved' 
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-500/30' 
                       : report.status === 'In Progress' 
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-300 dark:border-amber-500/30'
+                      : 'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-400 border border-orange-300 dark:border-orange-500/30'
                   }`}>
                     {report.status || 'Open'}
                   </span>
                 </div>
 
-                <div className="text-xs text-orange-400 font-medium">
-                  <span className="font-bold text-orange-400">{report.reporterName}</span>
-                  <span className="mx-1.5 text-slate-500">•</span>
-                  <span className="text-slate-400">{formatISTDate(report.createdAt)}</span>
+                <div className="text-xs font-medium">
+                  <span className="font-bold text-orange-600 dark:text-orange-400">{report.reporterName}</span>
+                  <span className="mx-1.5 text-gray-400 dark:text-slate-500">•</span>
+                  <span className="text-gray-500 dark:text-slate-400">{formatISTDate(report.createdAt)}</span>
                 </div>
 
-                <p className="text-sm text-slate-300 whitespace-pre-wrap pt-1 leading-relaxed">
+                <p className="text-sm text-gray-700 dark:text-slate-300 whitespace-pre-wrap pt-1 leading-relaxed">
                   {report.description}
                 </p>
               </div>
