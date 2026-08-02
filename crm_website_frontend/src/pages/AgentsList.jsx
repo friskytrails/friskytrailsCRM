@@ -14,7 +14,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const isOlderThan15DaysInactive = (agent) => {
     const status = agent.status || 'Active';
     if (status !== 'Inactive' && status !== 'Former Employee') return false;
-    const changedAt = agent.statusChangedAt || agent.updatedAt || agent.createdAt;
+    const changedAt = agent.statusChangedAt || agent.createdAt;
     if (!changedAt) return false;
     const diffMs = Date.now() - new Date(changedAt).getTime();
     const diffDays = diffMs / (1000 * 60 * 60 * 24);
@@ -26,18 +26,18 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   
   const baseTeamList = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
   const activeAgentsList = baseTeamList.filter(a => {
-    const hasQuery = globalSearchQuery.trim().length > 0;
+    const trimmedQuery = globalSearchQuery.trim().toLowerCase();
+    const hasQuery = trimmedQuery.length > 0;
     if (!hasQuery && isOlderThan15DaysInactive(a)) {
       return false;
     }
     if (!hasQuery) return true;
 
-    const query = globalSearchQuery.toLowerCase();
     return (
-      (a.name || '').toLowerCase().includes(query) ||
-      (a.email || '').toLowerCase().includes(query) ||
-      (a.phone || '').toLowerCase().includes(query) ||
-      (a.status || '').toLowerCase().includes(query)
+      (a.name || '').toLowerCase().includes(trimmedQuery) ||
+      (a.email || '').toLowerCase().includes(trimmedQuery) ||
+      (a.phone || '').toLowerCase().includes(trimmedQuery) ||
+      (a.status || '').toLowerCase().includes(trimmedQuery)
     );
   });
 

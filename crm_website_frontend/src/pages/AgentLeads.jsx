@@ -33,12 +33,13 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       return false;
     }
 
+    const query = searchQuery.trim().toLowerCase();
     const matchesSearch = !hasSearchQuery ||
-      (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (lead.phone || '').includes(searchQuery) ||
-      (lead.origin || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (lead.product || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (lead.name || '').toLowerCase().includes(query) ||
+      (lead.phone || '').includes(query) ||
+      (lead.origin || '').toLowerCase().includes(query) ||
+      (lead.destination || '').toLowerCase().includes(query) ||
+      (lead.product || '').toLowerCase().includes(query);
 
     const matchesStatus = filterStatus === 'all' || st === filterStatus;
 

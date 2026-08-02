@@ -394,28 +394,37 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   // Increment booking count for assigned agents if lead was not previously booked
   if (existingLead.status !== 'Booked' && Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0) {
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
     for (const agentId of existingLead.agentIds) {
       try {
         const agentUser = await User.findById(agentId);
         if (agentUser && !agentUser.isAdmin) {
           ensureCurrentMonthMetrics(agentUser);
-          agentUser.bookingCount = (agentUser.bookingCount || 0) + 1;
-
-          const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-          const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
-          let histIdx = (agentUser.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
-          if (histIdx !== -1) {
-            agentUser.historicalMetrics[histIdx].bookingCount = agentUser.bookingCount;
-          } else {
-            if (!agentUser.historicalMetrics) agentUser.historicalMetrics = [];
-            agentUser.historicalMetrics.push({
-              month: currentMonthStr,
-              monthlyTarget: agentUser.monthlyTarget || 0,
-              targetCompleted: agentUser.targetCompleted || 0,
-              bookingCount: agentUser.bookingCount
-            });
-          }
           await agentUser.save();
+
+          await User.updateOne(
+            { _id: agentId, "historicalMetrics.month": currentMonthStr },
+            { $inc: { bookingCount: 1, "historicalMetrics.$.bookingCount": 1 } }
+          ).then(async (res) => {
+            if (res.matchedCount === 0) {
+              await User.updateOne(
+                { _id: agentId },
+                {
+                  $inc: { bookingCount: 1 },
+                  $push: {
+                    historicalMetrics: {
+                      month: currentMonthStr,
+                      monthlyTarget: agentUser.monthlyTarget || 0,
+                      targetCompleted: agentUser.targetCompleted || 0,
+                      bookingCount: (agentUser.bookingCount || 0) + 1
+                    }
+                  }
+                }
+              );
+            }
+          });
         }
       } catch (e) {
         console.error("Failed to update agent booking count:", e);

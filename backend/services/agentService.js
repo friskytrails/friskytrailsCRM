@@ -96,8 +96,10 @@ async function updateAgentStatus(id, status) {
   }
 
   const wasPending = user.status === 'Pending';
-  user.status = status;
-  user.statusChangedAt = new Date();
+  if (user.status !== status) {
+    user.status = status;
+    user.statusChangedAt = new Date();
+  }
   await user.save();
 
   if (wasPending && status === 'Active') {
