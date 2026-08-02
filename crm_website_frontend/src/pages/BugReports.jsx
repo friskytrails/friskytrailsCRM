@@ -247,6 +247,9 @@ export default function BugReports({ token, API_URL, user }) {
           ) : (
             filteredReports.map((report) => {
               const isClosed = report.status === 'Closed' || report.status === 'Resolved';
+              const currentUserId = user?.id || user?._id;
+              const isOwner = currentUserId && String(report.reportedBy || report.authorId) === String(currentUserId);
+              const canToggleStatus = user?.isAdmin || user?.isManager || isOwner;
 
               return (
                 <div
@@ -280,16 +283,18 @@ export default function BugReports({ token, API_URL, user }) {
                         {isClosed ? 'Closed' : 'Open'}
                       </span>
 
-                      <button
-                        onClick={() => handleToggleStatus(report.id || report._id, report.status)}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
-                          isClosed
-                            ? 'border-orange-300 dark:border-orange-500/40 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30'
-                            : 'border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
-                        }`}
-                      >
-                        {isClosed ? 'Reopen' : 'Close'}
-                      </button>
+                      {canToggleStatus && (
+                        <button
+                          onClick={() => handleToggleStatus(report.id || report._id, report.status)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-md transition-colors cursor-pointer border ${
+                            isClosed
+                              ? 'border-orange-300 dark:border-orange-500/40 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-950/30'
+                              : 'border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {isClosed ? 'Reopen' : 'Close'}
+                        </button>
+                      )}
                     </div>
                   </div>
 

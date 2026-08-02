@@ -153,7 +153,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         targetReminderDate = customValue;
       } else if (reminderDateInput) {
         const timeToUse = reminderTimeInput || '09:00';
-        targetReminderDate = new Date(`${reminderDateInput}T${timeToUse}:00`).toISOString();
+        targetReminderDate = new Date(`${reminderDateInput}T${timeToUse}:00+05:30`).toISOString();
       }
 
       const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}/reminder`, {

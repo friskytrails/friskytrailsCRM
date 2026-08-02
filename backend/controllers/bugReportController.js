@@ -3,7 +3,14 @@ const BugReport = require('../models/BugReport');
 async function getBugReports(req, res) {
   try {
     const reports = await BugReport.Model.find({}).sort({ createdAt: -1 });
-    const formattedReports = reports.map(r => BugReport.formatDoc(r));
+    const isAdmin = req.user?.isAdmin;
+    const formattedReports = reports.map(r => {
+      const doc = BugReport.formatDoc(r);
+      if (!isAdmin) {
+        delete doc.reporterEmail;
+      }
+      return doc;
+    });
     res.json(formattedReports);
   } catch (error) {
     console.error("Error fetching bug reports:", error);
@@ -57,14 +64,20 @@ async function updateBugStatus(req, res) {
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: "Invalid status value" });
     }
-    const report = await BugReport.Model.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true }
-    );
+
+    const report = await BugReport.Model.findById(id);
     if (!report) {
       return res.status(404).json({ error: "Bug report not found" });
     }
+
+    const currentUserId = req.user.userId || req.user.id || req.user._id;
+    const isOwner = String(report.reportedBy) === String(currentUserId);
+    if (!req.user.isAdmin && !req.user.isManager && !isOwner) {
+      return res.status(403).json({ error: "Unauthorized to update this bug report status" });
+    }
+
+    report.status = status;
+    await report.save();
     res.json(BugReport.formatDoc(report));
   } catch (error) {
     console.error("Error updating bug status:", error);
