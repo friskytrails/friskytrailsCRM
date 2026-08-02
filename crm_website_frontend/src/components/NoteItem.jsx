@@ -20,88 +20,175 @@ const getNoteDisplayDate = (note) => {
   return note.timestamp;
 };
 
+const getSecureUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://')) {
+    return url.replace('http://', 'https://');
+  }
+  return url;
+};
+
 export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
-  const [imgError, setImgError] = React.useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   React.useEffect(() => {
     setImgError(false);
   }, [note.imageUrl]);
 
   const isMyNote = note.authorId ? note.authorId === currentUser?.id : note.author === currentUser?.name;
+  const rawUrl = note.imageUrl || '';
+  const secureUrl = getSecureUrl(rawUrl);
+
+  const isPdf = secureUrl.match(/\.pdf$/i) || (secureUrl.includes('/raw/upload/') && secureUrl.toLowerCase().includes('.pdf'));
+  const isOfficeDoc = secureUrl.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i);
+  const isDoc = isPdf || isOfficeDoc || secureUrl.includes('/raw/upload/');
+  const fileName = decodeURIComponent(rawUrl.split('/').pop() || 'attachment');
+
+  const getViewerUrl = (url) => {
+    if (isOfficeDoc) {
+      return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+    }
+    return url;
+  };
+
+  const handleOpenExternal = (e) => {
+    e.stopPropagation();
+    const externalUrl = isOfficeDoc 
+      ? `https://docs.google.com/gview?url=${encodeURIComponent(secureUrl)}`
+      : secureUrl;
+    window.open(externalUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
-    <div className={`flex items-start space-x-3 ${isMyNote ? '' : ''}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isMyNote ? 'bg-blue-100 dark:bg-orange-950' : 'bg-gray-100 dark:bg-slate-800'}`}>
-        <span className={`text-xs font-bold ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
-          {note.author?.charAt(0)?.toUpperCase() || '?'}
-        </span>
-      </div>
-      <div className={`flex-1 p-3 rounded-lg border text-sm ${isMyNote ? 'bg-blue-50/60 border-blue-100/60 dark:bg-orange-950/40 dark:border-orange-900/50' : 'bg-gray-50 border-gray-100 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
-        <div className="flex justify-between items-center mb-1">
-          <span className={`text-xs font-semibold ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
-            {note.author} {isMyNote && '(You)'}
+    <>
+      <div className={`flex items-start space-x-3 ${isMyNote ? '' : ''}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isMyNote ? 'bg-blue-100 dark:bg-orange-950' : 'bg-gray-100 dark:bg-slate-800'}`}>
+          <span className={`text-xs font-bold ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
+            {note.author?.charAt(0)?.toUpperCase() || '?'}
           </span>
-          <div className="flex items-center space-x-2">
-            <span className="text-[10px] text-gray-400">{getNoteDisplayDate(note)}</span>
-            {(isMyNote || currentUser?.isAdmin) && deleteNote && (
-              <button
-                onClick={() => deleteNote(leadId, note.id || note._id)}
-                className="text-red-400 hover:text-red-600 cursor-pointer p-0.5 rounded transition-colors"
-                title="Delete note"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"></polyline>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                </svg>
-              </button>
-            )}
-          </div>
         </div>
-        {note.text && <p className="text-gray-700 dark:text-slate-200 mt-0.5 whitespace-pre-wrap break-words">{note.text}</p>}
-        {note.imageUrl && (() => {
-          const isDoc = note.imageUrl.match(/\.(pdf|doc|docx)$/i) || note.imageUrl.includes('/raw/upload/');
-          const fileName = decodeURIComponent(note.imageUrl.split('/').pop() || 'file');
-          return (
-            <div className="mt-1.5 rounded overflow-hidden max-w-[240px] border border-gray-200/50 dark:border-slate-800 inline-block">
-              {isDoc ? (
-                <a
-                  href={note.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-gray-100 dark:bg-slate-800 text-sm font-semibold flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors gap-2 block"
-                  title="Click to view/download"
+        <div className={`flex-1 p-3 rounded-lg border text-sm ${isMyNote ? 'bg-blue-50/60 border-blue-100/60 dark:bg-orange-950/40 dark:border-orange-900/50' : 'bg-gray-50 border-gray-100 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
+          <div className="flex justify-between items-center mb-1">
+            <span className={`text-xs font-semibold ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
+              {note.author} {isMyNote && '(You)'}
+            </span>
+            <div className="flex items-center space-x-2">
+              <span className="text-[10px] text-gray-400">{getNoteDisplayDate(note)}</span>
+              {(isMyNote || currentUser?.isAdmin) && deleteNote && (
+                <button
+                  onClick={() => deleteNote(leadId, note.id || note._id)}
+                  className="text-red-400 hover:text-red-600 cursor-pointer p-0.5 rounded transition-colors"
+                  title="Delete note"
                 >
-                  <span className="text-base">📄</span>
-                  <span className="truncate max-w-[180px]">{fileName}</span>
-                </a>
-              ) : imgError ? (
-                <a
-                  href={note.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-3 bg-gray-100 dark:bg-slate-800 text-xs font-semibold flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors gap-1.5 block"
-                >
-                  <span>🖼️</span> View Image ({fileName})
-                </a>
-              ) : (
-                <a
-                  href={note.imageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block cursor-pointer"
-                >
-                  <img
-                    src={note.imageUrl}
-                    alt="Attachment preview"
-                    className="w-full h-auto max-h-[140px] object-cover hover:opacity-95 transition-opacity rounded"
-                    onError={() => setImgError(true)}
-                  />
-                </a>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
               )}
             </div>
-          );
-        })()}
+          </div>
+          {note.text && <p className="text-gray-700 dark:text-slate-200 mt-0.5 whitespace-pre-wrap break-words">{note.text}</p>}
+          
+          {secureUrl && (
+            <div className="mt-2 inline-block">
+              {isDoc ? (
+                <div
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-sm font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 max-w-[260px] shadow-sm"
+                  title="Click to preview file"
+                >
+                  <span className="text-lg">📄</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-bold text-gray-800 dark:text-slate-200">{fileName}</div>
+                    <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">Click to preview</div>
+                  </div>
+                </div>
+              ) : imgError ? (
+                <div
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700"
+                >
+                  <span>🖼️</span>
+                  <span className="text-orange-600 dark:text-orange-400 font-bold">View Image Attachment</span>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setIsPreviewOpen(true)}
+                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 max-w-[240px] cursor-pointer group shadow-sm"
+                  title="Click to preview image"
+                >
+                  <img
+                    src={secureUrl}
+                    alt="Attachment preview"
+                    className="w-full h-auto max-h-[140px] object-cover group-hover:scale-105 transition-transform duration-200"
+                    onError={() => setImgError(true)}
+                  />
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                    <span>🔍</span> Preview
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Interactive Modal File Preview */}
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
+              <div className="flex items-center space-x-2 min-w-0 pr-4">
+                <span className="text-lg">{isDoc ? '📄' : '🖼️'}</span>
+                <span className="text-sm font-bold text-white truncate">{fileName}</span>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleOpenExternal}
+                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="Open file in new tab"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  <span>Open External</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                  title="Close preview"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 p-4 bg-slate-950 flex items-center justify-center overflow-auto min-h-[400px]">
+              {isDoc ? (
+                <iframe
+                  src={getViewerUrl(secureUrl)}
+                  className="w-full h-[70vh] rounded-xl border-0 bg-white"
+                  title="File Preview"
+                />
+              ) : (
+                <img
+                  src={secureUrl}
+                  alt="Full preview"
+                  className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-lg"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
