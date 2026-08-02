@@ -138,12 +138,12 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
       {/* Interactive Modal File Preview */}
       {isPreviewOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl transition-colors">
             {/* Modal Header */}
-            <div className="px-5 py-3.5 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
+            <div className="px-5 py-3.5 bg-gray-50 dark:bg-slate-800 border-b border-gray-150 dark:border-slate-700 flex items-center justify-between transition-colors">
               <div className="flex items-center space-x-2 min-w-0 pr-4">
                 <span className="text-lg">{isDoc ? '📄' : '🖼️'}</span>
-                <span className="text-sm font-bold text-white truncate">{fileName}</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{fileName}</span>
               </div>
               <div className="flex items-center space-x-2 shrink-0">
                 <button
@@ -160,7 +160,7 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                 <button
                   type="button"
                   onClick={() => setIsPreviewOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                  className="p-1.5 text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
                   title="Close preview"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
@@ -171,7 +171,7 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
             </div>
 
             {/* Modal Content */}
-            <div className="flex-1 p-4 bg-slate-950 flex items-center justify-center overflow-auto min-h-[400px]">
+            <div className="flex-1 p-4 bg-gray-100 dark:bg-slate-950 flex items-center justify-center overflow-auto min-h-[400px] transition-colors">
               {isDoc ? (
                 <iframe
                   src={getViewerUrl(secureUrl)}
