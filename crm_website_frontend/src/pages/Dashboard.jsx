@@ -169,7 +169,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
   };
 
   const getAgentLeadCount = (agentId) => {
-    return leads.filter((lead) => (lead.agentIds || []).includes(agentId)).length;
+    return leads.filter((lead) => (lead.agentIds || []).some(id => matchIds(id, agentId))).length;
   };
 
   const handleInlineAssign = async (leadId, newIds) => {
@@ -247,7 +247,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   // Metrics calculations
   const totalLeads = leads.length;
-  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)))).length;
+  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => matchIds(a.id || a._id, id)))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
   // Filter logic
@@ -261,7 +261,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       return false;
     }
 
-    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => String(a.id || a._id) === String(id))?.name || "").join(" ");
+    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => matchIds(a.id || a._id, id))?.name || "").join(" ");
     const matchesSearch =
       (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.phone || '').includes(searchQuery) ||
@@ -269,13 +269,13 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       agentNames.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)));
+    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => matchIds(a.id || a._id, id)));
 
     const matchesAgent =
       filterAgent === 'all' ||
       (filterAgent === 'unassigned' && !isLeadAssigned) ||
       (filterAgent === 'assigned' && isLeadAssigned) ||
-      (lead.agentIds || []).some(id => String(id) === String(filterAgent));
+      (lead.agentIds || []).some(id => matchIds(id, filterAgent));
 
     const matchesStatus =
       filterStatus === 'all' ||

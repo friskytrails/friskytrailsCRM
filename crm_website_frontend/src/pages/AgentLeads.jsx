@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import AgentMetricsTable from '../components/AgentMetricsTable';
 
+const normalizeId = (id) => (id === null || id === undefined ? '' : String(id).trim());
+const matchIds = (id1, id2) => {
+  const norm1 = normalizeId(id1);
+  const norm2 = normalizeId(id2);
+  return norm1 !== '' && norm1 === norm2;
+};
+
 export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -17,13 +24,13 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
   const decodedParam = decodeURIComponent(id || '');
   const agent = agents.find(a => 
-    a.id === id || 
+    matchIds(a.id || a._id, id) || 
     a.name === decodedParam || 
     a.name?.toLowerCase() === decodedParam.toLowerCase() ||
     encodeURIComponent(a.name) === id
   );
   
-  const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).includes(agent.id)) : [];
+  const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : [];
   const filteredAgentLeads = agentLeads.filter(lead => {
     const st = lead.status || 'Fresh Leads';
     const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
