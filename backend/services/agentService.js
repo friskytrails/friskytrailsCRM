@@ -11,8 +11,48 @@ function createError(message, name = 'ValidationError') {
   return err;
 }
 
+function ensureCurrentMonthMetrics(user) {
+  if (!user || user.isAdmin) return false;
+
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
+  let modified = false;
+
+  if (!user.lastMetricsMonth) {
+    user.lastMetricsMonth = currentMonthStr;
+    modified = true;
+  } else if (user.lastMetricsMonth !== currentMonthStr) {
+    const prevMonth = user.lastMetricsMonth;
+
+    if (!user.historicalMetrics) user.historicalMetrics = [];
+    const exists = user.historicalMetrics.some(m => m.month === prevMonth);
+    if (!exists) {
+      user.historicalMetrics.push({
+        month: prevMonth,
+        monthlyTarget: user.monthlyTarget || 0,
+        targetCompleted: user.targetCompleted || 0,
+        bookingCount: user.bookingCount || 0
+      });
+    }
+
+    // Reset booking count and target completed to 0 for the new month upon completion of month
+    user.bookingCount = 0;
+    user.targetCompleted = 0;
+    user.lastMetricsMonth = currentMonthStr;
+    modified = true;
+  }
+
+  return modified;
+}
+
 async function getAgents() {
   const agents = await User.findAgents();
+  for (const agent of agents) {
+    if (ensureCurrentMonthMetrics(agent)) {
+      await agent.save();
+    }
+  }
   return agents.map(formatDoc);
 }
 
@@ -57,6 +97,7 @@ async function updateAgentStatus(id, status) {
 
   const wasPending = user.status === 'Pending';
   user.status = status;
+  user.statusChangedAt = new Date();
   await user.save();
 
   if (wasPending && status === 'Active') {
@@ -199,9 +240,13 @@ async function getAgentMetrics(id) {
   if (!user) {
     throw createError("Agent not found", "NotFoundError");
   }
+  if (ensureCurrentMonthMetrics(user)) {
+    await user.save();
+  }
   return {
     monthlyTarget: user.monthlyTarget || 0,
     targetCompleted: user.targetCompleted || 0,
+    bookingCount: user.bookingCount || 0,
     attendance: user.attendance || '',
     historicalMetrics: user.historicalMetrics || []
   };
@@ -248,7 +293,8 @@ module.exports = {
   getAgentMonthlyAttendance,
   toggleManagerRole,
   assignAgentsToManager,
-  getMyTeam
+  getMyTeam,
+  ensureCurrentMonthMetrics
 };
 
 async function toggleManagerRole(id, isManager) {

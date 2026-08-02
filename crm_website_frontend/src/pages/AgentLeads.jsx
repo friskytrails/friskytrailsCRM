@@ -13,6 +13,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
   }, [filterStatus]);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const decodedParam = decodeURIComponent(id || '');
   const agent = agents.find(a => 
     a.id === id || 
@@ -22,7 +24,26 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   );
   
   const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).includes(agent.id)) : [];
-  const filteredAgentLeads = agentLeads.filter(lead => filterStatus === 'all' || (lead.status || 'Fresh Leads') === filterStatus);
+  const filteredAgentLeads = agentLeads.filter(lead => {
+    const st = lead.status || 'Fresh Leads';
+    const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
+    const hasSearchQuery = searchQuery.trim().length > 0;
+    
+    if (filterStatus === 'all' && !hasSearchQuery && isBookedOrRejected) {
+      return false;
+    }
+
+    const matchesSearch = !hasSearchQuery ||
+      (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.phone || '').includes(searchQuery) ||
+      (lead.origin || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (lead.product || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = filterStatus === 'all' || st === filterStatus;
+
+    return matchesSearch && matchesStatus;
+  });
 
   // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
   useEffect(() => {
@@ -98,18 +119,32 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           <AgentMetricsTable agent={agent} agentId={agent.id} agentName={agent.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
         </div>
       </div>
-      <div className="mb-6 flex justify-between items-center">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Assigned Leads</h2>
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow"
-        >
-          <option value="all">All Statuses</option>
-          {availableStatuses.map(st => (
-            <option key={st} value={st}>{st}</option>
-          ))}
-        </select>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <input
+              type="text"
+              placeholder="Search leads..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow"
+            />
+            <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+          >
+            <option value="all">All Statuses</option>
+            {availableStatuses.map(st => (
+              <option key={st} value={st}>{st}</option>
+            ))}
+          </select>
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

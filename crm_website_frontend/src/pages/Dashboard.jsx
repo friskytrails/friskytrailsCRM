@@ -247,12 +247,21 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   // Metrics calculations
   const totalLeads = leads.length;
-  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => a.id === id))).length;
+  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
   // Filter logic
   const filteredLeads = leads.filter((lead) => {
-    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => a.id === id)?.name || "").join(" ");
+    const leadStatus = lead.status || 'Fresh Leads';
+    const isBookedOrRejected = leadStatus === 'Booked' || leadStatus === 'Rejected Leads' || leadStatus === 'Rejected';
+    const hasSearchQuery = searchQuery.trim().length > 0;
+
+    // Exclude Booked/Rejected leads by default from the main grid unless searching or explicitly filtering by status
+    if (filterStatus === 'all' && !hasSearchQuery && isBookedOrRejected) {
+      return false;
+    }
+
+    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => String(a.id || a._id) === String(id))?.name || "").join(" ");
     const matchesSearch =
       (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.phone || '').includes(searchQuery) ||
@@ -260,17 +269,17 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       agentNames.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => a.id === id));
+    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)));
 
     const matchesAgent =
       filterAgent === 'all' ||
       (filterAgent === 'unassigned' && !isLeadAssigned) ||
       (filterAgent === 'assigned' && isLeadAssigned) ||
-      (lead.agentIds || []).includes(filterAgent);
+      (lead.agentIds || []).some(id => String(id) === String(filterAgent));
 
     const matchesStatus =
       filterStatus === 'all' ||
-      (lead.status || 'Fresh Leads') === filterStatus;
+      leadStatus === filterStatus;
 
     const matchesProduct =
       filterProduct === 'all' ||

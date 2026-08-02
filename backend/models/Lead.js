@@ -98,7 +98,8 @@ const LeadSchema = new mongoose.Schema({
   },
   dates: {
     startDate: { type: Date, default: null },
-    dueDate: { type: Date, default: null }
+    dueDate: { type: Date, default: null },
+    reminderDate: { type: Date, default: null }
   },
   notes: {
     type: [NoteSchema],

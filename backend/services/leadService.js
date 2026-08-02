@@ -1,6 +1,7 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
 const { formatDoc } = require('../utils/helpers');
+const { ensureCurrentMonthMetrics } = require('./agentService');
 const mongoose = require('mongoose');
 
 async function getLeads(agentIdCondition = undefined) {
@@ -304,6 +305,21 @@ async function updateDates(id, dates, agentIdCondition) {
   return formatDoc(result);
 }
 
+async function updateReminder(id, reminderDate, agentIdCondition) {
+  let parsedDate = null;
+  if (reminderDate) {
+    parsedDate = new Date(reminderDate);
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error("Invalid reminder date");
+    }
+  }
+  const result = await Lead.updateLead(id, { 'dates.reminderDate': parsedDate }, agentIdCondition);
+  if (!result) {
+    throw new Error("Lead not found or unauthorized");
+  }
+  return formatDoc(result);
+}
+
 async function updateStatus(id, status, agentIdCondition) {
   const validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
   if (!validStatuses.includes(status)) {
@@ -375,6 +391,38 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
+
+  // Increment booking count for assigned agents if lead was not previously booked
+  if (existingLead.status !== 'Booked' && Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0) {
+    for (const agentId of existingLead.agentIds) {
+      try {
+        const agentUser = await User.findById(agentId);
+        if (agentUser && !agentUser.isAdmin) {
+          ensureCurrentMonthMetrics(agentUser);
+          agentUser.bookingCount = (agentUser.bookingCount || 0) + 1;
+
+          const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+          const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+          let histIdx = (agentUser.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
+          if (histIdx !== -1) {
+            agentUser.historicalMetrics[histIdx].bookingCount = agentUser.bookingCount;
+          } else {
+            if (!agentUser.historicalMetrics) agentUser.historicalMetrics = [];
+            agentUser.historicalMetrics.push({
+              month: currentMonthStr,
+              monthlyTarget: agentUser.monthlyTarget || 0,
+              targetCompleted: agentUser.targetCompleted || 0,
+              bookingCount: agentUser.bookingCount
+            });
+          }
+          await agentUser.save();
+        }
+      } catch (e) {
+        console.error("Failed to update agent booking count:", e);
+      }
+    }
+  }
+
   return formatDoc(result);
 }
 
@@ -497,6 +545,7 @@ module.exports = {
   getLeadById,
   updateLabels,
   updateDates,
+  updateReminder,
   updateStatus,
   bookLead,
   updateBooking

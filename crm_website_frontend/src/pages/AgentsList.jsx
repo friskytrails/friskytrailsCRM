@@ -9,10 +9,37 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [selectedAgentIds, setSelectedAgentIds] = useState([]);
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
   const [assignLoading, setAssignLoading] = useState(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+
+  const isOlderThan15DaysInactive = (agent) => {
+    const status = agent.status || 'Active';
+    if (status !== 'Inactive' && status !== 'Former Employee') return false;
+    const changedAt = agent.statusChangedAt || agent.updatedAt || agent.createdAt;
+    if (!changedAt) return false;
+    const diffMs = Date.now() - new Date(changedAt).getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    return diffDays > 15;
+  };
 
   const pendingAgentsList = agents.filter(a => a.status === 'Pending');
   const managersList = agents.filter(a => a.isManager && a.status !== 'Pending');
-  const activeAgentsList = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
+  
+  const baseTeamList = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
+  const activeAgentsList = baseTeamList.filter(a => {
+    const hasQuery = globalSearchQuery.trim().length > 0;
+    if (!hasQuery && isOlderThan15DaysInactive(a)) {
+      return false;
+    }
+    if (!hasQuery) return true;
+
+    const query = globalSearchQuery.toLowerCase();
+    return (
+      (a.name || '').toLowerCase().includes(query) ||
+      (a.email || '').toLowerCase().includes(query) ||
+      (a.phone || '').toLowerCase().includes(query) ||
+      (a.status || '').toLowerCase().includes(query)
+    );
+  });
 
   const agentLeadCounts = leads.reduce((acc, lead) => {
     (lead.agentIds || []).forEach(agentId => {
@@ -273,7 +300,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
 
           {/* Active Agents Section */}
           <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl shadow-xl rounded-2xl p-6 md:p-8 border border-gray-200/50 dark:border-slate-700/50">
-            <div className="border-b border-gray-200 dark:border-slate-700 pb-5 mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="border-b border-gray-200 dark:border-slate-700 pb-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
                   <span className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-xl text-orange-600 dark:text-orange-400">
@@ -282,7 +309,19 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                   Active Team
                   <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm py-0.5 px-2.5 rounded-full font-bold ml-1">{activeAgentsList.length}</span>
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-2 font-medium">Manage your travel agents and promote them to manager role.</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 font-medium">Manage your travel agents and promote them to manager role.</p>
+              </div>
+              <div className="relative w-full md:w-72">
+                <input
+                  type="text"
+                  placeholder="Search agent by name, email, or status..."
+                  value={globalSearchQuery}
+                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                  className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-100 shadow-sm"
+                />
+                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
               </div>
             </div>
 
