@@ -60,6 +60,24 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
     window.open(externalUrl, '_blank', 'noopener,noreferrer');
   };
 
+  React.useEffect(() => {
+    if (!isPreviewOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsPreviewOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPreviewOpen]);
+
+  const handleKeyDownTrigger = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsPreviewOpen(true);
+    }
+  };
+
   return (
     <>
       <div className={`flex items-start space-x-3 ${isMyNote ? '' : ''}`}>
@@ -95,8 +113,11 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
             <div className="mt-2 inline-block">
               {isDoc ? (
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setIsPreviewOpen(true)}
-                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-sm font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 max-w-[260px] shadow-sm"
+                  onKeyDown={handleKeyDownTrigger}
+                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-sm font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 max-w-[260px] shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                   title="Click to preview file"
                 >
                   <span className="text-lg">📄</span>
@@ -107,16 +128,22 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                 </div>
               ) : imgError ? (
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setIsPreviewOpen(true)}
-                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700"
+                  onKeyDown={handleKeyDownTrigger}
+                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
                   <span>🖼️</span>
                   <span className="text-orange-600 dark:text-orange-400 font-bold">View Image Attachment</span>
                 </div>
               ) : (
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setIsPreviewOpen(true)}
-                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 max-w-[240px] cursor-pointer group shadow-sm"
+                  onKeyDown={handleKeyDownTrigger}
+                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 max-w-[240px] cursor-pointer group shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                   title="Click to preview image"
                 >
                   <img
@@ -177,6 +204,8 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                   src={getViewerUrl(secureUrl)}
                   className="w-full h-[70vh] rounded-xl border-0 bg-white"
                   title="File Preview"
+                  referrerPolicy="no-referrer"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
                 />
               ) : (
                 <img
