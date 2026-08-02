@@ -19,7 +19,14 @@ function ensureCurrentMonthMetrics(user) {
 
   let modified = false;
 
+  // Backfill legacy statusChangedAt from createdAt if missing
+  if (!user.statusChangedAt) {
+    user.statusChangedAt = user.createdAt || user.updatedAt || new Date();
+    modified = true;
+  }
+
   if (!user.lastMetricsMonth) {
+    // Only assign current month if user has active metrics or initialized targets
     user.lastMetricsMonth = currentMonthStr;
     modified = true;
   } else if (user.lastMetricsMonth !== currentMonthStr) {
