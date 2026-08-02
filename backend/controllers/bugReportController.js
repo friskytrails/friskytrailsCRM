@@ -22,12 +22,23 @@ async function createBugReport(req, res) {
       return res.status(400).json({ error: "Bug description is required" });
     }
 
+    let reporterName = req.user.name;
+    let reporterEmail = req.user.email;
+    if (!reporterName || !reporterEmail) {
+      const User = require('../models/User');
+      const userDoc = await User.Model.findById(req.user.userId || req.user.id || req.user._id);
+      if (userDoc) {
+        reporterName = reporterName || userDoc.name || 'Anonymous Agent';
+        reporterEmail = reporterEmail || userDoc.email || '';
+      }
+    }
+
     const newReport = new BugReport.Model({
       title: title.trim(),
       description: description.trim(),
       reportedBy: req.user.userId || req.user.id || req.user._id,
-      reporterName: req.user.name || 'Anonymous Agent',
-      reporterEmail: req.user.email || ''
+      reporterName: reporterName || 'Anonymous Agent',
+      reporterEmail: reporterEmail || ''
     });
 
     await newReport.save();

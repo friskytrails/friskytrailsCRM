@@ -18,11 +18,11 @@ const BugReportSchema = new mongoose.Schema({
   },
   reporterName: {
     type: String,
-    required: true
+    default: 'Anonymous Agent'
   },
   reporterEmail: {
     type: String,
-    required: true
+    default: ''
   },
   status: {
     type: String,
