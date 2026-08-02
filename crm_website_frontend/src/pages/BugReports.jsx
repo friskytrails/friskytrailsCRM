@@ -12,16 +12,24 @@ export default function BugReports({ token, API_URL, user }) {
   const [filter, setFilter] = useState('all');
 
   const fetchReports = async () => {
+    const activeToken = token || localStorage.getItem('token');
+    if (!activeToken || activeToken === 'null' || activeToken === 'undefined') {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await fetch(`${API_URL}/bugs`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         }
       });
       if (res.ok) {
         const data = await res.json();
         setReports(data);
+      } else if (res.status === 401) {
+        toast.error('Session expired. Please log in again.');
       } else {
         toast.error('Failed to load bug reports');
       }
@@ -33,8 +41,11 @@ export default function BugReports({ token, API_URL, user }) {
   };
 
   useEffect(() => {
-    if (token) {
+    const activeToken = token || localStorage.getItem('token');
+    if (activeToken && activeToken !== 'null' && activeToken !== 'undefined') {
       fetchReports();
+    } else {
+      setLoading(false);
     }
   }, [token]);
 
@@ -43,13 +54,18 @@ export default function BugReports({ token, API_URL, user }) {
     if (!title.trim()) return toast.error('Please enter an issue title');
     if (!description.trim()) return toast.error('Please describe what went wrong');
 
+    const activeToken = token || localStorage.getItem('token');
+    if (!activeToken || activeToken === 'null' || activeToken === 'undefined') {
+      return toast.error('Please log in to submit a bug report');
+    }
+
     try {
       setSubmitting(true);
       const res = await fetch(`${API_URL}/bugs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify({
           title: title.trim(),
@@ -77,12 +93,17 @@ export default function BugReports({ token, API_URL, user }) {
   const handleToggleStatus = async (reportId, currentStatus) => {
     const isClosed = currentStatus === 'Closed' || currentStatus === 'Resolved';
     const newStatus = isClosed ? 'Open' : 'Closed';
+    const activeToken = token || localStorage.getItem('token');
+    if (!activeToken || activeToken === 'null' || activeToken === 'undefined') {
+      return toast.error('Please log in to update status');
+    }
+
     try {
       const res = await fetch(`${API_URL}/bugs/${reportId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeToken}`
         },
         body: JSON.stringify({ status: newStatus })
       });
