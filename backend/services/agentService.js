@@ -25,23 +25,6 @@ async function ensureCurrentMonthMetrics(user) {
   }
 
   if (!user.lastMetricsMonth) {
-<<<<<<< HEAD
-    // Only assign current month if user has active metrics or initialized targets
-    user.lastMetricsMonth = currentMonthStr;
-    modified = true;
-  } else if (user.lastMetricsMonth !== currentMonthStr) {
-    const prevMonth = user.lastMetricsMonth;
-
-    if (!user.historicalMetrics) user.historicalMetrics = [];
-    const exists = user.historicalMetrics.some(m => m.month === prevMonth);
-    if (!exists) {
-      user.historicalMetrics.push({
-        month: prevMonth,
-        monthlyTarget: user.monthlyTarget || 0,
-        targetCompleted: user.targetCompleted || 0,
-        bookingCount: user.bookingCount || 0
-      });
-=======
     const updated = await User.Model.findOneAndUpdate(
       { _id: userId, $or: [{ lastMetricsMonth: { $exists: false } }, { lastMetricsMonth: null }, { lastMetricsMonth: "" }] },
       { $set: { lastMetricsMonth: currentMonthStr } },
@@ -54,7 +37,6 @@ async function ensureCurrentMonthMetrics(user) {
         user.lastMetricsMonth = currentMonthStr;
       }
       return true;
->>>>>>> origin/main
     }
     return false;
   }
