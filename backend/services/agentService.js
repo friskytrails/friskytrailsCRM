@@ -96,8 +96,11 @@ async function updateAgentStatus(id, status) {
   }
 
   const wasPending = user.status === 'Pending';
+  const statusChanged = user.status !== status;
   user.status = status;
-  user.statusChangedAt = new Date();
+  if (statusChanged) {
+    user.statusChangedAt = new Date();
+  }
   await user.save();
 
   if (wasPending && status === 'Active') {
@@ -142,7 +145,10 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     throw createError("Cannot update metrics of an admin user");
   }
 
-  // Backup for manual rollback
+  // Ensure month rollover/archival before reading or modifying any metrics
+  ensureCurrentMonthMetrics(user);
+
+  // Backup for manual rollback (captured after rollover so rollback restores correct state)
   const originalState = {
     monthlyTarget: user.monthlyTarget,
     targetCompleted: user.targetCompleted,
