@@ -168,8 +168,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     }
   };
 
+  const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
+
   const getAgentLeadCount = (agentId) => {
-    return leads.filter((lead) => (lead.agentIds || []).includes(agentId)).length;
+    const targetId = String(agentId || '');
+    return leads.filter((lead) => (lead.agentIds || []).some(id => String(id) === targetId)).length;
   };
 
   const handleInlineAssign = async (leadId, newIds) => {
@@ -247,7 +250,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   // Metrics calculations
   const totalLeads = leads.length;
-  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)))).length;
+  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
   // Filter logic
@@ -261,7 +264,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       return false;
     }
 
-    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => String(a.id || a._id) === String(id))?.name || "").join(" ");
+    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => getAgentId(a) === String(id))?.name || "").join(" ");
     const matchesSearch =
       (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.phone || '').includes(searchQuery) ||
@@ -274,7 +277,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       return matchesSearch;
     }
 
-    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => String(a.id || a._id) === String(id)));
+    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)));
 
     const matchesAgent =
       filterAgent === 'all' ||
@@ -520,9 +523,10 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               <option value="assigned">Assigned Only</option>
               <option value="all">Unassigned & Assigned (All)</option>
               {agents.map((agent) => {
-                const count = getAgentLeadCount(agent.id);
+                const agentId = getAgentId(agent);
+                const count = getAgentLeadCount(agentId);
                 return (
-                  <option key={agent.id} value={agent.id}>
+                  <option key={agentId} value={agentId}>
                     {agent.name} ({count} {count === 1 ? 'lead' : 'leads'})
                   </option>
                 );

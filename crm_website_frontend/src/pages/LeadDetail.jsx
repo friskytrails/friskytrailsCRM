@@ -358,7 +358,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toISOString().split('T')[0]; // yyyy-mm-dd for input[type=date]
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
   };
 
   const formatDisplayDate = (dateStr) => {
@@ -389,12 +395,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         contactNumber: lead.phone || '',
         emergencyContactNumber: lead.bookingDetails?.emergencyContactNumber || '',
         packageName: lead.product || lead.bookingDetails?.packageName || '',
-        totalAmount: lead.bookingDetails?.totalAmount || '',
-        paidAmount: lead.bookingDetails?.paidAmount || '',
-        dueAmount: lead.bookingDetails?.dueAmount || '',
+        totalAmount: lead.bookingDetails?.totalAmount ?? '',
+        paidAmount: lead.bookingDetails?.paidAmount ?? '',
+        dueAmount: lead.bookingDetails?.dueAmount ?? '',
         startDate: lead.bookingDetails?.startDate ? formatDate(lead.bookingDetails.startDate) : '',
         endDate: lead.bookingDetails?.endDate ? formatDate(lead.bookingDetails.endDate) : '',
-        noOfPax: lead.bookingDetails?.noOfPax || ''
+        noOfPax: lead.bookingDetails?.noOfPax ?? ''
       });
       setShowBookingModal(true);
       return;
@@ -970,7 +976,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
           {/* Reminder / Due Date Card */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
             {(() => {
-              const canEditReminder = user?.isAdmin || user?.isManager || (lead.agentIds || []).some(id => String(id) === String(user?.id || user?._id));
+              const canEditReminder = user?.isAdmin || (lead.agentIds || []).some(id => String(id) === String(user?.id || user?._id));
               return (
                 <>
                   <div className="flex items-center justify-between mb-3">
