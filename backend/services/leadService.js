@@ -338,6 +338,17 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw new Error("Lead not found or unauthorized");
   }
 
+  const requiredFields = [
+    'fullName', 'emailId', 'contactNumber', 'emergencyContactNumber',
+    'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'
+  ];
+
+  for (const field of requiredFields) {
+    if (bookingDetails[field] === undefined || bookingDetails[field] === null || bookingDetails[field] === '') {
+      throw new Error(`The field '${field}' is required for booking.`);
+    }
+  }
+
   const tripObj = {
     tripId: bookingDetails.tripId || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
     packageName: bookingDetails.packageName || '',
