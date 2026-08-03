@@ -398,24 +398,40 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
       try {
         const agentUser = await User.findById(agentId);
         if (agentUser && !agentUser.isAdmin) {
-          ensureCurrentMonthMetrics(agentUser);
-          agentUser.bookingCount = (agentUser.bookingCount || 0) + 1;
+          await ensureCurrentMonthMetrics(agentUser);
 
           const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
           const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
-          let histIdx = (agentUser.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
-          if (histIdx !== -1) {
-            agentUser.historicalMetrics[histIdx].bookingCount = agentUser.bookingCount;
-          } else {
-            if (!agentUser.historicalMetrics) agentUser.historicalMetrics = [];
-            agentUser.historicalMetrics.push({
-              month: currentMonthStr,
-              monthlyTarget: agentUser.monthlyTarget || 0,
-              targetCompleted: agentUser.targetCompleted || 0,
-              bookingCount: agentUser.bookingCount
-            });
+
+          const updated = await User.Model.findOneAndUpdate(
+            { _id: agentId },
+            { $inc: { bookingCount: 1 } },
+            { new: true }
+          );
+
+          if (updated) {
+            let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
+            if (histIdx !== -1) {
+              await User.Model.updateOne(
+                { _id: agentId, "historicalMetrics.month": currentMonthStr },
+                { $set: { "historicalMetrics.$.bookingCount": updated.bookingCount } }
+              );
+            } else {
+              await User.Model.updateOne(
+                { _id: agentId },
+                {
+                  $push: {
+                    historicalMetrics: {
+                      month: currentMonthStr,
+                      monthlyTarget: updated.monthlyTarget || 0,
+                      targetCompleted: updated.targetCompleted || 0,
+                      bookingCount: updated.bookingCount
+                    }
+                  }
+                }
+              );
+            }
           }
-          await agentUser.save();
         }
       } catch (e) {
         console.error("Failed to update agent booking count:", e);
