@@ -204,8 +204,6 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                   src={getViewerUrl(secureUrl)}
                   className="w-full h-[70vh] rounded-xl border-0 bg-white"
                   title="File Preview"
-                  referrerPolicy="no-referrer"
-                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
                 />
               ) : (
                 <img
