@@ -133,6 +133,21 @@ async function updateDates(req, res) {
   }
 }
 
+async function updateReminder(req, res) {
+  try {
+    const { id } = req.params;
+    const { reminderDate } = req.body;
+    const agentIdCondition = await getAgentIdCondition(req.user);
+    const result = await leadService.updateReminder(id, reminderDate, agentIdCondition);
+    res.json(result);
+  } catch (error) {
+    if (error.message === "Lead not found or unauthorized") {
+      return res.status(403).json({ error: "Forbidden: Not assigned to you" });
+    }
+    res.status(400).json({ error: error.message });
+  }
+}
+
 async function updateStatus(req, res) {
   try {
     const { id } = req.params;
@@ -188,6 +203,7 @@ module.exports = {
   getLead,
   updateLabels,
   updateDates,
+  updateReminder,
   updateStatus,
   bookLead,
   updateBooking

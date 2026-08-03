@@ -161,6 +161,31 @@ export default function Profile({ user, setUser, token, API_URL, handleLogout })
             </button>
           </form>
 
+          {/* Bug Reports Section */}
+          <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-6">
+            <Link
+              to="/bug-reports"
+              className="group flex items-center justify-between p-5 bg-gray-50 dark:bg-slate-900 hover:bg-gray-100 dark:hover:bg-slate-800/90 rounded-2xl border border-gray-200 dark:border-slate-800 transition-all cursor-pointer shadow-sm"
+            >
+              <div className="flex items-center gap-4">
+                <span className="text-2xl p-2.5 bg-orange-100 dark:bg-orange-950/40 rounded-xl flex items-center justify-center shrink-0">
+                  🐞
+                </span>
+                <div>
+                  <h4 className="text-base font-bold text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
+                    Bug Reports
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    Report a problem or see what others reported
+                  </p>
+                </div>
+              </div>
+              <svg className="w-5 h-5 text-gray-400 group-hover:text-orange-500 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+
           <div className="pt-6 border-t border-gray-100 dark:border-slate-800 mt-6">
             <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Security</h3>
             <form onSubmit={handlePasswordUpdate} className="bg-gray-50 dark:bg-slate-900 rounded-xl p-6 border border-gray-100 dark:border-slate-800 space-y-4">

@@ -15,6 +15,7 @@ import ResetPassword from './pages/ResetPassword';
 import Reports from './pages/Reports';
 import GlobalSettings from './pages/GlobalSettings';
 import ManagerDashboard from './pages/ManagerDashboard';
+import BugReports from './pages/BugReports';
 import './index.css';
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
@@ -532,6 +533,9 @@ function App() {
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} handleLogout={handleLogout} />} />
+            <Route
+              path="/bug-reports"
+              element={<BugReports token={token} API_URL={API_URL} user={user} />} />
             <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
             <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
             {/* Redirect any other path to dashboard */}

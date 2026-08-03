@@ -19,9 +19,10 @@ router.post('/', auth, (req, res) => {
       
       // req.file contains information about the uploaded file,
       // including the path (which is the Cloudinary secure URL when using multer-storage-cloudinary)
+      const secureFileUrl = req.file.secure_url || (req.file.path ? req.file.path.replace('http://', 'https://') : '');
       res.status(200).json({
         message: 'File uploaded successfully',
-        fileUrl: req.file.path,
+        fileUrl: secureFileUrl,
         fileData: req.file
       });
     } catch (error) {

@@ -94,6 +94,96 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
   };
 
+  const formatISTDateTime = (dateStr) => {
+    if (!dateStr) return 'Not set';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Not set';
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const getISTDateAndParts = (dateStr) => {
+    if (!dateStr) {
+      const now = new Date();
+      const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+      const parts = new Intl.DateTimeFormat('en-GB', options).formatToParts(now);
+      const getPart = (type) => parts.find(p => p.type === type)?.value || '00';
+      return {
+        date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+        time: `${getPart('hour')}:${getPart('minute')}`
+      };
+    }
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+      return { date: '', time: '' };
+    }
+    const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+    const parts = new Intl.DateTimeFormat('en-GB', options).formatToParts(d);
+    const getPart = (type) => parts.find(p => p.type === type)?.value || '00';
+    return {
+      date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+      time: `${getPart('hour')}:${getPart('minute')}`
+    };
+  };
+
+  const [isEditingReminder, setIsEditingReminder] = useState(false);
+  const [reminderDateInput, setReminderDateInput] = useState('');
+  const [reminderTimeInput, setReminderTimeInput] = useState('');
+  const [isSavingReminder, setIsSavingReminder] = useState(false);
+
+  const handleStartEditReminder = () => {
+    const { date, time } = getISTDateAndParts(lead?.dates?.reminderDate);
+    setReminderDateInput(date);
+    setReminderTimeInput(time);
+    setIsEditingReminder(true);
+  };
+
+  const handleSaveReminder = async (customValue) => {
+    try {
+      setIsSavingReminder(true);
+      let targetReminderDate = null;
+      if (customValue !== undefined) {
+        targetReminderDate = customValue;
+      } else if (reminderDateInput) {
+        const timeToUse = reminderTimeInput || '09:00';
+        targetReminderDate = new Date(`${reminderDateInput}T${timeToUse}:00+05:30`).toISOString();
+      }
+
+      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}/reminder`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          reminderDate: targetReminderDate
+        })
+      });
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLead(updatedLead);
+        syncLeadToParent(updatedLead);
+        setIsEditingReminder(false);
+        toast.success(targetReminderDate ? 'Reminder updated!' : 'Reminder cleared!');
+      } else {
+        const errData = await res.json();
+        toast.error(errData.error || 'Failed to update reminder');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Server error updating reminder');
+    } finally {
+      setIsSavingReminder(false);
+    }
+  };
+
   const handleProductSave = async () => {
     if (!productInput.trim()) return;
     try {
@@ -268,7 +358,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const formatDate = (dateStr) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toISOString().split('T')[0]; // yyyy-mm-dd for input[type=date]
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d);
   };
 
   const formatDisplayDate = (dateStr) => {
@@ -293,6 +389,19 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     if (!lead || lead.status === newStatus) return;
 
     if (newStatus === 'Booked') {
+      setBookingForm({
+        fullName: lead.name || '',
+        emailId: lead.mailId || '',
+        contactNumber: lead.phone || '',
+        emergencyContactNumber: lead.bookingDetails?.emergencyContactNumber || '',
+        packageName: lead.product || lead.bookingDetails?.packageName || '',
+        totalAmount: lead.bookingDetails?.totalAmount ?? '',
+        paidAmount: lead.bookingDetails?.paidAmount ?? '',
+        dueAmount: lead.bookingDetails?.dueAmount ?? '',
+        startDate: lead.bookingDetails?.startDate ? formatDate(lead.bookingDetails.startDate) : '',
+        endDate: lead.bookingDetails?.endDate ? formatDate(lead.bookingDetails.endDate) : '',
+        noOfPax: lead.bookingDetails?.noOfPax ?? ''
+      });
       setShowBookingModal(true);
       return;
     }
@@ -862,6 +971,109 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Reminder / Due Date Card */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+            {(() => {
+              const canEditReminder = user?.isAdmin || (lead.agentIds || []).some(id => String(id) === String(user?.id || user?._id));
+              return (
+                <>
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider flex items-center gap-2">
+                      <span>📅</span>
+                      Reminder
+                    </h2>
+                    <div className="flex items-center gap-3">
+                      {lead.dates?.reminderDate && !isEditingReminder && canEditReminder && (
+                        <button
+                          onClick={() => handleSaveReminder(null)}
+                          disabled={isSavingReminder}
+                          className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:text-orange-700 cursor-pointer transition-colors"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      {!isEditingReminder && canEditReminder && (
+                        <button
+                          onClick={handleStartEditReminder}
+                          className="p-1 text-gray-400 hover:text-orange-500 transition-colors cursor-pointer"
+                          title="Edit Reminder Date & Time"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isEditingReminder ? (
+                    <div className="space-y-3 mt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">
+                            Date (IST)
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={reminderDateInput}
+                            onChange={(e) => setReminderDateInput(e.target.value)}
+                            className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2.5 text-gray-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-slate-400 mb-1">
+                            Time (IST)
+                          </label>
+                          <input
+                            type="time"
+                            required
+                            value={reminderTimeInput}
+                            onChange={(e) => setReminderTimeInput(e.target.value)}
+                            className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2.5 text-gray-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500 outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => handleSaveReminder()}
+                          disabled={isSavingReminder || !reminderDateInput}
+                          className="flex-1 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+                        >
+                          {isSavingReminder ? 'Saving...' : 'Save Date & Time'}
+                        </button>
+                        <button
+                          onClick={() => setIsEditingReminder(false)}
+                          className="px-3 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs rounded-lg hover:bg-gray-300 transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 mt-2">
+                      <div 
+                        onClick={() => canEditReminder && handleStartEditReminder()}
+                        className={`text-sm font-semibold text-gray-800 dark:text-slate-200 ${canEditReminder ? 'cursor-pointer hover:text-orange-600 dark:hover:text-orange-400 transition-colors' : ''}`}
+                        title={canEditReminder ? 'Click to edit date & time' : ''}
+                      >
+                        <span className="text-gray-500 dark:text-slate-400 font-medium mr-1.5">Set:</span>
+                        {formatISTDateTime(lead.dates?.reminderDate)}
+                      </div>
+
+                      {canEditReminder && (
+                        <button
+                          onClick={handleStartEditReminder}
+                          className="w-full py-2.5 px-4 rounded-xl border border-gray-300 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-900/60 hover:bg-gray-100 dark:hover:bg-slate-700/80 text-orange-600 dark:text-orange-400 font-bold text-sm text-center transition-colors cursor-pointer shadow-sm"
+                        >
+                          Change Date & Time
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
 

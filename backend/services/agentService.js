@@ -11,8 +11,103 @@ function createError(message, name = 'ValidationError') {
   return err;
 }
 
+async function ensureCurrentMonthMetrics(user) {
+  if (!user || user.isAdmin) return false;
+
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+  const userId = user._id || user.id;
+
+  if (!user.lastMetricsMonth) {
+    const updated = await User.Model.findOneAndUpdate(
+      { _id: userId, $or: [{ lastMetricsMonth: { $exists: false } }, { lastMetricsMonth: null }, { lastMetricsMonth: "" }] },
+      { $set: { lastMetricsMonth: currentMonthStr } },
+      { new: true }
+    );
+    if (updated) {
+      if (typeof user.toObject === 'function') {
+        Object.assign(user, updated.toObject());
+      } else {
+        user.lastMetricsMonth = currentMonthStr;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  if (user.lastMetricsMonth !== currentMonthStr) {
+    let attempts = 0;
+    while (attempts < 3) {
+      attempts++;
+      const currentDoc = await User.Model.findById(userId);
+      if (!currentDoc || currentDoc.lastMetricsMonth === currentMonthStr) {
+        if (currentDoc) {
+          if (typeof user.toObject === 'function') {
+            Object.assign(user, currentDoc.toObject());
+          } else {
+            Object.assign(user, currentDoc);
+          }
+        }
+        return false;
+      }
+
+      const prevMonthToArchive = currentDoc.lastMetricsMonth;
+      if (prevMonthToArchive === currentMonthStr) break;
+
+      const existsInHist = (currentDoc.historicalMetrics || []).some(m => m.month === prevMonthToArchive);
+      let updateOp;
+
+      if (!existsInHist && prevMonthToArchive) {
+        updateOp = {
+          $set: {
+            bookingCount: 0,
+            targetCompleted: 0,
+            lastMetricsMonth: currentMonthStr
+          },
+          $push: {
+            historicalMetrics: {
+              month: prevMonthToArchive,
+              monthlyTarget: currentDoc.monthlyTarget || 0,
+              targetCompleted: currentDoc.targetCompleted || 0,
+              bookingCount: currentDoc.bookingCount || 0
+            }
+          }
+        };
+      } else {
+        updateOp = {
+          $set: {
+            bookingCount: 0,
+            targetCompleted: 0,
+            lastMetricsMonth: currentMonthStr
+          }
+        };
+      }
+
+      const res = await User.Model.findOneAndUpdate(
+        { _id: userId, lastMetricsMonth: prevMonthToArchive },
+        updateOp,
+        { new: true }
+      );
+
+      if (res) {
+        if (typeof user.toObject === 'function') {
+          Object.assign(user, res.toObject());
+        } else {
+          Object.assign(user, res);
+        }
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 async function getAgents() {
   const agents = await User.findAgents();
+  for (const agent of agents) {
+    await ensureCurrentMonthMetrics(agent);
+  }
   return agents.map(formatDoc);
 }
 
@@ -56,7 +151,11 @@ async function updateAgentStatus(id, status) {
   }
 
   const wasPending = user.status === 'Pending';
+  const statusChanged = user.status !== status;
   user.status = status;
+  if (statusChanged) {
+    user.statusChangedAt = new Date();
+  }
   await user.save();
 
   if (wasPending && status === 'Active') {
@@ -101,7 +200,10 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     throw createError("Cannot update metrics of an admin user");
   }
 
-  // Backup for manual rollback
+  // Ensure month rollover/archival before reading or modifying any metrics
+  await ensureCurrentMonthMetrics(user);
+
+  // Backup for manual rollback (captured after rollover so rollback restores correct state)
   const originalState = {
     monthlyTarget: user.monthlyTarget,
     targetCompleted: user.targetCompleted,
@@ -199,9 +301,11 @@ async function getAgentMetrics(id) {
   if (!user) {
     throw createError("Agent not found", "NotFoundError");
   }
+  await ensureCurrentMonthMetrics(user);
   return {
     monthlyTarget: user.monthlyTarget || 0,
     targetCompleted: user.targetCompleted || 0,
+    bookingCount: user.bookingCount || 0,
     attendance: user.attendance || '',
     historicalMetrics: user.historicalMetrics || []
   };
@@ -248,7 +352,8 @@ module.exports = {
   getAgentMonthlyAttendance,
   toggleManagerRole,
   assignAgentsToManager,
-  getMyTeam
+  getMyTeam,
+  ensureCurrentMonthMetrics
 };
 
 async function toggleManagerRole(id, isManager) {

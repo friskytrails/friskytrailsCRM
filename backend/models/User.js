@@ -34,6 +34,10 @@ const UserSchema = new mongoose.Schema({
     enum: ['Active', 'Inactive', 'Former Employee', 'Pending'],
     default: 'Active'
   },
+  statusChangedAt: {
+    type: Date,
+    default: Date.now
+  },
   isVerified: {
     type: Boolean,
     default: false
@@ -59,6 +63,10 @@ const UserSchema = new mongoose.Schema({
     default: ''
   },
   attendanceDate: {
+    type: String,
+    default: ''
+  },
+  lastMetricsMonth: {
     type: String,
     default: ''
   },
