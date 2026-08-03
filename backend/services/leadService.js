@@ -338,30 +338,82 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw new Error("Lead not found or unauthorized");
   }
 
+  if (!bookingDetails || typeof bookingDetails !== 'object') {
+    throw new Error("Invalid booking details");
+  }
+
   const requiredFields = [
     'fullName', 'emailId', 'contactNumber', 'emergencyContactNumber',
     'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'
   ];
 
+  const numericFields = ['totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'];
+  const dateFields = ['startDate', 'endDate'];
+
   for (const field of requiredFields) {
-    if (bookingDetails[field] === undefined || bookingDetails[field] === null || bookingDetails[field] === '') {
+    const val = bookingDetails[field];
+    if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
       throw new Error(`The field '${field}' is required for booking.`);
+    }
+
+    if (numericFields.includes(field)) {
+      const num = Number(val);
+      if (!Number.isFinite(num)) {
+        throw new Error(`The field '${field}' must be a valid finite number.`);
+      }
+    }
+
+    if (dateFields.includes(field)) {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) {
+        throw new Error(`The field '${field}' must be a valid date.`);
+      }
     }
   }
 
+  const fullName = typeof bookingDetails.fullName === 'string' ? bookingDetails.fullName.trim() : String(bookingDetails.fullName);
+  const packageName = typeof bookingDetails.packageName === 'string' ? bookingDetails.packageName.trim() : String(bookingDetails.packageName);
+  const contactNumber = typeof bookingDetails.contactNumber === 'string' ? bookingDetails.contactNumber.trim() : String(bookingDetails.contactNumber);
+  const emailId = typeof bookingDetails.emailId === 'string' ? bookingDetails.emailId.trim() : String(bookingDetails.emailId);
+  const emergencyContactNumber = typeof bookingDetails.emergencyContactNumber === 'string' ? bookingDetails.emergencyContactNumber.trim() : String(bookingDetails.emergencyContactNumber);
+  const tripIdInput = typeof bookingDetails.tripId === 'string' ? bookingDetails.tripId.trim() : '';
+
+  const startDate = new Date(bookingDetails.startDate);
+  const endDate = new Date(bookingDetails.endDate);
+
+  const totalAmount = Number(bookingDetails.totalAmount);
+  const paidAmount = Number(bookingDetails.paidAmount);
+  const dueAmount = Number(bookingDetails.dueAmount);
+  const noOfPax = Number(bookingDetails.noOfPax);
+
+  const sanitizedBookingDetails = {
+    ...bookingDetails,
+    fullName,
+    packageName,
+    contactNumber,
+    emailId,
+    emergencyContactNumber,
+    startDate,
+    endDate,
+    totalAmount,
+    paidAmount,
+    dueAmount,
+    noOfPax
+  };
+
   const tripObj = {
-    tripId: bookingDetails.tripId || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
-    packageName: bookingDetails.packageName || '',
-    startDate: bookingDetails.startDate ? new Date(bookingDetails.startDate) : null,
-    endDate: bookingDetails.endDate ? new Date(bookingDetails.endDate) : null,
-    totalAmount: Number(bookingDetails.totalAmount) || 0,
-    paidAmount: Number(bookingDetails.paidAmount) || 0,
-    dueAmount: Number(bookingDetails.dueAmount) || 0,
-    noOfPax: Number(bookingDetails.noOfPax) || 1,
-    fullName: bookingDetails.fullName || '',
-    contactNumber: bookingDetails.contactNumber || '',
-    emailId: bookingDetails.emailId || '',
-    emergencyContactNumber: bookingDetails.emergencyContactNumber || '',
+    tripId: tripIdInput || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
+    packageName,
+    startDate,
+    endDate,
+    totalAmount,
+    paidAmount,
+    dueAmount,
+    noOfPax,
+    fullName,
+    contactNumber,
+    emailId,
+    emergencyContactNumber,
     bookedAt: new Date(),
     status: 'Booked'
   };
@@ -377,12 +429,12 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   const updateData = {
     status: 'Booked',
-    bookingDetails: bookingDetails,
+    bookingDetails: sanitizedBookingDetails,
     trips: tripsList
   };
 
-  if (bookingDetails.fullName) updateData.name = bookingDetails.fullName;
-  if (bookingDetails.packageName) updateData.product = bookingDetails.packageName;
+  if (fullName) updateData.name = fullName;
+  if (packageName) updateData.product = packageName;
 
   let result;
   try {
