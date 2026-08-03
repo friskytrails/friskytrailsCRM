@@ -314,7 +314,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               <div className="relative w-full md:w-72">
                 <input
                   type="text"
-                  placeholder="Search agent by name, email, or status..."
+                  aria-label="Search agents by name, email, phone, or status"
+                  placeholder="Search agent by name, email, phone, or status..."
                   value={globalSearchQuery}
                   onChange={(e) => setGlobalSearchQuery(e.target.value)}
                   className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-100 shadow-sm"

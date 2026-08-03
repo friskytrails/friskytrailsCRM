@@ -401,30 +401,40 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
       try {
         const agentUser = await User.findById(agentId);
         if (agentUser && !agentUser.isAdmin) {
-          ensureCurrentMonthMetrics(agentUser);
-          await agentUser.save();
+          await ensureCurrentMonthMetrics(agentUser);
 
-          await User.updateOne(
-            { _id: agentId, "historicalMetrics.month": currentMonthStr },
-            { $inc: { bookingCount: 1, "historicalMetrics.$.bookingCount": 1 } }
-          ).then(async (res) => {
-            if (res.matchedCount === 0) {
-              await User.updateOne(
+          const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+          const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
+          const updated = await User.Model.findOneAndUpdate(
+            { _id: agentId },
+            { $inc: { bookingCount: 1 } },
+            { new: true }
+          );
+
+          if (updated) {
+            let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
+            if (histIdx !== -1) {
+              await User.Model.updateOne(
+                { _id: agentId, "historicalMetrics.month": currentMonthStr },
+                { $set: { "historicalMetrics.$.bookingCount": updated.bookingCount } }
+              );
+            } else {
+              await User.Model.updateOne(
                 { _id: agentId },
                 {
-                  $inc: { bookingCount: 1 },
                   $push: {
                     historicalMetrics: {
                       month: currentMonthStr,
-                      monthlyTarget: agentUser.monthlyTarget || 0,
-                      targetCompleted: agentUser.targetCompleted || 0,
-                      bookingCount: (agentUser.bookingCount || 0) + 1
+                      monthlyTarget: updated.monthlyTarget || 0,
+                      targetCompleted: updated.targetCompleted || 0,
+                      bookingCount: updated.bookingCount
                     }
                   }
                 }
               );
             }
-          });
+          }
         }
       } catch (e) {
         console.error("Failed to update agent booking count:", e);

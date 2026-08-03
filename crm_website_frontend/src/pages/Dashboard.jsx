@@ -168,8 +168,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     }
   };
 
+  const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
+
   const getAgentLeadCount = (agentId) => {
-    return leads.filter((lead) => (lead.agentIds || []).some(id => matchIds(id, agentId))).length;
+    const targetId = String(agentId || '');
+    return leads.filter((lead) => (lead.agentIds || []).some(id => String(id) === targetId)).length;
   };
 
   const handleInlineAssign = async (leadId, newIds) => {
@@ -247,7 +250,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   // Metrics calculations
   const totalLeads = leads.length;
-  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => matchIds(a.id || a._id, id)))).length;
+  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
   // Filter logic
@@ -261,7 +264,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       return false;
     }
 
-    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => matchIds(a.id || a._id, id))?.name || "").join(" ");
+    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => getAgentId(a) === String(id))?.name || "").join(" ");
     const matchesSearch =
       (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (lead.phone || '').includes(searchQuery) ||
@@ -269,13 +272,18 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       agentNames.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => matchIds(a.id || a._id, id)));
+    // Active search query takes precedence to find any matching lead regardless of dropdown filter selections
+    if (hasSearchQuery) {
+      return matchesSearch;
+    }
+
+    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)));
 
     const matchesAgent =
       filterAgent === 'all' ||
       (filterAgent === 'unassigned' && !isLeadAssigned) ||
       (filterAgent === 'assigned' && isLeadAssigned) ||
-      (lead.agentIds || []).some(id => matchIds(id, filterAgent));
+      (lead.agentIds || []).some(id => String(id) === String(filterAgent));
 
     const matchesStatus =
       filterStatus === 'all' ||
@@ -515,9 +523,10 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               <option value="assigned">Assigned Only</option>
               <option value="all">Unassigned & Assigned (All)</option>
               {agents.map((agent) => {
-                const count = getAgentLeadCount(agent.id);
+                const agentId = getAgentId(agent);
+                const count = getAgentLeadCount(agentId);
                 return (
-                  <option key={agent.id} value={agent.id}>
+                  <option key={agentId} value={agentId}>
                     {agent.name} ({count} {count === 1 ? 'lead' : 'leads'})
                   </option>
                 );

@@ -36,6 +36,8 @@ module.exports = async function (req, res, next) {
     }
     req.user = {
       ...decoded,
+      name: user.name || decoded.name || 'Agent',
+      email: user.email || decoded.email || '',
       isAdmin: !!user.isAdmin,
       isManager: !!user.isManager,
       status: user.status
