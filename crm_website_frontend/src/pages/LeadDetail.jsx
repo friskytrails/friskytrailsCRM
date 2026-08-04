@@ -227,7 +227,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         setIsEditingTravelDate(false);
         toast.success("Travel date updated successfully!");
       } else {
-        toast.error("Failed to update travel date");
+        const errData = await res.json();
+        toast.error(errData.error || "Failed to update travel date");
       }
     } catch {
       toast.error("Error updating travel date");
@@ -236,7 +237,15 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const handlePersonsSave = async () => {
     try {
-      const num = personsInput !== '' ? parseInt(personsInput, 10) : null;
+      const trimmed = String(personsInput || '').trim();
+      let num = null;
+      if (trimmed !== '') {
+        num = Number(trimmed);
+        if (!Number.isSafeInteger(num) || num < 1) {
+          toast.error("Number of persons must be a positive integer (at least 1).");
+          return;
+        }
+      }
       const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
@@ -249,7 +258,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         setIsEditingPersons(false);
         toast.success("Number of persons updated successfully!");
       } else {
-        toast.error("Failed to update number of persons");
+        const errData = await res.json();
+        toast.error(errData.error || "Failed to update number of persons");
       }
     } catch {
       toast.error("Error updating number of persons");
