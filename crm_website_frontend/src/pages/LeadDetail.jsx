@@ -655,7 +655,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               </button>
               <button
                 onClick={() => setIsEditingProduct(false)}
-                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded transition-colors cursor-pointer"
+                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 text-xs rounded transition-colors cursor-pointer font-medium"
               >
                 Cancel
               </button>
@@ -679,12 +679,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
           )}
           {/* Editable Travel Date Badge */}
           {isEditingTravelDate ? (
-            <div className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 p-1.5 px-2 rounded-md border border-emerald-200">
+            <div className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 p-1.5 px-2 rounded-md border border-emerald-200 dark:border-emerald-800">
               <input
                 type="date"
                 value={travelDateInput}
                 onChange={(e) => setTravelDateInput(e.target.value)}
-                className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 bg-white dark:bg-slate-900 border border-emerald-300 rounded px-2 py-1 outline-none cursor-pointer"
+                className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 bg-white dark:bg-slate-900 border border-emerald-300 dark:border-emerald-700 rounded px-2 py-1 outline-none cursor-pointer"
                 autoFocus
               />
               <button
@@ -695,7 +695,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               </button>
               <button
                 onClick={() => setIsEditingTravelDate(false)}
-                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded transition-colors cursor-pointer"
+                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 text-xs rounded transition-colors cursor-pointer font-medium"
               >
                 Cancel
               </button>
@@ -720,14 +720,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
           {/* Editable Number of Persons Badge */}
           {isEditingPersons ? (
-            <div className="inline-flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-950/60 p-1.5 px-2 rounded-md border border-cyan-200">
+            <div className="inline-flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-950/60 p-1.5 px-2 rounded-md border border-cyan-200 dark:border-cyan-800">
               <input
                 type="number"
                 min="1"
                 placeholder="No. of persons"
                 value={personsInput}
                 onChange={(e) => setPersonsInput(e.target.value)}
-                className="w-24 text-xs font-semibold text-cyan-900 dark:text-cyan-100 bg-white dark:bg-slate-900 border border-cyan-300 rounded px-2 py-1 outline-none"
+                className="w-24 text-xs font-semibold text-cyan-900 dark:text-cyan-100 bg-white dark:bg-slate-900 border border-cyan-300 dark:border-cyan-700 rounded px-2 py-1 outline-none"
                 autoFocus
               />
               <button
@@ -738,7 +738,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               </button>
               <button
                 onClick={() => setIsEditingPersons(false)}
-                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded transition-colors cursor-pointer"
+                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-slate-200 text-xs rounded transition-colors cursor-pointer font-medium"
               >
                 Cancel
               </button>
