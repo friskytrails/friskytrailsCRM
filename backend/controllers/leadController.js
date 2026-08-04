@@ -37,9 +37,10 @@ async function createLead(req, res) {
 async function updateLead(req, res) {
   try {
     const { id } = req.params;
-    const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
+    const { name, phone, age, origin, destination, leadSource, mailId, product, travelDate, numberOfPersons, noOfPax } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
-    const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition);
+    const numPersons = numberOfPersons !== undefined ? numberOfPersons : noOfPax;
+    const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numPersons);
     res.json(result);
   } catch (error) {
     if (error.message === "Lead not found or unauthorized") {

@@ -45,6 +45,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [productInput, setProductInput] = useState('');
+  const [isEditingTravelDate, setIsEditingTravelDate] = useState(false);
+  const [travelDateInput, setTravelDateInput] = useState('');
+  const [isEditingPersons, setIsEditingPersons] = useState(false);
+  const [personsInput, setPersonsInput] = useState('');
   const [isTripSectionOpen, setIsTripSectionOpen] = useState(true);
 
   const [isEditingDates, setIsEditingDates] = useState(false);
@@ -206,6 +210,49 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       }
     } catch {
       toast.error("Error updating product package");
+    }
+  };
+
+  const handleTravelDateSave = async () => {
+    try {
+      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ travelDate: travelDateInput })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setLead(updated);
+        syncLeadToParent(updated);
+        setIsEditingTravelDate(false);
+        toast.success("Travel date updated successfully!");
+      } else {
+        toast.error("Failed to update travel date");
+      }
+    } catch {
+      toast.error("Error updating travel date");
+    }
+  };
+
+  const handlePersonsSave = async () => {
+    try {
+      const num = personsInput !== '' ? parseInt(personsInput, 10) : null;
+      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ numberOfPersons: num })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setLead(updated);
+        syncLeadToParent(updated);
+        setIsEditingPersons(false);
+        toast.success("Number of persons updated successfully!");
+      } else {
+        toast.error("Failed to update number of persons");
+      }
+    } catch {
+      toast.error("Error updating number of persons");
     }
   };
 
@@ -624,6 +671,89 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   }}
                   className="text-purple-500 hover:text-purple-700 dark:hover:text-purple-200 ml-1 cursor-pointer p-0.5 rounded transition-colors"
                   title="Edit Product Package"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                </button>
+              )}
+            </span>
+          )}
+          {/* Editable Travel Date Badge */}
+          {isEditingTravelDate ? (
+            <div className="inline-flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/60 p-1.5 px-2 rounded-md border border-emerald-200">
+              <input
+                type="date"
+                value={travelDateInput}
+                onChange={(e) => setTravelDateInput(e.target.value)}
+                className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 bg-white dark:bg-slate-900 border border-emerald-300 rounded px-2 py-1 outline-none cursor-pointer"
+                autoFocus
+              />
+              <button
+                onClick={handleTravelDateSave}
+                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded transition-colors cursor-pointer"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setIsEditingTravelDate(false)}
+                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-100/50">
+              📅 Travel Date: {lead.travelDate ? formatDisplayDate(lead.travelDate) : 'Not Set'}
+              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id) || (lead.agentIds || []).includes(user?.userId)) && (
+                <button
+                  onClick={() => {
+                    setTravelDateInput(lead.travelDate || '');
+                    setIsEditingTravelDate(true);
+                  }}
+                  className="text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-200 ml-1 cursor-pointer p-0.5 rounded transition-colors"
+                  title="Edit Travel Date"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                </button>
+              )}
+            </span>
+          )}
+
+          {/* Editable Number of Persons Badge */}
+          {isEditingPersons ? (
+            <div className="inline-flex items-center gap-1.5 bg-cyan-50 dark:bg-cyan-950/60 p-1.5 px-2 rounded-md border border-cyan-200">
+              <input
+                type="number"
+                min="1"
+                placeholder="No. of persons"
+                value={personsInput}
+                onChange={(e) => setPersonsInput(e.target.value)}
+                className="w-24 text-xs font-semibold text-cyan-900 dark:text-cyan-100 bg-white dark:bg-slate-900 border border-cyan-300 rounded px-2 py-1 outline-none"
+                autoFocus
+              />
+              <button
+                onClick={handlePersonsSave}
+                className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs rounded transition-colors cursor-pointer"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setIsEditingPersons(false)}
+                className="px-2 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs rounded transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-semibold bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300 border border-cyan-100/50">
+              👥 Persons: {lead.numberOfPersons !== undefined && lead.numberOfPersons !== null && lead.numberOfPersons !== '' ? `${lead.numberOfPersons} Pax` : (lead.bookingDetails?.noOfPax ? `${lead.bookingDetails.noOfPax} Pax` : 'Not Set')}
+              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id) || (lead.agentIds || []).includes(user?.userId)) && (
+                <button
+                  onClick={() => {
+                    setPersonsInput(lead.numberOfPersons !== undefined && lead.numberOfPersons !== null ? String(lead.numberOfPersons) : (lead.bookingDetails?.noOfPax ? String(lead.bookingDetails.noOfPax) : ''));
+                    setIsEditingPersons(true);
+                  }}
+                  className="text-cyan-500 hover:text-cyan-700 dark:hover:text-cyan-200 ml-1 cursor-pointer p-0.5 rounded transition-colors"
+                  title="Edit Number of Persons"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </button>

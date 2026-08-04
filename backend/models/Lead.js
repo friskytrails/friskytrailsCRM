@@ -88,6 +88,16 @@ const LeadSchema = new mongoose.Schema({
     required: false,
     default: ''
   },
+  travelDate: {
+    type: String,
+    required: false,
+    default: ''
+  },
+  numberOfPersons: {
+    type: Number,
+    required: false,
+    default: null
+  },
   agentIds: {
     type: [String],
     default: []

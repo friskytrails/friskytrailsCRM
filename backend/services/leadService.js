@@ -83,7 +83,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   return formatDoc(newLead);
 }
 
-async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition) {
+async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numberOfPersons) {
   const existingLead = await Lead.findById(id);
   if (!existingLead) {
     throw new Error("Lead not found or unauthorized");
@@ -108,6 +108,13 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     leadSource: leadSource !== undefined ? leadSource : (existingLead.leadSource || ''),
     product: product !== undefined ? product : (existingLead.product || '')
   };
+
+  if (travelDate !== undefined) {
+    updatePayload.travelDate = travelDate || '';
+  }
+  if (numberOfPersons !== undefined) {
+    updatePayload.numberOfPersons = (numberOfPersons !== '' && numberOfPersons !== null && numberOfPersons !== undefined) ? Number(numberOfPersons) : null;
+  }
 
   const finalMailId = mailId !== undefined ? mailId : existingLead.mailId;
   if (finalMailId && finalMailId.trim() !== '') {
