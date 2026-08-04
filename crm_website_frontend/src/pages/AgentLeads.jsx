@@ -31,6 +31,10 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   );
   
   const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : [];
+  const activeAgentLeads = agentLeads.filter(l => {
+    const st = l.status || 'Fresh Leads';
+    return st !== 'Booked' && st !== 'Rejected Leads' && st !== 'Rejected';
+  });
   const filteredAgentLeads = agentLeads.filter(lead => {
     const st = lead.status || 'Fresh Leads';
     const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
@@ -123,7 +127,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
               {agent.name}'s Board
             </h1>
             <p className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-1">
-              Showing {filteredAgentLeads.length} of {agentLeads.length} Assigned Leads
+              Showing {filteredAgentLeads.length} of {activeAgentLeads.length} Assigned Leads
             </p>
           </div>
         </div>
@@ -151,7 +155,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
             onChange={(e) => setFilterStatus(e.target.value)}
             className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
           >
-            <option value="all">All Statuses ({agentLeads.length})</option>
+            <option value="all">Active Statuses ({activeAgentLeads.length})</option>
             {availableStatuses.map(st => {
               const count = agentLeads.filter(l => (l.status || 'Fresh Leads') === st).length;
               return (
