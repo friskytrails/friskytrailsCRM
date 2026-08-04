@@ -338,19 +338,71 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw new Error("Lead not found or unauthorized");
   }
 
+  if (!bookingDetails || typeof bookingDetails !== 'object') {
+    throw new Error("Invalid booking details");
+  }
+
+  const trimString = (val) => (typeof val === 'string' ? val.trim() : '');
+  const parseFiniteNumber = (val, fieldName, defaultValue = 0) => {
+    if (val === undefined || val === null || val === '') return defaultValue;
+    const num = Number(val);
+    if (!Number.isFinite(num)) {
+      throw new Error(`Invalid number format for ${fieldName}`);
+    }
+    return num;
+  };
+  const parseValidDate = (val, fieldName) => {
+    if (!val) return null;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) {
+      throw new Error(`Invalid date format for ${fieldName}`);
+    }
+    return d;
+  };
+
+  const fullName = trimString(bookingDetails.fullName);
+  const packageName = trimString(bookingDetails.packageName);
+  const contactNumber = trimString(bookingDetails.contactNumber);
+  const emailId = trimString(bookingDetails.emailId);
+  const emergencyContactNumber = trimString(bookingDetails.emergencyContactNumber);
+  const tripIdInput = trimString(bookingDetails.tripId);
+
+  const startDate = parseValidDate(bookingDetails.startDate, 'startDate');
+  const endDate = parseValidDate(bookingDetails.endDate, 'endDate');
+
+  const totalAmount = parseFiniteNumber(bookingDetails.totalAmount, 'totalAmount', 0);
+  const paidAmount = parseFiniteNumber(bookingDetails.paidAmount, 'paidAmount', 0);
+  const dueAmount = parseFiniteNumber(bookingDetails.dueAmount, 'dueAmount', 0);
+  const noOfPax = parseFiniteNumber(bookingDetails.noOfPax, 'noOfPax', 1);
+
+  const sanitizedBookingDetails = {
+    ...bookingDetails,
+    fullName,
+    packageName,
+    contactNumber,
+    emailId,
+    emergencyContactNumber,
+    startDate,
+    endDate,
+    totalAmount,
+    paidAmount,
+    dueAmount,
+    noOfPax
+  };
+
   const tripObj = {
-    tripId: bookingDetails.tripId || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
-    packageName: bookingDetails.packageName || '',
-    startDate: bookingDetails.startDate ? new Date(bookingDetails.startDate) : null,
-    endDate: bookingDetails.endDate ? new Date(bookingDetails.endDate) : null,
-    totalAmount: Number(bookingDetails.totalAmount) || 0,
-    paidAmount: Number(bookingDetails.paidAmount) || 0,
-    dueAmount: Number(bookingDetails.dueAmount) || 0,
-    noOfPax: Number(bookingDetails.noOfPax) || 1,
-    fullName: bookingDetails.fullName || '',
-    contactNumber: bookingDetails.contactNumber || '',
-    emailId: bookingDetails.emailId || '',
-    emergencyContactNumber: bookingDetails.emergencyContactNumber || '',
+    tripId: tripIdInput || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
+    packageName,
+    startDate,
+    endDate,
+    totalAmount,
+    paidAmount,
+    dueAmount,
+    noOfPax,
+    fullName,
+    contactNumber,
+    emailId,
+    emergencyContactNumber,
     bookedAt: new Date(),
     status: 'Booked'
   };
@@ -366,12 +418,12 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   const updateData = {
     status: 'Booked',
-    bookingDetails: bookingDetails,
+    bookingDetails: sanitizedBookingDetails,
     trips: tripsList
   };
 
-  if (bookingDetails.fullName) updateData.name = bookingDetails.fullName;
-  if (bookingDetails.packageName) updateData.product = bookingDetails.packageName;
+  if (fullName) updateData.name = fullName;
+  if (packageName) updateData.product = packageName;
 
   let result;
   try {
@@ -394,6 +446,9 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   // Increment booking count for assigned agents if lead was not previously booked
   if (existingLead.status !== 'Booked' && Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0) {
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
     for (const agentId of existingLead.agentIds) {
       try {
         const agentUser = await User.findById(agentId);

@@ -36,7 +36,7 @@ const UserSchema = new mongoose.Schema({
   },
   statusChangedAt: {
     type: Date,
-    default: Date.now
+    default: null
   },
   isVerified: {
     type: Boolean,

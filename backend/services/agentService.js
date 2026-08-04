@@ -18,6 +18,12 @@ async function ensureCurrentMonthMetrics(user) {
   const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
   const userId = user._id || user.id;
 
+  // Backfill legacy statusChangedAt from createdAt if missing
+  if (!user.statusChangedAt) {
+    user.statusChangedAt = user.createdAt || user.updatedAt || new Date();
+    modified = true;
+  }
+
   if (!user.lastMetricsMonth) {
     const updated = await User.Model.findOneAndUpdate(
       { _id: userId, $or: [{ lastMetricsMonth: { $exists: false } }, { lastMetricsMonth: null }, { lastMetricsMonth: "" }] },
