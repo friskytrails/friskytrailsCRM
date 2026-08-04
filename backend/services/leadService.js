@@ -1,5 +1,6 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
+const GlobalConfig = require('../models/GlobalConfig');
 const { formatDoc } = require('../utils/helpers');
 const { ensureCurrentMonthMetrics } = require('./agentService');
 const mongoose = require('mongoose');
@@ -321,11 +322,21 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
 }
 
 async function updateStatus(id, status, agentIdCondition) {
-  const validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
-  if (!validStatuses.includes(status)) {
+  let validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
+  try {
+    const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
+    if (config && Array.isArray(config.statuses) && config.statuses.length > 0) {
+      validStatuses = config.statuses;
+    }
+  } catch (err) {
+    console.error("Error fetching global config statuses in updateStatus:", err);
+  }
+
+  const trimmedStatus = typeof status === 'string' ? status.trim() : '';
+  if (!trimmedStatus || !validStatuses.includes(trimmedStatus)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
-  const result = await Lead.updateLead(id, { status }, agentIdCondition);
+  const result = await Lead.updateLead(id, { status: trimmedStatus }, agentIdCondition);
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
@@ -342,24 +353,36 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw new Error("Invalid booking details");
   }
 
-  const trimString = (val) => (typeof val === 'string' ? val.trim() : '');
-  const parseFiniteNumber = (val, fieldName, defaultValue = 0) => {
-    if (val === undefined || val === null || val === '') return defaultValue;
-    const num = Number(val);
-    if (!Number.isFinite(num)) {
-      throw new Error(`Invalid number format for ${fieldName}`);
-    }
-    return num;
-  };
-  const parseValidDate = (val, fieldName) => {
-    if (!val) return null;
-    const d = new Date(val);
-    if (isNaN(d.getTime())) {
-      throw new Error(`Invalid date format for ${fieldName}`);
-    }
-    return d;
-  };
+  const requiredFields = [
+    'fullName', 'emailId', 'contactNumber', 'emergencyContactNumber',
+    'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'
+  ];
 
+  const numericFields = ['totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'];
+  const dateFields = ['startDate', 'endDate'];
+
+  for (const field of requiredFields) {
+    const val = bookingDetails[field];
+    if (val === undefined || val === null || (typeof val === 'string' && val.trim() === '')) {
+      throw new Error(`The field '${field}' is required for booking.`);
+    }
+
+    if (numericFields.includes(field)) {
+      const num = Number(val);
+      if (!Number.isFinite(num)) {
+        throw new Error(`The field '${field}' must be a valid finite number.`);
+      }
+    }
+
+    if (dateFields.includes(field)) {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) {
+        throw new Error(`The field '${field}' must be a valid date.`);
+      }
+    }
+  }
+
+  const trimString = (val) => (typeof val === 'string' ? val.trim() : String(val || ''));
   const fullName = trimString(bookingDetails.fullName);
   const packageName = trimString(bookingDetails.packageName);
   const contactNumber = trimString(bookingDetails.contactNumber);
@@ -367,13 +390,13 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   const emergencyContactNumber = trimString(bookingDetails.emergencyContactNumber);
   const tripIdInput = trimString(bookingDetails.tripId);
 
-  const startDate = parseValidDate(bookingDetails.startDate, 'startDate');
-  const endDate = parseValidDate(bookingDetails.endDate, 'endDate');
+  const startDate = new Date(bookingDetails.startDate);
+  const endDate = new Date(bookingDetails.endDate);
 
-  const totalAmount = parseFiniteNumber(bookingDetails.totalAmount, 'totalAmount', 0);
-  const paidAmount = parseFiniteNumber(bookingDetails.paidAmount, 'paidAmount', 0);
-  const dueAmount = parseFiniteNumber(bookingDetails.dueAmount, 'dueAmount', 0);
-  const noOfPax = parseFiniteNumber(bookingDetails.noOfPax, 'noOfPax', 1);
+  const totalAmount = Number(bookingDetails.totalAmount);
+  const paidAmount = Number(bookingDetails.paidAmount);
+  const dueAmount = Number(bookingDetails.dueAmount);
+  const noOfPax = Number(bookingDetails.noOfPax);
 
   const sanitizedBookingDetails = {
     ...bookingDetails,
