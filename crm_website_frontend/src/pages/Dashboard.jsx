@@ -190,8 +190,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("File size must be 10MB or smaller");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("File size must be 15MB or smaller");
       return;
     }
 

@@ -1,5 +1,6 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
+const GlobalConfig = require('../models/GlobalConfig');
 const { formatDoc } = require('../utils/helpers');
 const { ensureCurrentMonthMetrics } = require('./agentService');
 const mongoose = require('mongoose');
@@ -321,11 +322,21 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
 }
 
 async function updateStatus(id, status, agentIdCondition) {
-  const validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
-  if (!validStatuses.includes(status)) {
+  let validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
+  try {
+    const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
+    if (config && Array.isArray(config.statuses) && config.statuses.length > 0) {
+      validStatuses = config.statuses;
+    }
+  } catch (err) {
+    console.error("Error fetching global config statuses in updateStatus:", err);
+  }
+
+  const trimmedStatus = typeof status === 'string' ? status.trim() : '';
+  if (!trimmedStatus || !validStatuses.includes(trimmedStatus)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
-  const result = await Lead.updateLead(id, { status }, agentIdCondition);
+  const result = await Lead.updateLead(id, { status: trimmedStatus }, agentIdCondition);
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }

@@ -111,7 +111,6 @@ const LeadSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'],
     default: 'Fresh Leads'
   },
   bookingDetails: {

@@ -217,8 +217,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("File size must be less than 10MB");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("File size must be 15MB or smaller");
       return;
     }
 
