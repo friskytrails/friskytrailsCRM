@@ -371,12 +371,13 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     }
   }
 
-  const fullName = typeof bookingDetails.fullName === 'string' ? bookingDetails.fullName.trim() : String(bookingDetails.fullName);
-  const packageName = typeof bookingDetails.packageName === 'string' ? bookingDetails.packageName.trim() : String(bookingDetails.packageName);
-  const contactNumber = typeof bookingDetails.contactNumber === 'string' ? bookingDetails.contactNumber.trim() : String(bookingDetails.contactNumber);
-  const emailId = typeof bookingDetails.emailId === 'string' ? bookingDetails.emailId.trim() : String(bookingDetails.emailId);
-  const emergencyContactNumber = typeof bookingDetails.emergencyContactNumber === 'string' ? bookingDetails.emergencyContactNumber.trim() : String(bookingDetails.emergencyContactNumber);
-  const tripIdInput = typeof bookingDetails.tripId === 'string' ? bookingDetails.tripId.trim() : '';
+  const trimString = (val) => (typeof val === 'string' ? val.trim() : String(val || ''));
+  const fullName = trimString(bookingDetails.fullName);
+  const packageName = trimString(bookingDetails.packageName);
+  const contactNumber = trimString(bookingDetails.contactNumber);
+  const emailId = trimString(bookingDetails.emailId);
+  const emergencyContactNumber = trimString(bookingDetails.emergencyContactNumber);
+  const tripIdInput = trimString(bookingDetails.tripId);
 
   const startDate = new Date(bookingDetails.startDate);
   const endDate = new Date(bookingDetails.endDate);
@@ -457,6 +458,9 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   // Increment booking count for assigned agents if lead was not previously booked
   if (existingLead.status !== 'Booked' && Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0) {
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
     for (const agentId of existingLead.agentIds) {
       try {
         const agentUser = await User.findById(agentId);
