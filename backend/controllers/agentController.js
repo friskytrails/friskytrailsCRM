@@ -28,8 +28,8 @@ async function updateAgentStatus(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const { id } = req.params;
-    const { status } = req.body;
-    const agent = await agentService.updateAgentStatus(id, status);
+    const { status, role } = req.body;
+    const agent = await agentService.updateAgentStatus(id, status, role);
     res.json(agent);
   } catch (error) {
     return handleAgentServiceError(error, res);
@@ -154,6 +154,20 @@ async function getMyTeam(req, res) {
   }
 }
 
+async function toggleItineraryRole(req, res) {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Forbidden: Admin access only" });
+    }
+    const { id } = req.params;
+    const { isItinerary } = req.body;
+    const agent = await agentService.toggleItineraryRole(id, isItinerary);
+    res.json(agent);
+  } catch (error) {
+    return handleAgentServiceError(error, res);
+  }
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
@@ -163,6 +177,7 @@ module.exports = {
   getAgentAttendance,
   getAgentMonthlyAttendance,
   toggleManagerRole,
+  toggleItineraryRole,
   assignAgentsToManager,
   getMyTeam
 };

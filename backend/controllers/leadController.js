@@ -2,7 +2,7 @@ const leadService = require('../services/leadService');
 const agentService = require('../services/agentService');
 
 async function getAgentIdCondition(user) {
-  if (user.isAdmin) {
+  if (user.isAdmin || user.isItinerary) {
     return undefined;
   }
   if (user.isManager) {
@@ -13,10 +13,46 @@ async function getAgentIdCondition(user) {
   return user.userId;
 }
 
+function sanitizeLeadForItinerary(leadDoc) {
+  if (!leadDoc) return leadDoc;
+  const leadObj = typeof leadDoc.toObject === 'function' ? leadDoc.toObject() : { ...leadDoc };
+  const leadIdStr = leadObj.id || leadObj._id?.toString() || '';
+  return {
+    id: leadIdStr,
+    _id: leadObj._id,
+    leadId: leadObj.leadId,
+    name: leadObj.name || 'Unnamed Lead',
+    notes: leadObj.notes || [],
+    status: leadObj.status || 'Fresh Leads',
+    origin: leadObj.origin || '',
+    destination: leadObj.destination || '',
+    product: leadObj.product || '',
+    agentIds: leadObj.agentIds || [],
+    createdAt: leadObj.createdAt,
+    updatedAt: leadObj.updatedAt,
+    // Sensitive fields redacted
+    phone: '',
+    mailId: '',
+    age: null,
+    leadSource: '',
+    travelDate: '',
+    numberOfPersons: null,
+    labels: leadObj.labels || [],
+    dates: { startDate: null, dueDate: null, reminderDate: null },
+    bookingDetails: {},
+    booking: {},
+    callLogs: [],
+    trips: []
+  };
+}
+
 async function getLeads(req, res) {
   try {
     const agentIdCondition = await getAgentIdCondition(req.user);
     const leads = await leadService.getLeads(agentIdCondition);
+    if (req.user.isItinerary) {
+      return res.json(leads.map(sanitizeLeadForItinerary));
+    }
     res.json(leads);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -25,6 +61,9 @@ async function getLeads(req, res) {
 
 async function createLead(req, res) {
   try {
+    if (req.user.isItinerary) {
+      return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot create leads" });
+    }
     const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
     const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product, req.user);
     
@@ -36,6 +75,9 @@ async function createLead(req, res) {
 
 async function updateLead(req, res) {
   try {
+    if (req.user.isItinerary) {
+      return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot update lead details" });
+    }
     const { id } = req.params;
     const { name, phone, age, origin, destination, leadSource, mailId, product, travelDate, numberOfPersons, noOfPax } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
@@ -70,6 +112,9 @@ async function addNote(req, res) {
     const { text, imageUrl } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.addNote(id, text, req.user.userId, imageUrl, agentIdCondition);
+    if (req.user.isItinerary) {
+      return res.status(201).json(sanitizeLeadForItinerary(result));
+    }
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -81,6 +126,9 @@ async function deleteNote(req, res) {
     const { id, noteId } = req.params;
     const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.deleteNote(id, noteId, req.user.userId, req.user.isAdmin, agentIdCondition);
+    if (req.user.isItinerary) {
+      return res.json(sanitizeLeadForItinerary(result));
+    }
     res.json(result);
   } catch (error) {
     if (error.message === "Unauthorized to delete this note") {
@@ -98,6 +146,9 @@ async function getLead(req, res) {
     const { id } = req.params;
     const agentIdCondition = await getAgentIdCondition(req.user);
     const lead = await leadService.getLeadById(id, agentIdCondition);
+    if (req.user.isItinerary) {
+      return res.json(sanitizeLeadForItinerary(lead));
+    }
     res.json(lead);
   } catch (error) {
     res.status(404).json({ error: error.message });
@@ -106,6 +157,7 @@ async function getLead(req, res) {
 
 async function updateLabels(req, res) {
   try {
+    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot modify lead labels" });
     const { id } = req.params;
     const { labels } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
@@ -121,6 +173,7 @@ async function updateLabels(req, res) {
 
 async function updateDates(req, res) {
   try {
+    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot modify lead dates" });
     const { id } = req.params;
     const { startDate, dueDate } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
@@ -136,6 +189,7 @@ async function updateDates(req, res) {
 
 async function updateReminder(req, res) {
   try {
+    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot modify reminders" });
     const { id } = req.params;
     const { reminderDate } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
@@ -151,6 +205,7 @@ async function updateReminder(req, res) {
 
 async function updateStatus(req, res) {
   try {
+    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot change lead status" });
     const { id } = req.params;
     const { status } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
@@ -166,6 +221,7 @@ async function updateStatus(req, res) {
 
 async function bookLead(req, res) {
   try {
+    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot book leads" });
     const { id } = req.params;
     const { bookingDetails } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
@@ -181,6 +237,7 @@ async function bookLead(req, res) {
 
 async function updateBooking(req, res) {
   try {
+    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot modify booking info" });
     const { id } = req.params;
     const { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);

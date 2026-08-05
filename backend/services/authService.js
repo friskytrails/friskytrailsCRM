@@ -116,6 +116,7 @@ async function login(email, password) {
       email: user.email,
       isAdmin: !!user.isAdmin,
       isManager: !!user.isManager,
+      isItinerary: !!user.isItinerary,
       isVerified: user.isVerified,
       status: user.status
     }
@@ -134,6 +135,7 @@ async function getProfile(userId) {
     email: user.email,
     isAdmin: !!user.isAdmin,
     isManager: !!user.isManager,
+    isItinerary: !!user.isItinerary,
     isVerified: user.isVerified
   };
 }
@@ -190,6 +192,7 @@ async function updateProfile(userId, name, email) {
     email: user.email,
     isAdmin: !!user.isAdmin,
     isManager: !!user.isManager,
+    isItinerary: !!user.isItinerary,
     isVerified: user.isVerified
   };
 }

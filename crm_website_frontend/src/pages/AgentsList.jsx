@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, assignAgentsToManager }) {
+export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager }) {
   const [loadingAction, setLoadingAction] = useState({});
   const [processedAgents, setProcessedAgents] = useState({});
   const [assignModalManager, setAssignModalManager] = useState(null); // manager object or null
@@ -49,7 +49,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   }, {});
 
   const handleAction = async (agentId, action, value) => {
-    setLoadingAction(prev => ({ ...prev, [agentId]: true }));
+    setLoadingAction(prev => ({ ...prev, [agentId]: value || true }));
     try {
       if (action === 'status' && updateAgentStatus) {
         const result = await updateAgentStatus(agentId, value);
@@ -58,6 +58,20 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
         }
       } else if (action === 'verify' && updateAgentVerification) {
         await updateAgentVerification(agentId, value);
+      }
+    } finally {
+      setLoadingAction(prev => ({ ...prev, [agentId]: false }));
+    }
+  };
+
+  const handleActionWithRole = async (agentId, status, role) => {
+    setLoadingAction(prev => ({ ...prev, [agentId]: role }));
+    try {
+      if (updateAgentStatus) {
+        const result = await updateAgentStatus(agentId, status, role);
+        if (result && (status === 'Active' || status === 'Rejected')) {
+          setProcessedAgents(prev => ({ ...prev, [agentId]: status }));
+        }
       }
     } finally {
       setLoadingAction(prev => ({ ...prev, [agentId]: false }));
@@ -75,6 +89,22 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
       await toggleManagerRole(agent.id, promoting);
     } finally {
       setLoadingAction(prev => ({ ...prev, [`mgr_${agent.id}`]: false }));
+    }
+  };
+
+  const handleToggleItinerary = async (agent) => {
+    const nextVal = !agent.isItinerary;
+    const confirmMsg = nextVal
+      ? `Convert "${agent.name}" to Itinerary Team? They will have restricted access to leads (Lead name and comments section only).`
+      : `Convert "${agent.name}" to standard Agent?`;
+    if (!window.confirm(confirmMsg)) return;
+    setLoadingAction(prev => ({ ...prev, [`itin_${agent.id}`]: true }));
+    try {
+      if (toggleItineraryRole) {
+        await toggleItineraryRole(agent.id, nextVal);
+      }
+    } finally {
+      setLoadingAction(prev => ({ ...prev, [`itin_${agent.id}`]: false }));
     }
   };
 
@@ -140,20 +170,29 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{agent.email}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <button
-              onClick={() => handleAction(agent.id, 'status', 'Active')}
-              disabled={loadingAction[agent.id] || processedAgents[agent.id]}
-              className={`flex-1 text-[11px] font-bold py-2 rounded-lg transition-all shadow-sm ${processedAgents[agent.id] === 'Active' ? 'bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white hover:shadow-md'} disabled:opacity-50`}
-            >
-              {loadingAction[agent.id] && !processedAgents[agent.id] ? 'Saving...' : processedAgents[agent.id] === 'Active' ? 'Approved' : 'Approve'}
-            </button>
+          <div className="flex flex-col gap-2 mt-1">
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleActionWithRole(agent.id, 'Active', 'agent')}
+                disabled={!!loadingAction[agent.id] || !!processedAgents[agent.id]}
+                className={`flex-1 text-[11px] font-bold py-1.5 px-2 rounded-lg transition-all shadow-sm ${processedAgents[agent.id] === 'Active' ? 'bg-green-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white hover:shadow-md'} disabled:opacity-50`}
+              >
+                {loadingAction[agent.id] === 'agent' ? 'Saving...' : 'Agent'}
+              </button>
+              <button
+                onClick={() => handleActionWithRole(agent.id, 'Active', 'itinerary')}
+                disabled={!!loadingAction[agent.id] || !!processedAgents[agent.id]}
+                className={`flex-1 text-[11px] font-bold py-1.5 px-2 rounded-lg transition-all shadow-sm ${processedAgents[agent.id] === 'Active' ? 'bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-md'} disabled:opacity-50`}
+              >
+                {loadingAction[agent.id] === 'itinerary' ? 'Saving...' : 'Itinerary'}
+              </button>
+            </div>
             <button
               onClick={() => handleAction(agent.id, 'status', 'Rejected')}
-              disabled={loadingAction[agent.id] || processedAgents[agent.id]}
-              className={`flex-1 text-[11px] font-bold py-2 rounded-lg transition-all border border-transparent ${processedAgents[agent.id] === 'Rejected' ? 'bg-red-700 text-white' : 'bg-gray-100 hover:bg-red-100 text-gray-700 hover:text-red-700 hover:border-red-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-red-900/30 dark:hover:text-red-400'} disabled:opacity-50`}
+              disabled={!!loadingAction[agent.id] || !!processedAgents[agent.id]}
+              className={`w-full text-[11px] font-bold py-1.5 rounded-lg transition-all border border-transparent ${processedAgents[agent.id] === 'Rejected' ? 'bg-red-700 text-white' : 'bg-gray-100 hover:bg-red-100 text-gray-700 hover:text-red-700 hover:border-red-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-red-900/30 dark:hover:text-red-400'} disabled:opacity-50`}
             >
-              {loadingAction[agent.id] && !processedAgents[agent.id] ? 'Saving...' : processedAgents[agent.id] === 'Rejected' ? 'Rejected' : 'Reject'}
+              {loadingAction[agent.id] === 'Rejected' ? 'Saving...' : processedAgents[agent.id] === 'Rejected' ? 'Rejected' : 'Reject'}
             </button>
           </div>
         </div>
@@ -169,6 +208,9 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           <div>
             <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
               <Link to={`/agents/${agent.id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
+              {agent.isItinerary && (
+                <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-900/50">Itinerary Team</span>
+              )}
               {status !== 'Active' && (
                 <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
               )}
@@ -194,6 +236,16 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
             {count} {count === 1 ? 'Lead' : 'Leads'}
           </span>
+
+          {/* Toggle Itinerary Role */}
+          <button
+            onClick={() => handleToggleItinerary(agent)}
+            disabled={!!loadingAction[`itin_${agent.id}`]}
+            title={agent.isItinerary ? "Convert to standard Agent" : "Convert to Itinerary Team"}
+            className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-all disabled:opacity-50 ${agent.isItinerary ? 'bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300' : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400'}`}
+          >
+            {loadingAction[`itin_${agent.id}`] ? '...' : agent.isItinerary ? 'Itinerary Role' : '+ Itinerary'}
+          </button>
 
           {/* Make Manager toggle */}
           <button

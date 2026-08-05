@@ -36,9 +36,11 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                   Dashboard
                 </Link>
 
-                <Link to="/add-lead" className={getLinkClass('/add-lead')}>
-                  Add Lead
-                </Link>
+                {!user.isItinerary && (
+                  <Link to="/add-lead" className={getLinkClass('/add-lead')}>
+                    Add Lead
+                  </Link>
+                )}
                 
                 {user.isManager && !user.isAdmin && (
                   <Link to="/manager-dashboard" className={getLinkClass('/manager-dashboard')}>
@@ -94,7 +96,7 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                     {user.name}
                   </span>
                   <span className="text-[9px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-500">
-                    {user.isAdmin ? 'Admin' : user.isManager ? 'Manager' : 'Agent'}
+                    {user.isAdmin ? 'Admin' : user.isManager ? 'Manager' : user.isItinerary ? 'Itinerary Team' : 'Agent'}
                   </span>
                 </div>
                 <Link to="/profile" className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400 font-bold border border-orange-200/50 dark:border-orange-900/50 shadow-sm text-sm hover:ring-2 hover:ring-orange-500 transition-all cursor-pointer">
@@ -147,9 +149,11 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
               Dashboard
             </Link>
 
-            <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
-              Add Lead
-            </Link>
+            {!user.isItinerary && (
+              <Link to="/add-lead" onClick={() => setIsOpen(false)} className={getLinkClass('/add-lead', true)}>
+                Add Lead
+              </Link>
+            )}
 
             {user.isManager && !user.isAdmin && (
               <Link to="/manager-dashboard" onClick={() => setIsOpen(false)} className={getLinkClass('/manager-dashboard', true)}>
@@ -187,7 +191,7 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                     {user.name}
                   </span>
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-600 dark:text-orange-500">
-                    {user.isAdmin ? 'Admin' : user.isManager ? 'Manager' : 'Agent'}
+                    {user.isAdmin ? 'Admin' : user.isManager ? 'Manager' : user.isItinerary ? 'Itinerary Team' : 'Agent'}
                   </span>
                 </div>
               </Link>

@@ -117,7 +117,7 @@ async function getAgents() {
   return agents.map(formatDoc);
 }
 
-async function updateAgentStatus(id, status) {
+async function updateAgentStatus(id, status, role) {
   const validStatuses = ['Active', 'Inactive', 'Former Employee', 'Rejected'];
   if (!validStatuses.includes(status)) {
     throw createError(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
@@ -130,6 +130,15 @@ async function updateAgentStatus(id, status) {
 
   if (user.isAdmin) {
     throw createError("Cannot update status of an admin user");
+  }
+
+  if (role) {
+    if (role === 'itinerary' || role === 'itenary') {
+      user.isItinerary = true;
+      user.isManager = false;
+    } else if (role === 'agent') {
+      user.isItinerary = false;
+    }
   }
 
   if (status === 'Rejected') {
@@ -357,10 +366,30 @@ module.exports = {
   getAgentAttendance,
   getAgentMonthlyAttendance,
   toggleManagerRole,
+  toggleItineraryRole,
   assignAgentsToManager,
   getMyTeam,
   ensureCurrentMonthMetrics
 };
+
+async function toggleItineraryRole(id, isItinerary) {
+  const user = await User.findById(id);
+  if (!user) throw createError("Agent not found", "NotFoundError");
+  if (user.isAdmin) throw createError("Cannot change role of an admin user");
+
+  if (typeof isItinerary !== 'boolean') {
+    if (isItinerary === 'true') isItinerary = true;
+    else if (isItinerary === 'false') isItinerary = false;
+    else throw createError("isItinerary must be a boolean value");
+  }
+
+  user.isItinerary = isItinerary;
+  if (isItinerary) {
+    user.isManager = false;
+  }
+  await user.save();
+  return formatDoc(user);
+}
 
 async function toggleManagerRole(id, isManager) {
   const user = await User.findById(id);

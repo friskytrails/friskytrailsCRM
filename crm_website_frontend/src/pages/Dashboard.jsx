@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Dashboard({ leads, agents, products = [], statuses = [], assignAgent, addNote, deleteNote, updateLead, user, loading }) {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
   const [noteInputs, setNoteInputs] = useState({}); // { [leadId]: 'comment text' }
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -610,7 +611,12 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
             return (
               <div
                 key={lead.id}
-                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
+                onClick={(e) => {
+                  if (!e.target.closest('button, input, select, textarea, a, label')) {
+                    navigate(`/leads/${lead.id}`);
+                  }
+                }}
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group cursor-pointer"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -794,7 +800,12 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
             return (
               <div
                 key={lead.id}
-                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border border-gray-100 dark:border-slate-700/50 p-5 flex flex-col space-y-4"
+                onClick={(e) => {
+                  if (!e.target.closest('button, input, select, textarea, a, label')) {
+                    navigate(`/leads/${lead.id}`);
+                  }
+                }}
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border border-gray-100 dark:border-slate-700/50 p-5 flex flex-col space-y-4 cursor-pointer"
               >
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center">
                   <div className="lg:col-span-4 flex items-center">
