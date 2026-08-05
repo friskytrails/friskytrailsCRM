@@ -64,6 +64,9 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
     e.stopPropagation();
     try {
       const response = await fetch(secureUrl);
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
