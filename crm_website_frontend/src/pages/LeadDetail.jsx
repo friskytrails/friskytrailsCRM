@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
+import { uploadFileToCloudinary } from '../utils/uploadHelper';
 
 const STATUS_OPTIONS = [
   { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
@@ -331,24 +332,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     try {
       let finalImageUrl = null;
 
-      // Upload image first if it exists
+      // Upload file directly to Cloudinary using signed upload credentials
       if (imageFile) {
-        const formData = new FormData();
-        formData.append('file', imageFile);
-
-        const uploadRes = await fetch(`${API_URL}/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
-
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          finalImageUrl = uploadData.fileUrl;
-        } else {
-          toast.error('Failed to upload image to Cloudinary');
+        try {
+          finalImageUrl = await uploadFileToCloudinary(imageFile, token, API_URL);
+        } catch (uploadErr) {
+          console.error('Direct upload error:', uploadErr);
+          toast.error(`File upload failed: ${uploadErr.message}`);
           setIsUploading(false);
           return;
         }

@@ -60,6 +60,32 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
     window.open(externalUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const handleDownload = async (e) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(secureUrl);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName || 'attachment';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error('Download error:', err);
+      const link = document.createElement('a');
+      link.href = secureUrl;
+      link.download = fileName || 'attachment';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   React.useEffect(() => {
     if (!isPreviewOpen) return;
     const handleKeyDown = (e) => {
@@ -173,6 +199,17 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                 <span className="text-sm font-bold text-gray-900 dark:text-white truncate">{fileName}</span>
               </div>
               <div className="flex items-center space-x-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  title="Download file"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <span>Download</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleOpenExternal}

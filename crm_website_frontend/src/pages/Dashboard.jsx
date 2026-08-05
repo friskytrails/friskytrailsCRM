@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
+import { uploadFileToCloudinary } from '../utils/uploadHelper';
 
 const STATUS_OPTIONS = [
   { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
@@ -216,20 +217,13 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     try {
       let finalImageUrl = null;
       if (file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          },
-          body: formData
-        });
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json();
-          finalImageUrl = uploadData.fileUrl;
-        } else {
-          toast.error('Failed to upload image');
+        try {
+          const token = localStorage.getItem('token');
+          const apiUrl = import.meta.env.VITE_API_URL;
+          finalImageUrl = await uploadFileToCloudinary(file, token, apiUrl);
+        } catch (uploadErr) {
+          console.error('Direct upload error:', uploadErr);
+          toast.error(`Failed to upload file: ${uploadErr.message}`);
           setIsUploading(prev => ({ ...prev, [leadId]: false }));
           return;
         }
