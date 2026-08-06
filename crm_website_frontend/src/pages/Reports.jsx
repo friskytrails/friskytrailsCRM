@@ -129,7 +129,7 @@ export default function Reports({ agents = [] }) {
   };
 
   const activeReports = reports.filter(report => {
-    const ag = (agents || []).find(a => String(a.id || a._id) === String(report.agentId) || a.name === report.name);
+    const ag = (agents || []).find(a => String(a.id || a._id) === String(report.agentId));
     if (ag) {
       const st = ag.status || 'Active';
       return st !== 'Inactive' && st !== 'Former Employee';
@@ -308,7 +308,7 @@ export default function Reports({ agents = [] }) {
                   </td>
                 </tr>
               ))}
-              {reports.length === 0 && !loading && (
+              {activeReports.length === 0 && !loading && (
                 <tr>
                   <td colSpan="7" className="px-6 py-8 text-center text-gray-500">No data found for this date range.</td>
                 </tr>

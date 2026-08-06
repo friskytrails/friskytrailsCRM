@@ -385,6 +385,12 @@ async function toggleItineraryRole(id, isItinerary) {
 
   user.isItinerary = isItinerary;
   if (isItinerary) {
+    if (user.isManager) {
+      await User.Model.updateMany(
+        { managerId: user._id },
+        { $set: { managerId: null } }
+      );
+    }
     user.isManager = false;
   }
   await user.save();
