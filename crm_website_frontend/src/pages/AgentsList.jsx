@@ -25,9 +25,19 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     const hasQuery = trimmedQuery.length > 0;
     const status = a.status || 'Active';
 
-    // Without search, only show Active agents (hide Inactive/Former Employee immediately)
+    // Without search: show Active agents, and hide Inactive/Former Employee only after 24 hours
     if (!hasQuery) {
-      return status === 'Active';
+      if (status === 'Active') return true;
+
+      const changedAt = a.statusChangedAt || a.updatedAt || a.createdAt;
+      if (changedAt) {
+        const changedTime = new Date(changedAt).getTime();
+        const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+        if (!isNaN(changedTime) && (Date.now() - changedTime < TWENTY_FOUR_HOURS)) {
+          return true;
+        }
+      }
+      return false;
     }
 
     // When searching, allow matching inactive or former employees as well
@@ -54,7 +64,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     if (action === 'status' && (value === 'Inactive' || value === 'Former Employee')) {
       const agentObj = agents.find(a => a.id === agentId || a._id === agentId);
       const agentName = agentObj?.name || 'this agent';
-      const confirmed = window.confirm(`Are you sure you want to change the status of "${agentName}" to ${value}? They will be hidden from the Active Team list.`);
+      const confirmed = window.confirm(`Are you sure you want to change the status of "${agentName}" to ${value}? They will be hidden from the Active Team list after 24 hours.`);
       if (!confirmed) return;
     }
 

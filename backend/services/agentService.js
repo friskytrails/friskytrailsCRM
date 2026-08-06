@@ -21,7 +21,13 @@ async function ensureCurrentMonthMetrics(user) {
   // Backfill legacy statusChangedAt from createdAt if missing
   if (!user.statusChangedAt) {
     user.statusChangedAt = user.createdAt || user.updatedAt || new Date();
-    modified = true;
+    if (typeof user.save === 'function') {
+      try {
+        await user.save();
+      } catch (err) {
+        // Ignore save error in read path
+      }
+    }
   }
 
   if (!user.lastMetricsMonth) {
