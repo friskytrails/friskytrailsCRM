@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager }) {
@@ -11,15 +11,10 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [assignLoading, setAssignLoading] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
 
-  const isOlderThan15DaysInactive = (agent) => {
-    const status = agent.status || 'Active';
-    if (status !== 'Inactive' && status !== 'Former Employee') return false;
-    const changedAt = agent.statusChangedAt || agent.createdAt;
-    if (!changedAt) return false;
-    const diffMs = Date.now() - new Date(changedAt).getTime();
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return diffDays > 15;
-  };
+  useEffect(() => {
+    sessionStorage.setItem('leadDetail_backUrl', '/agents');
+    sessionStorage.setItem('leadDetail_backLabel', 'Active Team');
+  }, []);
 
   const pendingAgentsList = agents.filter(a => a.status === 'Pending');
   const managersList = agents.filter(a => a.isManager && a.status !== 'Pending');
@@ -28,27 +23,41 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const activeAgentsList = baseTeamList.filter(a => {
     const trimmedQuery = globalSearchQuery.trim().toLowerCase();
     const hasQuery = trimmedQuery.length > 0;
-    if (!hasQuery && isOlderThan15DaysInactive(a)) {
-      return false;
-    }
-    if (!hasQuery) return true;
+    const status = a.status || 'Active';
 
+    // Without search, only show Active agents (hide Inactive/Former Employee immediately)
+    if (!hasQuery) {
+      return status === 'Active';
+    }
+
+    // When searching, allow matching inactive or former employees as well
     return (
       (a.name || '').toLowerCase().includes(trimmedQuery) ||
       (a.email || '').toLowerCase().includes(trimmedQuery) ||
       (a.phone || '').toLowerCase().includes(trimmedQuery) ||
-      (a.status || '').toLowerCase().includes(trimmedQuery)
+      (status).toLowerCase().includes(trimmedQuery)
     );
   });
 
   const agentLeadCounts = leads.reduce((acc, lead) => {
-    (lead.agentIds || []).forEach(agentId => {
-      acc[agentId] = (acc[agentId] || 0) + 1;
-    });
+    const st = lead.status || 'Fresh Leads';
+    const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
+    if (!isBookedOrRejected) {
+      (lead.agentIds || []).forEach(agentId => {
+        acc[agentId] = (acc[agentId] || 0) + 1;
+      });
+    }
     return acc;
   }, {});
 
   const handleAction = async (agentId, action, value) => {
+    if (action === 'status' && (value === 'Inactive' || value === 'Former Employee')) {
+      const agentObj = agents.find(a => a.id === agentId || a._id === agentId);
+      const agentName = agentObj?.name || 'this agent';
+      const confirmed = window.confirm(`Are you sure you want to change the status of "${agentName}" to ${value}? They will be hidden from the Active Team list.`);
+      if (!confirmed) return;
+    }
+
     setLoadingAction(prev => ({ ...prev, [agentId]: value || true }));
     try {
       if (action === 'status' && updateAgentStatus) {

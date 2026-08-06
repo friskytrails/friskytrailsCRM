@@ -174,7 +174,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   const getAgentLeadCount = (agentId) => {
     const targetId = String(agentId || '');
-    return leads.filter((lead) => (lead.agentIds || []).some(id => String(id) === targetId)).length;
+    return leads.filter((lead) => {
+      const st = lead.status || 'Fresh Leads';
+      const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
+      return !isBookedOrRejected && (lead.agentIds || []).some(id => String(id) === targetId);
+    }).length;
   };
 
   const handleInlineAssign = async (leadId, newIds) => {
@@ -310,6 +314,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
   useEffect(() => {
     const activeIds = (sortedLeads || []).map(l => l.id || l._id);
     sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+    sessionStorage.setItem('leadDetail_backUrl', '/');
+    sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
   }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, leads, agents]);
 
   return (
@@ -400,7 +406,16 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                   </tr>
                 </thead>
                 <tbody>
-                  {liveStatus.map(status => {
+                  {liveStatus
+                    .filter(status => {
+                      const ag = (agents || []).find(a => String(a.id || a._id) === String(status.agentId) || a.name === status.name);
+                      if (ag) {
+                        const st = ag.status || 'Active';
+                        return st !== 'Inactive' && st !== 'Former Employee';
+                      }
+                      return true;
+                    })
+                    .map(status => {
                     const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
                     const idleHours = idleMs / (1000 * 60 * 60);
                     const isIdle = idleHours > 2;
@@ -455,7 +470,17 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                   </tr>
                 </thead>
                 <tbody>
-                  {[...liveActivity].sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall)).map(act => {
+                  {[...liveActivity]
+                    .filter(act => {
+                      const ag = (agents || []).find(a => String(a.id || a._id) === String(act.agentId) || a.name === act.name);
+                      if (ag) {
+                        const st = ag.status || 'Active';
+                        return st !== 'Inactive' && st !== 'Former Employee';
+                      }
+                      return true;
+                    })
+                    .sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall))
+                    .map(act => {
                     const sec = act.talkTime || 0;
                     const h = Math.floor(sec / 3600);
                     const m = Math.floor((sec % 3600) / 60);
@@ -517,7 +542,12 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               <option value="unassigned">Unassigned Only (Default)</option>
               <option value="assigned">Assigned Only</option>
               <option value="all">Unassigned & Assigned (All)</option>
-              {agents.map((agent) => {
+              {agents
+                .filter(agent => {
+                  const st = agent.status || 'Active';
+                  return st !== 'Inactive' && st !== 'Former Employee';
+                })
+                .map((agent) => {
                 const agentId = getAgentId(agent);
                 const count = getAgentLeadCount(agentId);
                 return (

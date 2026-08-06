@@ -134,7 +134,8 @@ async function getLiveStatus(agentIdCondition) {
         as: "agent"
       }
     },
-    { $unwind: "$agent" }
+    { $unwind: "$agent" },
+    { $match: { "agent.status": { $nin: ["Inactive", "Former Employee"] } } }
   ]);
 
   const now = new Date();
@@ -181,7 +182,8 @@ async function getLiveActivity(agentIdCondition) {
         as: "agent"
       }
     },
-    { $unwind: "$agent" }
+    { $unwind: "$agent" },
+    { $match: { "agent.status": { $nin: ["Inactive", "Former Employee"] } } }
   ]);
 
   const formattedActivity = activity.map(a => ({

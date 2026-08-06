@@ -328,9 +328,12 @@ function App() {
         if (status === 'Rejected') {
           setAgents((prev) => prev.filter(agent => agent.id !== agentId));
           toast.success(data.message || "Agent rejected successfully.");
-        } else {
+        } else if (role) {
           setAgents((prev) => prev.map(agent => agent.id === agentId ? data : agent));
           toast.success(`User approved as ${role === 'itinerary' ? 'Itinerary Team' : 'Agent'}.`);
+        } else {
+          setAgents((prev) => prev.map(agent => agent.id === agentId ? data : agent));
+          toast.success(`Agent status updated to ${status}.`);
         }
         return data;
       } else {

@@ -268,7 +268,20 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   };
 
   const getAgentLeadCount = (agentId) => {
-    return leads?.filter((l) => (l.agentIds || []).includes(agentId)).length || 0;
+    return leads?.filter((l) => {
+      const st = l.status || 'Fresh Leads';
+      const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
+      return !isBookedOrRejected && (l.agentIds || []).includes(agentId);
+    }).length || 0;
+  };
+
+  const handleBackClick = () => {
+    const savedBackUrl = sessionStorage.getItem('leadDetail_backUrl');
+    if (savedBackUrl) {
+      navigate(savedBackUrl);
+    } else {
+      navigate('/agents');
+    }
   };
 
   const handleImageChange = (e) => {
@@ -558,7 +571,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         {/* Top Navigation Bar */}
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => navigate('/')}
+            onClick={handleBackClick}
             className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
           >
             <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -734,7 +747,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between mb-6">
         <button
-          onClick={() => navigate('/')}
+          onClick={handleBackClick}
           className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
         >
           <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
