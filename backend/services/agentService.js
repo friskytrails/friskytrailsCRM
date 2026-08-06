@@ -411,6 +411,9 @@ async function toggleManagerRole(id, isManager) {
   }
 
   user.isManager = isManager;
+  if (isManager) {
+    user.isItinerary = false;
+  }
   await user.save();
   return formatDoc(user);
 }

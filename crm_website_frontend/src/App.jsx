@@ -518,7 +518,7 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={<AddLead addLead={addLead} user={user} products={products} />}
+              element={user?.isItinerary ? <Navigate to="/" replace /> : <AddLead addLead={addLead} user={user} products={products} />}
             />
             <Route
               path="/settings"

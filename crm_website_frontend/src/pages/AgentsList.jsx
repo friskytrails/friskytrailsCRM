@@ -259,8 +259,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           {/* Make Manager toggle */}
           <button
             onClick={() => handleToggleManager(agent)}
-            disabled={!!loadingAction[`mgr_${agent.id}`]}
-            title="Promote to Manager"
+            disabled={!!loadingAction[`mgr_${agent.id}`] || agent.isItinerary}
+            title={agent.isItinerary ? "Itinerary Team members cannot be promoted to Manager" : "Promote to Manager"}
             className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-900/40 dark:hover:bg-violet-900/40"
           >
             {loadingAction[`mgr_${agent.id}`] ? '...' : '+ Manager'}
