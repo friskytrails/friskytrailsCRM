@@ -406,16 +406,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                   </tr>
                 </thead>
                 <tbody>
-                  {liveStatus
-                    .filter(status => {
-                      const ag = (agents || []).find(a => String(a.id || a._id) === String(status.agentId) || a.name === status.name);
-                      if (ag) {
-                        const st = ag.status || 'Active';
-                        return st !== 'Inactive' && st !== 'Former Employee';
-                      }
-                      return true;
-                    })
-                    .map(status => {
+                  {filteredLiveStatus.map(status => {
                     const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
                     const idleHours = idleMs / (1000 * 60 * 60);
                     const isIdle = idleHours > 2;
@@ -432,7 +423,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                       </tr>
                     );
                   })}
-                  {liveStatus.length === 0 && (
+                  {filteredLiveStatus.length === 0 && (
                     <tr>
                       <td colSpan="3" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
                     </tr>
@@ -470,15 +461,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                   </tr>
                 </thead>
                 <tbody>
-                  {[...liveActivity]
-                    .filter(act => {
-                      const ag = (agents || []).find(a => String(a.id || a._id) === String(act.agentId) || a.name === act.name);
-                      if (ag) {
-                        const st = ag.status || 'Active';
-                        return st !== 'Inactive' && st !== 'Former Employee';
-                      }
-                      return true;
-                    })
+                  {[...filteredLiveActivity]
                     .sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall))
                     .map(act => {
                     const sec = act.talkTime || 0;
@@ -502,7 +485,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                       </tr>
                     );
                   })}
-                  {liveActivity.length === 0 && (
+                  {filteredLiveActivity.length === 0 && (
                     <tr>
                       <td colSpan="4" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
                     </tr>
