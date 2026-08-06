@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-export default function Reports() {
+export default function Reports({ agents = [] }) {
   const getLocalDateString = (d) => {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -128,7 +128,16 @@ export default function Reports() {
     return `${m}m ${s}s`;
   };
 
-  const aggregate = reports.reduce((acc, curr) => {
+  const activeReports = reports.filter(report => {
+    const ag = (agents || []).find(a => String(a.id || a._id) === String(report.agentId) || a.name === report.name);
+    if (ag) {
+      const st = ag.status || 'Active';
+      return st !== 'Inactive' && st !== 'Former Employee';
+    }
+    return true;
+  });
+
+  const aggregate = activeReports.reduce((acc, curr) => {
     acc.talkTime += curr.talkTime || 0;
     acc.totalDials += curr.totalDials || 0;
     acc.uniqueCalls += curr.uniqueCalls || 0;
@@ -241,7 +250,7 @@ export default function Reports() {
                   )}
                 </td>
               </tr>
-              {[...reports].sort((a, b) => {
+              {[...activeReports].sort((a, b) => {
                 let valA = a[sortBy];
                 let valB = b[sortBy];
                 if (sortBy === 'name') {

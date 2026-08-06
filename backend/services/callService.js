@@ -90,7 +90,8 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
         as: "agent"
       }
     },
-    { $unwind: "$agent" }
+    { $unwind: "$agent" },
+    { $match: { "agent.status": { $nin: ["Inactive", "Former Employee"] } } }
   ]);
 
   const formattedReports = reports.map(r => {
