@@ -83,7 +83,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   return formatDoc(newLead);
 }
 
-async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition) {
+async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numberOfPersons) {
   const existingLead = await Lead.findById(id);
   if (!existingLead) {
     throw new Error("Lead not found or unauthorized");
@@ -108,6 +108,34 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     leadSource: leadSource !== undefined ? leadSource : (existingLead.leadSource || ''),
     product: product !== undefined ? product : (existingLead.product || '')
   };
+
+  if (travelDate !== undefined) {
+    if (travelDate === null || String(travelDate).trim() === '') {
+      updatePayload.travelDate = '';
+    } else {
+      const strDate = String(travelDate).trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(strDate)) {
+        throw new Error("Invalid travel date format. Must be a valid YYYY-MM-DD date.");
+      }
+      const [y, m, d] = strDate.split('-').map(Number);
+      const dateObj = new Date(Date.UTC(y, m - 1, d));
+      if (dateObj.getUTCFullYear() !== y || dateObj.getUTCMonth() + 1 !== m || dateObj.getUTCDate() !== d) {
+        throw new Error("Invalid travel date. Date does not exist in calendar.");
+      }
+      updatePayload.travelDate = strDate;
+    }
+  }
+  if (numberOfPersons !== undefined) {
+    if (numberOfPersons === null || String(numberOfPersons).trim() === '') {
+      updatePayload.numberOfPersons = null;
+    } else {
+      const numVal = Number(numberOfPersons);
+      if (!Number.isSafeInteger(numVal) || numVal < 1) {
+        throw new Error("Number of persons must be a positive integer (at least 1).");
+      }
+      updatePayload.numberOfPersons = numVal;
+    }
+  }
 
   const finalMailId = mailId !== undefined ? mailId : existingLead.mailId;
   if (finalMailId && finalMailId.trim() !== '') {
