@@ -316,26 +316,53 @@ function App() {
     }
   };
 
-  const updateAgentStatus = async (agentId, status) => {
+  const updateAgentStatus = async (agentId, status, role) => {
     try {
       const response = await fetch(`${API_URL}/agents/${agentId}/status`, {
         method: 'PUT',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, role }),
       });
       if (response.ok) {
         const data = await response.json();
         if (status === 'Rejected') {
           setAgents((prev) => prev.filter(agent => agent.id !== agentId));
           toast.success(data.message || "Agent rejected successfully.");
+        } else if (role) {
+          setAgents((prev) => prev.map(agent => agent.id === agentId ? data : agent));
+          toast.success(`User approved as ${role === 'itinerary' ? 'Itinerary Team' : 'Agent'}.`);
         } else {
           setAgents((prev) => prev.map(agent => agent.id === agentId ? data : agent));
-          toast.success("Agent status updated successfully.");
+          toast.success(`Agent status updated to ${status}.`);
         }
         return data;
       } else {
         const errData = await response.json().catch(() => ({}));
         toast.error(`Failed to update agent status: ${errData.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error.");
+      return null;
+    }
+  };
+
+  const toggleItineraryRole = async (agentId, isItinerary) => {
+    try {
+      const response = await fetch(`${API_URL}/agents/${agentId}/toggle-itinerary`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isItinerary }),
+      });
+      if (response.ok) {
+        const updatedAgent = await response.json();
+        setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
+        toast.success(isItinerary ? `${updatedAgent.name} is now Itinerary Team.` : `${updatedAgent.name} is now Agent.`);
+        return updatedAgent;
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        toast.error(`Failed to update itinerary role: ${errData.error || response.statusText}`);
         return null;
       }
     } catch (error) {
@@ -491,7 +518,7 @@ function App() {
 
             <Route
               path="/add-lead"
-              element={<AddLead addLead={addLead} user={user} products={products} />}
+              element={user?.isItinerary ? <Navigate to="/" replace /> : <AddLead addLead={addLead} user={user} products={products} />}
             />
             <Route
               path="/settings"
@@ -499,7 +526,7 @@ function App() {
             />
             <Route
               path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} assignAgentsToManager={assignAgentsToManager} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents/:id"

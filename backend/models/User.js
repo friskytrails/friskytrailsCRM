@@ -24,6 +24,10 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isItinerary: {
+    type: Boolean,
+    default: false
+  },
   managerId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

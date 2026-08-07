@@ -71,9 +71,13 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
   };
 
   const agentLeadCounts = leads.reduce((acc, lead) => {
-    (lead.agentIds || []).forEach(agentId => {
-      acc[agentId] = (acc[agentId] || 0) + 1;
-    });
+    const st = lead.status || 'Fresh Leads';
+    const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
+    if (!isBookedOrRejected) {
+      (lead.agentIds || []).forEach(agentId => {
+        acc[agentId] = (acc[agentId] || 0) + 1;
+      });
+    }
     return acc;
   }, {});
 

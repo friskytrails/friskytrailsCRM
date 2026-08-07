@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Dashboard({ leads, agents, products = [], statuses = [], assignAgent, addNote, deleteNote, updateLead, user, loading }) {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
   const [noteInputs, setNoteInputs] = useState({}); // { [leadId]: 'comment text' }
   const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
@@ -173,7 +174,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   const getAgentLeadCount = (agentId) => {
     const targetId = String(agentId || '');
-    return leads.filter((lead) => (lead.agentIds || []).some(id => String(id) === targetId)).length;
+    return leads.filter((lead) => {
+      const st = lead.status || 'Fresh Leads';
+      const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
+      return !isBookedOrRejected && (lead.agentIds || []).some(id => String(id) === targetId);
+    }).length;
   };
 
   const handleInlineAssign = async (leadId, newIds) => {
@@ -309,7 +314,27 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
   useEffect(() => {
     const activeIds = (sortedLeads || []).map(l => l.id || l._id);
     sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+    sessionStorage.setItem('leadDetail_backUrl', '/');
+    sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
   }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, leads, agents]);
+
+  const filteredLiveStatus = liveStatus.filter(status => {
+    const ag = (agents || []).find(a => String(a.id || a._id) === String(status.agentId) || a.name === status.name);
+    if (ag) {
+      const st = ag.status || 'Active';
+      return st !== 'Inactive' && st !== 'Former Employee';
+    }
+    return true;
+  });
+
+  const filteredLiveActivity = liveActivity.filter(act => {
+    const ag = (agents || []).find(a => String(a.id || a._id) === String(act.agentId) || a.name === act.name);
+    if (ag) {
+      const st = ag.status || 'Active';
+      return st !== 'Inactive' && st !== 'Former Employee';
+    }
+    return true;
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -399,7 +424,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                   </tr>
                 </thead>
                 <tbody>
-                  {liveStatus.map(status => {
+                  {filteredLiveStatus.map(status => {
                     const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
                     const idleHours = idleMs / (1000 * 60 * 60);
                     const isIdle = idleHours > 2;
@@ -416,7 +441,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                       </tr>
                     );
                   })}
-                  {liveStatus.length === 0 && (
+                  {filteredLiveStatus.length === 0 && (
                     <tr>
                       <td colSpan="3" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
                     </tr>
@@ -454,7 +479,9 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                   </tr>
                 </thead>
                 <tbody>
-                  {[...liveActivity].sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall)).map(act => {
+                  {[...filteredLiveActivity]
+                    .sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall))
+                    .map(act => {
                     const sec = act.talkTime || 0;
                     const h = Math.floor(sec / 3600);
                     const m = Math.floor((sec % 3600) / 60);
@@ -476,7 +503,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                       </tr>
                     );
                   })}
-                  {liveActivity.length === 0 && (
+                  {filteredLiveActivity.length === 0 && (
                     <tr>
                       <td colSpan="4" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
                     </tr>
@@ -516,7 +543,12 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               <option value="unassigned">Unassigned Only (Default)</option>
               <option value="assigned">Assigned Only</option>
               <option value="all">Unassigned & Assigned (All)</option>
-              {agents.map((agent) => {
+              {agents
+                .filter(agent => {
+                  const st = agent.status || 'Active';
+                  return st !== 'Inactive' && st !== 'Former Employee';
+                })
+                .map((agent) => {
                 const agentId = getAgentId(agent);
                 const count = getAgentLeadCount(agentId);
                 return (
@@ -610,7 +642,12 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
             return (
               <div
                 key={lead.id}
-                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group"
+                onClick={(e) => {
+                  if (!e.target.closest('button, input, select, textarea, a, label')) {
+                    navigate(`/leads/${lead.id}`);
+                  }
+                }}
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group cursor-pointer"
               >
                 <div>
                   <div className="flex items-start justify-between">
@@ -794,7 +831,12 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
             return (
               <div
                 key={lead.id}
-                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border border-gray-100 dark:border-slate-700/50 p-5 flex flex-col space-y-4"
+                onClick={(e) => {
+                  if (!e.target.closest('button, input, select, textarea, a, label')) {
+                    navigate(`/leads/${lead.id}`);
+                  }
+                }}
+                className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 border border-gray-100 dark:border-slate-700/50 p-5 flex flex-col space-y-4 cursor-pointer"
               >
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center">
                   <div className="lg:col-span-4 flex items-center">

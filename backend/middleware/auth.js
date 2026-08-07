@@ -40,6 +40,7 @@ module.exports = async function (req, res, next) {
       email: user.email || decoded.email || '',
       isAdmin: !!user.isAdmin,
       isManager: !!user.isManager,
+      isItinerary: !!user.isItinerary,
       status: user.status
     };
     next();

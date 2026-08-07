@@ -13,6 +13,7 @@ router.put('/:id/metrics', auth, agentController.updateAgentMetrics);
 router.get('/:id/attendance/monthly', auth, agentController.getAgentMonthlyAttendance);
 router.get('/:id/attendance', auth, agentController.getAgentAttendance);
 router.put('/:id/toggle-manager', auth, agentController.toggleManagerRole);
+router.put('/:id/toggle-itinerary', auth, agentController.toggleItineraryRole);
 router.put('/:id/assign-agents', auth, agentController.assignAgentsToManager);
 
 module.exports = router;

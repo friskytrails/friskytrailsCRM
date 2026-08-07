@@ -65,7 +65,7 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
     try {
       const response = await fetch(secureUrl);
       if (!response.ok) {
-        throw new Error(`Download failed: ${response.status}`);
+        throw new Error(`Download failed with status ${response.status}`);
       }
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);

@@ -61,7 +61,12 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   useEffect(() => {
     const activeIds = (filteredAgentLeads || []).map(l => l.id || l._id);
     sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
-  }, [filteredAgentLeads]);
+    if (agent) {
+      const agentId = agent.id || agent._id;
+      sessionStorage.setItem('leadDetail_backUrl', `/agents/${agentId}`);
+      sessionStorage.setItem('leadDetail_backLabel', `${agent.name}'s Board`);
+    }
+  }, [filteredAgentLeads, agent]);
 
   if (!agent) {
     return <div className="p-8 text-center text-gray-500">Agent not found</div>;
