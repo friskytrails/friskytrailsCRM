@@ -11,9 +11,7 @@ export default function Reports({ agents = [] }) {
   };
 
   const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    d.setDate(1); // First day of current month
-    return getLocalDateString(d);
+    return getLocalDateString(new Date());
   });
   const [endDate, setEndDate] = useState(() => {
     return getLocalDateString(new Date());
