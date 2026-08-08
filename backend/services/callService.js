@@ -54,10 +54,10 @@ async function getHistoricalReports(startDate, endDate, team, agentIdCondition) 
     start = new Date(startDate.includes('T') ? startDate : `${startDate}T00:00:00.000`);
     end = new Date(endDate.includes('T') ? endDate : `${endDate}T23:59:59.999`);
   } else {
-    // Default to last 30 days if no explicit date range is provided (Fixes F2)
-    end = new Date();
-    start = new Date();
-    start.setDate(start.getDate() - 30);
+    // Default to Present Day if no explicit date range is provided
+    const now = new Date();
+    end = now;
+    start = new Date(now.getTime());
     start.setHours(0, 0, 0, 0);
   }
 
