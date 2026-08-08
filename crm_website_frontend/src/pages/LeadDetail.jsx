@@ -449,6 +449,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     if (!lead || lead.status === newStatus) return;
 
     if (newStatus === 'Booked') {
+      if (user?.isItinerary) {
+        toast.error("Itinerary Team members cannot book leads");
+        return;
+      }
       setBookingForm({
         fullName: lead.name || '',
         emailId: lead.mailId || '',
@@ -640,9 +644,15 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 </div>
               )}
 
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}>
-                {lead.status || 'Fresh Leads'}
-              </span>
+              <select
+                value={lead.status || 'Fresh Leads'}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className={`text-xs font-bold py-1 px-2.5 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}
+              >
+                {availableStatuses.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

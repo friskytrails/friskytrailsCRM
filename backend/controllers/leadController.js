@@ -205,11 +205,13 @@ async function updateReminder(req, res) {
 
 async function updateStatus(req, res) {
   try {
-    if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot change lead status" });
     const { id } = req.params;
     const { status } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateStatus(id, status, agentIdCondition);
+    if (req.user.isItinerary) {
+      return res.json(sanitizeLeadForItinerary(result));
+    }
     res.json(result);
   } catch (error) {
     if (error.message === "Lead not found or unauthorized") {
