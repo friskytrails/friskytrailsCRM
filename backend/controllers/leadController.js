@@ -207,6 +207,10 @@ async function updateStatus(req, res) {
   try {
     const { id } = req.params;
     const { status } = req.body;
+    const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+    if (req.user.isItinerary && normalizedStatus === 'Booked') {
+      return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot mark leads as Booked" });
+    }
     const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateStatus(id, status, agentIdCondition);
     if (req.user.isItinerary) {
