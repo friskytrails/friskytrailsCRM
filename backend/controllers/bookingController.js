@@ -376,9 +376,14 @@ async function editBooking(req, res) {
       if (updates.startDate) booking.startDate = new Date(updates.startDate);
       if (updates.endDate) booking.endDate = new Date(updates.endDate);
       if (updates.totalAmount !== undefined) booking.totalAmount = parseFloat(updates.totalAmount);
-      if (updates.paidAmount !== undefined) booking.paidAmount = parseFloat(updates.paidAmount);
-      
-      // Recalculate dueAmount
+      if (updates.paidAmount !== undefined) {
+        const newPaid = parseFloat(updates.paidAmount);
+        booking.paidAmount = newPaid;
+        // Also update the initial payment to prevent the pre-save hook from reverting the change
+        if (booking.payments && booking.payments.length > 0) {
+          booking.payments[0].amountPaid = newPaid;
+        }
+      }
       if (updates.totalAmount !== undefined || updates.paidAmount !== undefined) {
         booking.dueAmount = Math.max(0, (booking.totalAmount || 0) - (booking.paidAmount || 0));
       }
