@@ -3,19 +3,22 @@ const mongoose = require('mongoose');
 const NoteSchema = new mongoose.Schema({
   id: {
     type: String,
-    required: true
+    required: false
   },
   text: {
     type: String,
-    required: true
+    required: false,
+    default: ''
   },
   timestamp: {
     type: String,
-    required: true
+    required: false,
+    default: () => new Date().toISOString()
   },
   author: {
     type: String,
-    required: true
+    required: false,
+    default: 'System'
   },
   authorId: {
     type: String,
@@ -124,6 +127,7 @@ const LeadSchema = new mongoose.Schema({
     default: 'Fresh Leads'
   },
   bookingDetails: {
+    bookingId: { type: String, default: '' },
     fullName: { type: String, default: '' },
     emailId: { type: String, default: '' },
     contactNumber: { type: String, default: '' },
@@ -152,12 +156,16 @@ const LeadSchema = new mongoose.Schema({
   trips: {
     type: [{
       tripId: { type: String, default: '' },
+      bookingId: { type: String, default: '' },
       packageName: { type: String, default: '' },
       startDate: { type: Date, default: null },
       endDate: { type: Date, default: null },
       totalAmount: { type: Number, default: 0 },
       paidAmount: { type: Number, default: 0 },
       dueAmount: { type: Number, default: 0 },
+      transactionId: { type: String, default: '' },
+      paymentMode: { type: String, default: '' },
+      screenshot: { type: String, default: '' },
       noOfPax: { type: Number, default: 1 },
       fullName: { type: String, default: '' },
       contactNumber: { type: String, default: '' },

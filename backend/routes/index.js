@@ -7,6 +7,7 @@ const cronRoutes = require('./cronRoutes');
 const callRoutes = require('./callRoutes');
 const configRoutes = require('./configRoutes');
 const bugReportRoutes = require('./bugReportRoutes');
+const bookingRoutes = require('./bookingRoutes');
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use('/cron', cronRoutes);
 router.use('/calls', callRoutes);
 router.use('/config', configRoutes);
 router.use('/bugs', bugReportRoutes);
+router.use('/bookings', bookingRoutes);
 
 module.exports = router;

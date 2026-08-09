@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const config = require('./config');
 const { connectDB } = require('./db');
+const { connectBookingDB } = require('./db/bookingDb');
 const apiRoutes = require('./routes');
 
 const app = express();
@@ -38,6 +39,7 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use('/api', async (req, res, next) => {
   try {
     await connectDB();
+    await connectBookingDB();
     next();
   } catch (error) {
     console.error("Critical database connection failure:", error);

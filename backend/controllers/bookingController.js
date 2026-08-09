@@ -1,0 +1,457 @@
+ const Booking = require('../models/Booking');
+const Lead = require('../models/Lead');
+const crypto = require('crypto');
+
+// Generate unique bookingId: "BK-" + 6 random uppercase chars
+async function generateBookingId() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let bookingId = '';
+  let exists = true;
+  while (exists) {
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    bookingId = 'BK-' + code;
+    const found = await Booking.findOne({ bookingId });
+    if (!found) exists = false;
+  }
+  return bookingId;
+}
+
+// Generate unique paymentId: 6 random digits
+async function generatePaymentId() {
+  let paymentId = '';
+  let exists = true;
+  while (exists) {
+    paymentId = Math.floor(100000 + Math.random() * 900000).toString();
+    const found = await Booking.findOne({ 'payments.paymentId': paymentId });
+    if (!found) exists = false;
+  }
+  return paymentId;
+}
+
+/**
+ * POST /api/bookings
+ * Create new booking
+ */
+async function createBooking(req, res) {
+  try {
+    const {
+      travellerName,
+      travellerEmail,
+      travellerPhone,
+      adults,
+      children,
+      packageName,
+      location,
+      startDate,
+      endDate,
+      totalAmount,
+      paidAmount,
+      transactionId,
+      paymentMode,
+      leadId
+    } = req.body;
+
+    // 1. Field Validations
+    if (!travellerName || !travellerName.trim()) {
+      return res.status(400).json({ success: false, error: 'Full Name is required.' });
+    }
+
+    if (!travellerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(travellerEmail.trim())) {
+      return res.status(400).json({ success: false, error: 'Valid Email ID is required.' });
+    }
+
+    const trimmedPhone = (travellerPhone || '').toString().trim();
+    if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
+      return res.status(400).json({ success: false, error: 'Phone Number must be exactly 10 digits starting with 6, 7, 8, or 9.' });
+    }
+
+    const numAdults = parseInt(adults, 10);
+    const numChildren = parseInt(children, 10);
+    if (isNaN(numAdults) || numAdults < 0) {
+      return res.status(400).json({ success: false, error: 'Adults count must be a non-negative integer.' });
+    }
+    if (isNaN(numChildren) || numChildren < 0) {
+      return res.status(400).json({ success: false, error: 'Children count must be a non-negative integer.' });
+    }
+
+    if (!packageName || !packageName.trim()) {
+      return res.status(400).json({ success: false, error: 'Package Name is required.' });
+    }
+
+    if (!location || !location.trim()) {
+      return res.status(400).json({ success: false, error: 'Destination Location is required.' });
+    }
+
+    if (!startDate || isNaN(Date.parse(startDate))) {
+      return res.status(400).json({ success: false, error: 'Valid Start Date is required.' });
+    }
+
+    if (!endDate || isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ success: false, error: 'Valid End Date is required.' });
+    }
+
+    if (new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
+    }
+
+    const numTotal = parseFloat(totalAmount);
+    const numPaid = parseFloat(paidAmount);
+    if (isNaN(numTotal) || numTotal < 0) {
+      return res.status(400).json({ success: false, error: 'Total Amount must be a non-negative number.' });
+    }
+    if (isNaN(numPaid) || numPaid < 0) {
+      return res.status(400).json({ success: false, error: 'Paid Amount must be a non-negative number.' });
+    }
+    if (numPaid > numTotal) {
+      return res.status(400).json({ success: false, error: 'Paid Amount cannot exceed Total Amount.' });
+    }
+
+    const trimmedTxn = (transactionId || '').trim();
+    if (!trimmedTxn || !/^[a-zA-Z0-9_-]+$/.test(trimmedTxn)) {
+      return res.status(400).json({ success: false, error: 'Transaction ID is required and can only contain letters, numbers, underscore, and hyphen.' });
+    }
+
+    // Check unique transactionId
+    const existingTxn = await Booking.findOne({
+      $or: [
+        { transactionId: trimmedTxn },
+        { 'payments.details': trimmedTxn }
+      ]
+    });
+    if (existingTxn) {
+      return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+    }
+
+    // Check screenshot file
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Transaction screenshot file is mandatory.' });
+    }
+    const screenshotUrl = req.file.secure_url || req.file.path || '';
+
+    // 2. Generate IDs and create ledger entry
+    const bookingId = await generateBookingId();
+    const paymentId = await generatePaymentId();
+    const calculatedDue = Math.max(0, numTotal - numPaid);
+
+    const initialPayment = {
+      paymentId: paymentId,
+      paymentDate: new Date(),
+      paymentFrom: 'TRAVELER',
+      paymentTo: 'COMPANY',
+      amountPaid: numPaid,
+      paymentMode: paymentMode || 'Kalpana BOI',
+      status: 'VERIFICATION-REQUIRED',
+      addedBy: req.user.name || req.user.email || 'Agent',
+      attachment: screenshotUrl,
+      attachmentName: 'Screenshot',
+      details: trimmedTxn,
+      verified: false
+    };
+
+    const newBooking = new Booking({
+      bookingId,
+      paymentId,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      packageName: packageName.trim(),
+      location: location.trim(),
+      totalAmount: numTotal,
+      paidAmount: numPaid,
+      dueAmount: calculatedDue,
+      transactionId: trimmedTxn,
+      screenshot: screenshotUrl,
+      travellerName: travellerName.trim(),
+      travellerEmail: travellerEmail.trim().toLowerCase(),
+      travellerPhone: trimmedPhone,
+      createdBy: req.user.userId || req.user.id || req.user._id,
+      status: 'Pending',
+      tripStatus: 'Pending',
+      assignedTo: req.user.userId ? [req.user.userId] : [],
+      adults: numAdults,
+      children: numChildren,
+      payments: [initialPayment]
+    });
+
+    await newBooking.save();
+
+    // 3. Update corresponding CRM Lead status if leadId was provided
+    if (leadId) {
+      try {
+        const lead = await Lead.findById(leadId);
+        if (lead) {
+          lead.status = 'Booked';
+          if (!lead.bookingDetails) lead.bookingDetails = {};
+          lead.bookingDetails.bookingId = bookingId;
+          lead.bookingDetails.travellerName = travellerName.trim();
+          lead.bookingDetails.travellerEmail = travellerEmail.trim().toLowerCase();
+          lead.bookingDetails.travellerPhone = trimmedPhone;
+          lead.bookingDetails.adults = numAdults;
+          lead.bookingDetails.children = numChildren;
+          lead.bookingDetails.packageName = packageName.trim();
+          lead.bookingDetails.location = location.trim();
+          lead.bookingDetails.totalAmount = numTotal;
+          lead.bookingDetails.paidAmount = numPaid;
+          lead.bookingDetails.dueAmount = calculatedDue;
+          lead.bookingDetails.transactionId = trimmedTxn;
+          lead.bookingDetails.paymentMode = paymentMode || 'Kalpana BOI';
+          lead.bookingDetails.screenshot = screenshotUrl;
+          lead.bookingDetails.startDate = startDate;
+          lead.bookingDetails.endDate = endDate;
+
+          if (!Array.isArray(lead.trips)) lead.trips = [];
+          lead.trips.push({
+            bookingId,
+            travellerName: travellerName.trim(),
+            travellerEmail: travellerEmail.trim().toLowerCase(),
+            travellerPhone: trimmedPhone,
+            adults: numAdults,
+            children: numChildren,
+            packageName: packageName.trim(),
+            location: location.trim(),
+            startDate,
+            endDate,
+            totalAmount: numTotal,
+            paidAmount: numPaid,
+            dueAmount: calculatedDue,
+            transactionId: trimmedTxn,
+            paymentMode: paymentMode || 'Kalpana BOI',
+            screenshot: screenshotUrl,
+            status: 'Booked',
+            createdAt: new Date()
+          });
+
+          await lead.save({ validateBeforeSave: false });
+        }
+      } catch (leadErr) {
+        console.error('Failed to sync CRM lead status:', leadErr);
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      data: newBooking
+    });
+  } catch (error) {
+    console.error('Error creating booking:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+}
+
+/**
+ * GET /api/bookings/:id
+ * Load existing booking for view/edit
+ */
+async function getBookingById(req, res) {
+  try {
+    const { id } = req.params;
+    const { packageName } = req.query;
+    let booking = null;
+
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      booking = await Booking.findById(id);
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ bookingId: id });
+    }
+    if (!booking) {
+      booking = await Booking.findOne({ transactionId: id });
+    }
+    if (!booking) {
+      const query = {
+        $or: [
+          { leadId: id },
+          { travellerPhone: id }
+        ]
+      };
+      
+      // Filter by packageName if provided to prevent overwriting trip details with the wrong booking
+      if (packageName) {
+        query.packageName = packageName;
+      }
+      
+      booking = await Booking.findOne(query);
+    }
+
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found.' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: booking
+    });
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+}
+
+/**
+ * PUT /api/bookings/:id/edit
+ * Edit booking fields
+ */
+async function editBooking(req, res) {
+  try {
+    const { id } = req.params;
+    let booking = id.match(/^[0-9a-fA-F]{24}$/) 
+      ? await Booking.findById(id) 
+      : await Booking.findOne({ bookingId: id });
+
+    if (!booking) {
+      booking = await Booking.findOne({ transactionId: id });
+    }
+
+    if (!booking) {
+      const query = {
+        $or: [
+          { leadId: id },
+          { travellerPhone: id }
+        ]
+      };
+      if (req.body.packageName) {
+        query.packageName = req.body.packageName;
+      }
+      booking = await Booking.findOne(query);
+    }
+
+    if (!booking) {
+      return res.status(404).json({ success: false, error: 'Booking not found.' });
+    }
+
+    // Role check: Admin, creator, or assigned employee can edit
+    const userIdStr = (req.user.userId || req.user.id || req.user._id).toString();
+    const isCreator = booking.createdBy && booking.createdBy.toString() === userIdStr;
+    const isAssigned = Array.isArray(booking.assignedTo) && booking.assignedTo.some(a => a.toString() === userIdStr);
+    const isAdmin = !!req.user.isAdmin;
+
+    if (!isAdmin && !isCreator && !isAssigned) {
+      return res.status(403).json({ success: false, error: 'Forbidden: You are not authorized to edit this booking.' });
+    }
+
+    const updates = req.body;
+
+    // Non-admin users are restricted to editing startDate and endDate
+    if (!isAdmin) {
+      if (updates.startDate) {
+        if (isNaN(Date.parse(updates.startDate))) {
+          return res.status(400).json({ success: false, error: 'Invalid Start Date.' });
+        }
+        booking.startDate = new Date(updates.startDate);
+      }
+      if (updates.endDate) {
+        if (isNaN(Date.parse(updates.endDate))) {
+          return res.status(400).json({ success: false, error: 'Invalid End Date.' });
+        }
+        booking.endDate = new Date(updates.endDate);
+      }
+      if (booking.endDate < booking.startDate) {
+        return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
+      }
+    } else {
+      // Admin update logic
+      if (updates.travellerName) booking.travellerName = updates.travellerName.trim();
+      if (updates.travellerEmail) booking.travellerEmail = updates.travellerEmail.trim().toLowerCase();
+      if (updates.travellerPhone) booking.travellerPhone = updates.travellerPhone.trim();
+      if (updates.packageName) booking.packageName = updates.packageName.trim();
+      if (updates.location) booking.location = updates.location.trim();
+      if (updates.startDate) booking.startDate = new Date(updates.startDate);
+      if (updates.endDate) booking.endDate = new Date(updates.endDate);
+      if (updates.totalAmount !== undefined) booking.totalAmount = parseFloat(updates.totalAmount);
+      if (updates.paidAmount !== undefined) booking.paidAmount = parseFloat(updates.paidAmount);
+      
+      // Recalculate dueAmount
+      if (updates.totalAmount !== undefined || updates.paidAmount !== undefined) {
+        booking.dueAmount = Math.max(0, (booking.totalAmount || 0) - (booking.paidAmount || 0));
+      }
+      if (updates.adults !== undefined) booking.adults = parseInt(updates.adults, 10);
+      if (updates.children !== undefined) booking.children = parseInt(updates.children, 10);
+      if (updates.status) booking.status = updates.status;
+      if (updates.tripStatus) booking.tripStatus = updates.tripStatus;
+      if (updates.transactionId) booking.transactionId = updates.transactionId.trim();
+    }
+
+    // Optional replacement screenshot upload
+    if (req.file) {
+      booking.screenshot = req.file.secure_url || req.file.path;
+    }
+
+    await booking.save();
+
+    // Sync updated booking to corresponding Lead record
+    const targetLeadId = updates.leadId || updates.lead;
+    try {
+      let lead = null;
+      if (targetLeadId) {
+        lead = await Lead.findById(targetLeadId);
+      }
+      if (!lead && booking.bookingId) {
+        lead = await Lead.findOne({
+          $or: [
+            { 'bookingDetails.bookingId': booking.bookingId },
+            { 'trips.bookingId': booking.bookingId }
+          ]
+        });
+      }
+      if (lead) {
+        if (lead.bookingDetails && lead.bookingDetails.bookingId === booking.bookingId) {
+          lead.bookingDetails.travellerName = booking.travellerName;
+          lead.bookingDetails.travellerEmail = booking.travellerEmail;
+          lead.bookingDetails.travellerPhone = booking.travellerPhone;
+          lead.bookingDetails.packageName = booking.packageName;
+          lead.bookingDetails.location = booking.location;
+          lead.bookingDetails.startDate = booking.startDate;
+          lead.bookingDetails.endDate = booking.endDate;
+          lead.bookingDetails.totalAmount = booking.totalAmount;
+          lead.bookingDetails.paidAmount = booking.paidAmount;
+          lead.bookingDetails.dueAmount = booking.dueAmount;
+          lead.bookingDetails.transactionId = booking.transactionId;
+          lead.bookingDetails.screenshot = booking.screenshot;
+        }
+
+        if (Array.isArray(lead.trips)) {
+          lead.trips = lead.trips.map(t => {
+            if (t.bookingId === booking.bookingId) {
+              return {
+                ...t,
+                travellerName: booking.travellerName,
+                travellerEmail: booking.travellerEmail,
+                travellerPhone: booking.travellerPhone,
+                packageName: booking.packageName,
+                location: booking.location,
+                startDate: booking.startDate,
+                endDate: booking.endDate,
+                totalAmount: booking.totalAmount,
+                paidAmount: booking.paidAmount,
+                dueAmount: booking.dueAmount,
+                transactionId: booking.transactionId,
+                screenshot: booking.screenshot,
+                status: booking.status
+              };
+            }
+            return t;
+          });
+        }
+        await lead.save({ validateBeforeSave: false });
+      }
+    } catch (syncErr) {
+      console.error('Failed to sync updated booking to lead:', syncErr);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: booking
+    });
+  } catch (error) {
+    console.error('Error editing booking:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+}
+
+module.exports = {
+  createBooking,
+  getBookingById,
+  editBooking
+};

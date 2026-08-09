@@ -292,6 +292,84 @@ function App() {
     }
   };
 
+  const createBookingAPI = async (formData) => {
+    try {
+      const response = await fetch(`${API_URL}/bookings`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Booking created successfully in ft_booking_system!");
+        const leadId = formData.get('leadId');
+        if (leadId) {
+          try {
+            const leadRes = await fetch(`${API_URL}/leads/${leadId}`, {
+              headers: getAuthHeaders()
+            });
+            if (leadRes.ok) {
+              const updatedLead = await leadRes.json();
+              setLeads((prev) => prev.map(l => l.id === leadId ? updatedLead : l));
+            }
+          } catch (e) {
+            console.error("Error refreshing lead details:", e);
+          }
+        }
+        return data.data;
+      } else {
+        toast.error(`Failed to create booking: ${data.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error during booking creation.");
+      return null;
+    }
+  };
+
+  const editBookingAPI = async (bookingId, formData) => {
+    try {
+      const response = await fetch(`${API_URL}/bookings/${bookingId}/edit`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Booking updated successfully!");
+        return data.data;
+      } else {
+        toast.error(`Failed to edit booking: ${data.error || response.statusText}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Server connection error during booking update.");
+      return null;
+    }
+  };
+
+  const getBookingAPI = async (bookingId) => {
+    try {
+      const response = await fetch(`${API_URL}/bookings/${bookingId}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        return data.data;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching booking:", error);
+      return null;
+    }
+  };
+
   const updateLeadBooking = async (leadId, bookingData) => {
     try {
       const response = await fetch(`${API_URL}/leads/${leadId}/booking`, {
@@ -554,6 +632,9 @@ function App() {
                       statuses={statuses}
                       updateLeadStatus={updateLeadStatus} 
                       bookLeadAPI={bookLeadAPI}
+                      createBookingAPI={createBookingAPI}
+                      editBookingAPI={editBookingAPI}
+                      getBookingAPI={getBookingAPI}
                       updateLeadBooking={updateLeadBooking}
                       assignAgent={assignAgent}
                     />} />
