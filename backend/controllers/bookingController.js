@@ -394,7 +394,14 @@ async function editBooking(req, res) {
       booking.screenshot = req.file.secure_url || req.file.path;
     }
 
-    await booking.save();
+    try {
+      await booking.save();
+    } catch (saveError) {
+      if (saveError.code === 11000) {
+        return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+      }
+      throw saveError;
+    }
 
     // Sync updated booking to corresponding Lead record
     const targetLeadId = updates.leadId || updates.lead;
