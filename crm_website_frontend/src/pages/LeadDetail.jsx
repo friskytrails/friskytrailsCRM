@@ -1739,12 +1739,19 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       {/* Booking Form Modal */}
       {showBookingModal && (
-        <FocusTrap focusTrapOptions={{ onDeactivate: () => { setShowBookingModal(false); setEditingBookingId(null); }, escapeDeactivates: true }}>
+        <FocusTrap focusTrapOptions={{ escapeDeactivates: false, fallbackFocus: '.modal-content' }}>
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm modal-content"
             role="dialog"
             aria-modal="true"
             aria-label={editingBookingId ? `Edit Booking (${editingBookingId})` : 'Add New Booking'}
+            tabIndex="-1"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowBookingModal(false);
+                setEditingBookingId(null);
+              }
+            }}
           >
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
               {/* Modal Header */}
