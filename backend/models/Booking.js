@@ -59,7 +59,7 @@ const bookingSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true, min: 0, default: 0 },
   paidAmount: { type: Number, required: true, min: 0, default: 0 },
   dueAmount: { type: Number, required: true, min: 0, default: 0 },
-  transactionId: { type: String, required: true, trim: true },
+  transactionId: { type: String, required: true, trim: true, unique: true, index: true },
   screenshot: { type: String, required: false, default: '' },
   travellerName: { type: String, required: true, trim: true },
   travellerEmail: { type: String, required: true, lowercase: true, trim: true },

@@ -7,7 +7,9 @@ async function generateBookingId() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let bookingId = '';
   let exists = true;
-  while (exists) {
+  let attempts = 0;
+  while (exists && attempts < 10) {
+    attempts++;
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -16,6 +18,9 @@ async function generateBookingId() {
     const found = await Booking.findOne({ bookingId });
     if (!found) exists = false;
   }
+  if (exists) {
+    throw new Error('Failed to generate a unique bookingId');
+  }
   return bookingId;
 }
 
@@ -23,10 +28,15 @@ async function generateBookingId() {
 async function generatePaymentId() {
   let paymentId = '';
   let exists = true;
-  while (exists) {
-    paymentId = Math.floor(100000 + Math.random() * 900000).toString();
+  let attempts = 0;
+  while (exists && attempts < 10) {
+    attempts++;
+    paymentId = crypto.randomInt(100000, 1000000).toString();
     const found = await Booking.findOne({ 'payments.paymentId': paymentId });
     if (!found) exists = false;
+  }
+  if (exists) {
+    throw new Error('Failed to generate a unique paymentId');
   }
   return paymentId;
 }
@@ -175,9 +185,17 @@ async function createBooking(req, res) {
       payments: [initialPayment]
     });
 
-    await newBooking.save();
+    try {
+      await newBooking.save();
+    } catch (saveError) {
+      if (saveError.code === 11000) {
+        return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+      }
+      throw saveError;
+    }
 
     // 3. Update corresponding CRM Lead status if leadId was provided
+    let leadSyncStatus = 'Not Attempted';
     if (leadId) {
       try {
         const lead = await Lead.findById(leadId);
@@ -224,15 +242,20 @@ async function createBooking(req, res) {
           });
 
           await lead.save({ validateBeforeSave: false });
+          leadSyncStatus = 'Success';
+        } else {
+          leadSyncStatus = 'Failed: Lead not found';
         }
       } catch (leadErr) {
         console.error('Failed to sync CRM lead status:', leadErr);
+        leadSyncStatus = 'Failed: Error syncing lead';
       }
     }
 
     res.status(201).json({
       success: true,
-      data: newBooking
+      data: newBooking,
+      leadSyncStatus: leadId ? leadSyncStatus : undefined
     });
   } catch (error) {
     console.error('Error creating booking:', error);
@@ -260,12 +283,7 @@ async function getBookingById(req, res) {
       booking = await Booking.findOne({ transactionId: id });
     }
     if (!booking) {
-      const query = {
-        $or: [
-          { leadId: id },
-          { travellerPhone: id }
-        ]
-      };
+      const query = { travellerPhone: id };
       
       // Filter by packageName if provided to prevent overwriting trip details with the wrong booking
       if (packageName) {
@@ -277,6 +295,17 @@ async function getBookingById(req, res) {
 
     if (!booking) {
       return res.status(404).json({ success: false, error: 'Booking not found.' });
+    }
+
+    if (req.user) {
+      const userIdStr = (req.user.userId || req.user.id || req.user._id).toString();
+      const isCreator = booking.createdBy && booking.createdBy.toString() === userIdStr;
+      const isAssigned = Array.isArray(booking.assignedTo) && booking.assignedTo.some(a => a.toString() === userIdStr);
+      const isAdmin = !!req.user.isAdmin;
+
+      if (!isAdmin && !isCreator && !isAssigned) {
+        return res.status(403).json({ success: false, error: 'Forbidden: You are not authorized to view this booking.' });
+      }
     }
 
     res.status(200).json({
@@ -302,19 +331,6 @@ async function editBooking(req, res) {
 
     if (!booking) {
       booking = await Booking.findOne({ transactionId: id });
-    }
-
-    if (!booking) {
-      const query = {
-        $or: [
-          { leadId: id },
-          { travellerPhone: id }
-        ]
-      };
-      if (req.body.packageName) {
-        query.packageName = req.body.packageName;
-      }
-      booking = await Booking.findOne(query);
     }
 
     if (!booking) {

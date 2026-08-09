@@ -354,9 +354,11 @@ function App() {
     }
   };
 
-  const getBookingAPI = async (bookingId) => {
+  const getBookingAPI = async (bookingId, options = {}) => {
     try {
-      const response = await fetch(`${API_URL}/bookings/${bookingId}`, {
+      const queryString = new URLSearchParams(options).toString();
+      const url = `${API_URL}/bookings/${encodeURIComponent(bookingId)}${queryString ? `?${queryString}` : ''}`;
+      const response = await fetch(url, {
         headers: getAuthHeaders()
       });
       const data = await response.json();

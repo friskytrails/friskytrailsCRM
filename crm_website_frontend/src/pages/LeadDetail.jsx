@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
 import { uploadFileToCloudinary } from '../utils/uploadHelper';
+import FocusTrap from 'focus-trap-react';
 
 const STATUS_OPTIONS = [
   { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
@@ -50,6 +51,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     screenshotPreview: null
   });
   const [isBooking, setIsBooking] = useState(false);
+  const [isLoadingBooking, setIsLoadingBooking] = useState(false);
 
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [productInput, setProductInput] = useState('');
@@ -598,51 +600,55 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     if (result) {
       setShowBookingModal(false);
       setEditingBookingId(null);
-      setLead(prev => {
-        const tripObj = {
-          bookingId: result.bookingId,
-          travellerName: result.travellerName,
-          travellerEmail: result.travellerEmail,
-          travellerPhone: result.travellerPhone,
-          adults: result.adults,
-          children: result.children,
-          packageName: result.packageName,
-          location: result.location,
-          startDate: result.startDate,
-          endDate: result.endDate,
-          totalAmount: result.totalAmount,
-          paidAmount: result.paidAmount,
-          dueAmount: result.dueAmount,
-          transactionId: result.transactionId,
-          paymentMode: result.paymentMode,
-          screenshot: result.screenshot,
-          status: result.status || 'Booked',
-          createdAt: result.createdAt || new Date()
-        };
 
-        const existingTrips = Array.isArray(prev.trips) ? prev.trips : [];
-        let updatedTrips;
-        if (isEdit) {
-          updatedTrips = existingTrips.map(t => {
-            if ((t.bookingId && t.bookingId === editingBookingId) || t._id === editingBookingId) {
-              return { ...t, ...tripObj };
-            }
-            return t;
-          });
-        } else {
-          updatedTrips = [...existingTrips, tripObj];
-        }
+      const tripObj = {
+        bookingId: result.bookingId,
+        travellerName: result.travellerName,
+        travellerEmail: result.travellerEmail,
+        travellerPhone: result.travellerPhone,
+        adults: result.adults,
+        children: result.children,
+        packageName: result.packageName,
+        location: result.location,
+        startDate: result.startDate,
+        endDate: result.endDate,
+        totalAmount: result.totalAmount,
+        paidAmount: result.paidAmount,
+        dueAmount: result.dueAmount,
+        transactionId: result.transactionId,
+        paymentMode: result.paymentMode,
+        screenshot: result.screenshot,
+        status: result.status || 'Booked',
+        createdAt: result.createdAt || new Date()
+      };
 
-        return {
-          ...prev,
-          status: 'Booked',
-          trips: updatedTrips,
-          bookingDetails: {
-            ...prev.bookingDetails,
-            ...tripObj
+      const existingTrips = Array.isArray(lead.trips) ? lead.trips : [];
+      let updatedTrips;
+      if (isEdit) {
+        updatedTrips = existingTrips.map(t => {
+          if ((t.bookingId && t.bookingId === editingBookingId) || t._id === editingBookingId) {
+            return { ...t, ...tripObj };
           }
-        };
-      });
+          return t;
+        });
+      } else {
+        updatedTrips = [...existingTrips, tripObj];
+      }
+
+      const shouldUpdateBookingDetails = !isEdit || (lead.bookingDetails && lead.bookingDetails.bookingId === editingBookingId);
+
+      const updatedLead = {
+        ...lead,
+        status: 'Booked',
+        trips: updatedTrips,
+        bookingDetails: shouldUpdateBookingDetails ? {
+          ...lead.bookingDetails,
+          ...tripObj
+        } : lead.bookingDetails
+      };
+
+      setLead(updatedLead);
+      syncLeadToParent(updatedLead);
     }
   };
 
@@ -1309,10 +1315,11 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                         {!user?.isItinerary && (
                           <button
                             type="button"
+                            disabled={!trip.bookingId}
                             onClick={() => {
                               try {
-                                const lookupKey = trip.bookingId || trip.transactionId || lead.bookingDetails?.bookingId || trip._id || trip.id || lead.id || lead._id || lead.phone;
-                                setEditingBookingId(trip.bookingId || trip.transactionId || lead.bookingDetails?.bookingId || trip._id || trip.id || lead.id || lead._id);
+                                const lookupKey = trip.bookingId;
+                                setEditingBookingId(trip.bookingId);
 
                                 let startDt = '';
                                 let endDt = '';
@@ -1352,50 +1359,63 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                                 setShowBookingModal(true);
 
                                 if (getBookingAPI && lookupKey) {
-                                  const queryParams = new URLSearchParams();
-                                  if (trip.packageName) queryParams.append('packageName', trip.packageName);
-                                  const queryStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
+                                  setIsLoadingBooking(true);
+                                  const queryOptions = {};
+                                  if (trip.packageName) queryOptions.packageName = trip.packageName;
                                   
-                                  getBookingAPI(`${lookupKey}${queryStr}`).then(res => {
-                                    if (res) {
-                                      let fetchedStart = '';
-                                      let fetchedEnd = '';
-                                      if (res.startDate) {
-                                        fetchedStart = formatDate(res.startDate);
-                                      }
-                                      if (res.endDate) {
-                                        fetchedEnd = formatDate(res.endDate);
-                                      }
+                                  getBookingAPI(lookupKey, queryOptions).then(res => {
+                                    setEditingBookingId(currentId => {
+                                      if (currentId !== lookupKey) return currentId;
+                                      
+                                      if (res) {
+                                        let fetchedStart = '';
+                                        let fetchedEnd = '';
+                                        if (res.startDate) {
+                                          fetchedStart = formatDate(res.startDate);
+                                        }
+                                        if (res.endDate) {
+                                          fetchedEnd = formatDate(res.endDate);
+                                        }
 
-                                      setBookingForm(prev => ({
-                                        ...prev,
-                                        travellerName: res.travellerName || res.fullName || prev.travellerName,
-                                        travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
-                                        travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
-                                        adults: res.adults ?? res.noOfPax ?? prev.adults,
-                                        children: res.children ?? prev.children,
-                                        packageName: res.packageName || prev.packageName,
-                                        location: res.location || res.destination || res.destinationLocation || prev.location,
-                                        startDate: fetchedStart || prev.startDate,
-                                        endDate: fetchedEnd || prev.endDate,
-                                        totalAmount: res.totalAmount ?? prev.totalAmount,
-                                        paidAmount: res.paidAmount ?? prev.paidAmount,
-                                        dueAmount: res.dueAmount ?? prev.dueAmount,
-                                        transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
-                                        paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
-                                        status: res.status || prev.status,
-                                        screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
-                                      }));
-                                    }
-                                  }).catch(err => console.error("Error fetching booking details:", err));
+                                        setBookingForm(prev => ({
+                                          ...prev,
+                                          travellerName: res.travellerName || res.fullName || prev.travellerName,
+                                          travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
+                                          travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
+                                          adults: res.adults ?? res.noOfPax ?? prev.adults,
+                                          children: res.children ?? prev.children,
+                                          packageName: res.packageName || prev.packageName,
+                                          location: res.location || res.destination || res.destinationLocation || prev.location,
+                                          startDate: fetchedStart || prev.startDate,
+                                          endDate: fetchedEnd || prev.endDate,
+                                          totalAmount: res.totalAmount ?? prev.totalAmount,
+                                          paidAmount: res.paidAmount ?? prev.paidAmount,
+                                          dueAmount: res.dueAmount ?? prev.dueAmount,
+                                          transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
+                                          paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
+                                          status: res.status || prev.status,
+                                          screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
+                                        }));
+                                      }
+                                      
+                                      setIsLoadingBooking(false);
+                                      return currentId;
+                                    });
+                                  }).catch(err => {
+                                    console.error("Error fetching booking details:", err);
+                                    setEditingBookingId(currentId => {
+                                      if (currentId === lookupKey) setIsLoadingBooking(false);
+                                      return currentId;
+                                    });
+                                  });
                                 }
                               } catch (err) {
                                 console.error("Error opening edit modal:", err);
                                 setShowBookingModal(true);
                               }
                             }}
-                            className="p-2 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-600 dark:text-slate-300 transition-colors cursor-pointer flex items-center gap-1 font-bold text-xs"
-                            title="Edit Trip Details"
+                            className={`p-2 border rounded-lg flex items-center gap-1 font-bold text-xs transition-colors ${!trip.bookingId ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100 cursor-pointer dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700'}`}
+                            title={!trip.bookingId ? "Trip lacks a booking ID" : "Edit Trip Details"}
                           >
                             <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             Edit
@@ -1719,31 +1739,39 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       {/* Booking Form Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/60">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {editingBookingId ? `Edit Booking (${editingBookingId})` : 'Add New Booking'}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {editingBookingId ? 'Update traveller, trip, and payment verification details' : 'Fill in traveller, trip, and payment verification details'}
-                </p>
+        <FocusTrap focusTrapOptions={{ onDeactivate: () => { setShowBookingModal(false); setEditingBookingId(null); }, escapeDeactivates: true }}>
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingBookingId ? `Edit Booking (${editingBookingId})` : 'Add New Booking'}
+          >
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/60">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {editingBookingId ? `Edit Booking (${editingBookingId})` : 'Add New Booking'}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {editingBookingId ? 'Update traveller, trip, and payment verification details' : 'Fill in traveller, trip, and payment verification details'}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowBookingModal(false);
+                    setEditingBookingId(null);
+                  }} 
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
               </div>
-              <button 
-                onClick={() => {
-                  setShowBookingModal(false);
-                  setEditingBookingId(null);
-                }} 
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
 
-            <form onSubmit={submitBooking} className="p-6 overflow-y-auto flex-1 space-y-6">
-              {/* Section 1: Traveller Information */}
+              <form onSubmit={submitBooking} className="p-6 overflow-y-auto flex-1 space-y-6">
+                <fieldset disabled={isLoadingBooking || isBooking} className="space-y-6 min-w-0">
+                  {/* Section 1: Traveller Information */}
               <div>
                 <h4 className="text-sm font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-3 flex items-center gap-2">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -2038,11 +2066,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   )}
                 </button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>
-      )}
-    </div>
-  );
+      </FocusTrap>
+    )}
+  </div>
+);
 }
 
