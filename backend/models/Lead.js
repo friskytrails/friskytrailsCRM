@@ -126,20 +126,6 @@ const LeadSchema = new mongoose.Schema({
     type: String,
     default: 'Fresh Leads'
   },
-  bookingDetails: {
-    bookingId: { type: String, default: '' },
-    fullName: { type: String, default: '' },
-    emailId: { type: String, default: '' },
-    contactNumber: { type: String, default: '' },
-    emergencyContactNumber: { type: String, default: '' },
-    packageName: { type: String, default: '' },
-    totalAmount: { type: Number, default: 0 },
-    paidAmount: { type: Number, default: 0 },
-    dueAmount: { type: Number, default: 0 },
-    startDate: { type: Date, default: null },
-    endDate: { type: Date, default: null },
-    noOfPax: { type: Number, default: 0 }
-  },
   booking: {
     totalDial: { type: Number, default: 0 },
     dailyDial: { type: Number, default: 0 },
@@ -154,27 +140,7 @@ const LeadSchema = new mongoose.Schema({
     default: []
   },
   trips: {
-    type: [{
-      tripId: { type: String, default: '' },
-      bookingId: { type: String, default: '' },
-      packageName: { type: String, default: '' },
-      startDate: { type: Date, default: null },
-      endDate: { type: Date, default: null },
-      totalAmount: { type: Number, default: 0 },
-      paidAmount: { type: Number, default: 0 },
-      dueAmount: { type: Number, default: 0 },
-      transactionId: { type: String, default: '' },
-      paymentMode: { type: String, default: '' },
-      screenshot: { type: String, default: '' },
-      noOfPax: { type: Number, default: 1 },
-      fullName: { type: String, default: '' },
-      contactNumber: { type: String, default: '' },
-      emailId: { type: String, default: '' },
-      emergencyContactNumber: { type: String, default: '' },
-      bookedAt: { type: Date, default: Date.now },
-      bookedBy: { type: String, default: '' },
-      status: { type: String, default: 'Booked' }
-    }],
+    type: [mongoose.Schema.Types.Mixed],
     default: []
   }
 }, { timestamps: true });

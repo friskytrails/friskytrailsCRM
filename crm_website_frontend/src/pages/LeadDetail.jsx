@@ -1225,7 +1225,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               Trip Information
             </h2>
             <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 text-xs font-bold rounded-full">
-              {((lead.trips && lead.trips.length > 0) ? lead.trips.length : ((lead.bookingDetails && (lead.status === 'Booked' || lead.bookingDetails.packageName)) ? 1 : 0))} Recorded
+              {lead.trips?.length || 0} Recorded
             </span>
           </div>
 
@@ -1250,13 +1250,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         {/* Content: Simple Trip List */}
         {isTripSectionOpen && (
           <div className="p-4">
-            {(!lead.trips || lead.trips.length === 0) && (!lead.bookingDetails || (lead.status !== 'Booked' && !lead.bookingDetails.packageName)) ? (
+            {(!lead.trips || lead.trips.length === 0) ? (
               <div className="p-6 text-center text-gray-500 dark:text-slate-400 text-xs font-medium">
                 No trips recorded for this lead yet.
               </div>
             ) : (
               <div className="space-y-3">
-                {(lead.trips && lead.trips.length > 0 ? lead.trips : [lead.bookingDetails]).map((trip, idx) => {
+                {(lead.trips || []).map((trip, idx) => {
                   if (!trip) return null;
                   const originalIndex = lead.trips && lead.trips.length > 0 ? idx : 0;
                   return (

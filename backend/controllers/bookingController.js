@@ -163,6 +163,7 @@ async function createBooking(req, res) {
 
     const newBooking = new Booking({
       bookingId,
+      leadId,
       paymentId,
       startDate: new Date(startDate),
       endDate: new Date(endDate),
@@ -206,46 +207,6 @@ async function createBooking(req, res) {
         const lead = await Lead.findById(leadId);
         if (lead) {
           lead.status = 'Booked';
-          if (!lead.bookingDetails) lead.bookingDetails = {};
-          lead.bookingDetails.bookingId = bookingId;
-          lead.bookingDetails.travellerName = travellerName.trim();
-          lead.bookingDetails.travellerEmail = travellerEmail.trim().toLowerCase();
-          lead.bookingDetails.travellerPhone = trimmedPhone;
-          lead.bookingDetails.adults = numAdults;
-          lead.bookingDetails.children = numChildren;
-          lead.bookingDetails.packageName = packageName.trim();
-          lead.bookingDetails.location = location.trim();
-          lead.bookingDetails.totalAmount = numTotal;
-          lead.bookingDetails.paidAmount = numPaid;
-          lead.bookingDetails.dueAmount = calculatedDue;
-          lead.bookingDetails.transactionId = trimmedTxn;
-          lead.bookingDetails.paymentMode = paymentMode || 'Kalpana BOI';
-          lead.bookingDetails.screenshot = screenshotUrl;
-          lead.bookingDetails.startDate = startDate;
-          lead.bookingDetails.endDate = endDate;
-
-          if (!Array.isArray(lead.trips)) lead.trips = [];
-          lead.trips.push({
-            bookingId,
-            travellerName: travellerName.trim(),
-            travellerEmail: travellerEmail.trim().toLowerCase(),
-            travellerPhone: trimmedPhone,
-            adults: numAdults,
-            children: numChildren,
-            packageName: packageName.trim(),
-            location: location.trim(),
-            startDate,
-            endDate,
-            totalAmount: numTotal,
-            paidAmount: numPaid,
-            dueAmount: calculatedDue,
-            transactionId: trimmedTxn,
-            paymentMode: paymentMode || 'Kalpana BOI',
-            screenshot: screenshotUrl,
-            status: 'Booked',
-            createdAt: new Date()
-          });
-
           await lead.save({ validateBeforeSave: false });
           leadSyncStatus = 'Success';
         } else {
@@ -418,67 +379,7 @@ async function editBooking(req, res) {
       throw saveError;
     }
 
-    // Sync updated booking to corresponding Lead record
-    const targetLeadId = updates.leadId || updates.lead;
-    try {
-      let lead = null;
-      if (targetLeadId) {
-        lead = await Lead.findById(targetLeadId);
-      }
-      if (!lead && booking.bookingId) {
-        lead = await Lead.findOne({
-          $or: [
-            { 'bookingDetails.bookingId': booking.bookingId },
-            { 'trips.bookingId': booking.bookingId }
-          ]
-        });
-      }
-      if (lead) {
-        if (lead.bookingDetails && lead.bookingDetails.bookingId === booking.bookingId) {
-          lead.bookingDetails.travellerName = booking.travellerName;
-          lead.bookingDetails.travellerEmail = booking.travellerEmail;
-          lead.bookingDetails.travellerPhone = booking.travellerPhone;
-          lead.bookingDetails.packageName = booking.packageName;
-          lead.bookingDetails.location = booking.location;
-          lead.bookingDetails.startDate = booking.startDate;
-          lead.bookingDetails.endDate = booking.endDate;
-          lead.bookingDetails.totalAmount = booking.totalAmount;
-          lead.bookingDetails.paidAmount = booking.paidAmount;
-          lead.bookingDetails.dueAmount = booking.dueAmount;
-          lead.bookingDetails.transactionId = booking.transactionId;
-          lead.bookingDetails.screenshot = booking.screenshot;
-        }
-
-        if (Array.isArray(lead.trips)) {
-          lead.trips = lead.trips.map(t => {
-            if (t.bookingId === booking.bookingId) {
-              return {
-                ...t,
-                travellerName: booking.travellerName,
-                travellerEmail: booking.travellerEmail,
-                travellerPhone: booking.travellerPhone,
-                packageName: booking.packageName,
-                location: booking.location,
-                startDate: booking.startDate,
-                endDate: booking.endDate,
-                totalAmount: booking.totalAmount,
-                paidAmount: booking.paidAmount,
-                dueAmount: booking.dueAmount,
-                transactionId: booking.transactionId,
-                screenshot: booking.screenshot,
-                status: booking.status
-              };
-            }
-            return t;
-          });
-        }
-        await lead.save({ validateBeforeSave: false });
-      }
-    } catch (syncErr) {
-      console.error('Failed to sync updated booking to lead:', syncErr);
-    }
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: booking
     });

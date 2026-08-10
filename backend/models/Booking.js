@@ -51,6 +51,7 @@ const taskSubdocumentSchema = new mongoose.Schema({
 
 const bookingSchema = new mongoose.Schema({
   bookingId: { type: String, required: true, unique: true, index: true },
+  leadId: { type: String, required: false, index: true },
   paymentId: { type: String, required: false },
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },

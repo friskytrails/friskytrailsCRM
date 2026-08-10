@@ -1,6 +1,7 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
 const GlobalConfig = require('../models/GlobalConfig');
+const Booking = require('../models/Booking');
 const { formatDoc } = require('../utils/helpers');
 const { ensureCurrentMonthMetrics } = require('./agentService');
 const mongoose = require('mongoose');
@@ -14,7 +15,59 @@ async function getLeads(agentIdCondition = undefined) {
       leads = leads.filter(lead => lead.agentIds && lead.agentIds.includes(agentIdCondition));
     }
   }
-  return leads.map(formatDoc);
+
+  const formattedLeads = leads.map(formatDoc);
+
+  // Dynamically fetch and stitch bookings
+  try {
+    const leadIdSet = new Set();
+    formattedLeads.forEach(l => {
+      if (l._id) leadIdSet.add(l._id.toString());
+      if (l.id) leadIdSet.add(l.id.toString());
+      if (l.leadId !== undefined && l.leadId !== null) {
+        leadIdSet.add(l.leadId.toString());
+      }
+    });
+
+    const leadIds = Array.from(leadIdSet);
+    const bookings = await Booking.find({ leadId: { $in: leadIds } }).lean();
+
+    const bookingsMap = {};
+    bookings.forEach(b => {
+      const bKey = b.leadId ? b.leadId.toString() : null;
+      if (bKey) {
+        if (!bookingsMap[bKey]) bookingsMap[bKey] = [];
+        bookingsMap[bKey].push(b);
+      }
+    });
+
+    formattedLeads.forEach(l => {
+      const possibleKeys = [
+        l._id ? l._id.toString() : null,
+        l.id ? l.id.toString() : null,
+        l.leadId !== undefined && l.leadId !== null ? l.leadId.toString() : null
+      ].filter(Boolean);
+
+      let matchedBookings = [];
+      possibleKeys.forEach(key => {
+        if (bookingsMap[key]) {
+          matchedBookings = matchedBookings.concat(bookingsMap[key]);
+        }
+      });
+
+      const seen = new Set();
+      l.trips = matchedBookings.filter(b => {
+        const bId = b.bookingId || (b._id && b._id.toString());
+        if (!bId || seen.has(bId)) return false;
+        seen.add(bId);
+        return true;
+      });
+    });
+  } catch (err) {
+    console.error('Failed to fetch and stitch bookings in getLeads:', err);
+  }
+
+  return formattedLeads;
 }
 
 async function createLead(name, phone, age, origin, destination, leadSource, mailId, product, createdByUser) {
@@ -292,7 +345,31 @@ async function getLeadById(id, agentIdCondition = undefined) {
     }
   }
 
-  return formatDoc(lead);
+  const formattedLead = formatDoc(lead);
+
+  // Dynamically fetch and stitch bookings
+  try {
+    const possibleKeys = [
+      formattedLead._id ? formattedLead._id.toString() : null,
+      formattedLead.id ? formattedLead.id.toString() : null,
+      formattedLead.leadId !== undefined && formattedLead.leadId !== null ? formattedLead.leadId.toString() : null
+    ].filter(Boolean);
+
+    const bookings = await Booking.find({ leadId: { $in: possibleKeys } }).lean();
+    
+    const seen = new Set();
+    formattedLead.trips = (bookings || []).filter(b => {
+      const bId = b.bookingId || (b._id && b._id.toString());
+      if (!bId || seen.has(bId)) return false;
+      seen.add(bId);
+      return true;
+    });
+  } catch (err) {
+    console.error('Failed to fetch and stitch bookings in getLeadById:', err);
+    formattedLead.trips = [];
+  }
+
+  return formattedLead;
 }
 
 async function updateLabels(id, labels, agentIdCondition) {
@@ -441,36 +518,37 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     noOfPax
   };
 
-  const tripObj = {
-    tripId: tripIdInput || ('TRIP-' + Math.random().toString(36).substring(2, 8).toUpperCase()),
-    packageName,
+  // Create or update standalone Booking document in ft_booking_system
+  const bookingId = bookingDetails.bookingId || ('BK-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+  const paymentId = bookingDetails.paymentId || ('PAY-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+  const transactionId = bookingDetails.transactionId || ('TXN-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+
+  const newBooking = new Booking({
+    bookingId,
+    paymentId,
+    leadId: existingLead._id.toString(),
     startDate,
     endDate,
+    packageName,
+    location: bookingDetails.location || existingLead.destination || 'N/A',
     totalAmount,
     paidAmount,
     dueAmount,
-    noOfPax,
-    fullName,
-    contactNumber,
-    emailId,
-    emergencyContactNumber,
-    bookedAt: new Date(),
-    status: 'Booked'
-  };
+    transactionId,
+    screenshot: bookingDetails.screenshot || '',
+    travellerName: fullName || existingLead.name || 'Traveller',
+    travellerEmail: emailId || existingLead.mailId || 'traveller@example.com',
+    travellerPhone: contactNumber || existingLead.phone,
+    status: 'Booked',
+    tripStatus: 'Booked',
+    adults: noOfPax || 1,
+    children: 0
+  });
 
-  let tripsList = existingLead.trips ? [...existingLead.trips] : [];
-  
-  if (bookingDetails.tripIndex !== undefined && bookingDetails.tripIndex !== null && Number(bookingDetails.tripIndex) >= 0 && Number(bookingDetails.tripIndex) < tripsList.length) {
-    const idx = Number(bookingDetails.tripIndex);
-    tripsList[idx] = { ...tripsList[idx], ...tripObj, tripId: tripsList[idx].tripId || tripObj.tripId };
-  } else {
-    tripsList.push(tripObj);
-  }
+  await newBooking.save();
 
   const updateData = {
-    status: 'Booked',
-    bookingDetails: sanitizedBookingDetails,
-    trips: tripsList
+    status: 'Booked'
   };
 
   if (fullName) updateData.name = fullName;
