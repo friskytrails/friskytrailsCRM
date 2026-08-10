@@ -189,7 +189,12 @@ async function createBooking(req, res) {
       await newBooking.save();
     } catch (saveError) {
       if (saveError.code === 11000) {
-        return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+        if (saveError.keyPattern && saveError.keyPattern.transactionId) {
+          return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+        }
+        if (saveError.keyPattern && saveError.keyPattern.bookingId) {
+          return res.status(400).json({ success: false, error: 'Booking ID must be unique.' });
+        }
       }
       throw saveError;
     }
@@ -403,7 +408,12 @@ async function editBooking(req, res) {
       await booking.save();
     } catch (saveError) {
       if (saveError.code === 11000) {
-        return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+        if (saveError.keyPattern && saveError.keyPattern.transactionId) {
+          return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
+        }
+        if (saveError.keyPattern && saveError.keyPattern.bookingId) {
+          return res.status(400).json({ success: false, error: 'Booking ID must be unique.' });
+        }
       }
       throw saveError;
     }
