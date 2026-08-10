@@ -1,6 +1,8 @@
  const Booking = require('../models/Booking');
 const Lead = require('../models/Lead');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
+const { getAgentIdCondition } = require('../services/agentService');
 
 // Generate unique bookingId: "BK-" + 6 random uppercase chars
 async function generateBookingId() {
@@ -141,6 +143,31 @@ async function createBooking(req, res) {
     }
     const screenshotUrl = req.file.secure_url || req.file.path || '';
 
+    // Validate leadId and lead authorization if provided
+    let targetLead = null;
+    if (leadId) {
+      const strLeadId = leadId.toString();
+      if (!mongoose.Types.ObjectId.isValid(strLeadId) || strLeadId.length !== 24) {
+        return res.status(400).json({ success: false, error: 'Invalid leadId format. Must be a 24-character hex ObjectId.' });
+      }
+
+      targetLead = await Lead.findById(strLeadId);
+      if (!targetLead) {
+        return res.status(400).json({ success: false, error: 'Target lead not found.' });
+      }
+
+      // Authorization check using agentIdCondition
+      const agentIdCondition = await getAgentIdCondition(req.user);
+      if (agentIdCondition !== undefined) {
+        const isAuthorized = Array.isArray(agentIdCondition)
+          ? (targetLead.agentIds || []).some(id => agentIdCondition.includes(id))
+          : (targetLead.agentIds || []).includes(agentIdCondition);
+        if (!isAuthorized) {
+          return res.status(403).json({ success: false, error: 'Forbidden: You are not authorized to mark this lead as Booked.' });
+        }
+      }
+    }
+
     // 2. Generate IDs and create ledger entry
     const bookingId = await generateBookingId();
     const paymentId = await generatePaymentId();
@@ -208,18 +235,13 @@ async function createBooking(req, res) {
       throw saveError;
     }
 
-    // 3. Update corresponding CRM Lead status if leadId was provided
+    // 3. Update corresponding CRM Lead status if targetLead was validated
     let leadSyncStatus = 'Not Attempted';
-    if (leadId) {
+    if (targetLead) {
       try {
-        const lead = await Lead.findById(leadId);
-        if (lead) {
-          lead.status = 'Booked';
-          await lead.save({ validateBeforeSave: false });
-          leadSyncStatus = 'Success';
-        } else {
-          leadSyncStatus = 'Failed: Lead not found';
-        }
+        targetLead.status = 'Booked';
+        await targetLead.save();
+        leadSyncStatus = 'Success';
       } catch (leadErr) {
         console.error('Failed to sync CRM lead status:', leadErr);
         leadSyncStatus = 'Failed: Error syncing lead';
@@ -353,10 +375,6 @@ async function editBooking(req, res) {
       if (updates.paidAmount !== undefined) {
         const newPaid = parseFloat(updates.paidAmount);
         booking.paidAmount = newPaid;
-        // Also update the initial payment to prevent the pre-save hook from reverting the change
-        if (booking.payments && booking.payments.length > 0) {
-          booking.payments[0].amountPaid = newPaid;
-        }
       }
       if (updates.totalAmount !== undefined || updates.paidAmount !== undefined) {
         booking.dueAmount = Math.max(0, (booking.totalAmount || 0) - (booking.paidAmount || 0));
@@ -408,5 +426,7 @@ async function editBooking(req, res) {
 module.exports = {
   createBooking,
   getBookingById,
-  editBooking
+  editBooking,
+  generateBookingId,
+  generatePaymentId
 };

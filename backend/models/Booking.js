@@ -90,25 +90,32 @@ bookingSchema.pre('save', function (next) {
   let verifiedPaid = 0;
   let hasVerifiedPayments = false;
 
-  if (Array.isArray(this.payments) && this.payments.length > 0) {
-    this.payments.forEach(p => {
-      if (p.status === 'VERIFIED' || p.verified === true) {
-        verifiedPaid += Number(p.amountPaid) || 0;
-        hasVerifiedPayments = true;
-      }
-    });
-  }
+  const paidAmountExplicitlyModified = this.isModified('paidAmount');
+  const paymentsModified = this.isModified('payments');
 
-  if (hasVerifiedPayments) {
-    this.paidAmount = verifiedPaid;
-  } else if (Array.isArray(this.payments) && this.payments.length > 0) {
-    let unrejectedSum = 0;
-    this.payments.forEach(p => {
-      if (p.status !== 'REJECTED' && p.status !== 'DISAPPROVED') {
-        unrejectedSum += Number(p.amountPaid) || 0;
-      }
-    });
-    this.paidAmount = unrejectedSum > 0 ? unrejectedSum : (Number(this.paidAmount) || 0);
+  if (!paidAmountExplicitlyModified || paymentsModified) {
+    if (Array.isArray(this.payments) && this.payments.length > 0) {
+      this.payments.forEach(p => {
+        if (p.status === 'VERIFIED' || p.verified === true) {
+          verifiedPaid += Number(p.amountPaid) || 0;
+          hasVerifiedPayments = true;
+        }
+      });
+    }
+
+    if (hasVerifiedPayments) {
+      this.paidAmount = verifiedPaid;
+    } else if (Array.isArray(this.payments) && this.payments.length > 0) {
+      let unrejectedSum = 0;
+      this.payments.forEach(p => {
+        if (p.status !== 'REJECTED' && p.status !== 'DISAPPROVED') {
+          unrejectedSum += Number(p.amountPaid) || 0;
+        }
+      });
+      this.paidAmount = unrejectedSum > 0 ? unrejectedSum : (Number(this.paidAmount) || 0);
+    } else {
+      this.paidAmount = Number(this.paidAmount) || 0;
+    }
   } else {
     this.paidAmount = Number(this.paidAmount) || 0;
   }

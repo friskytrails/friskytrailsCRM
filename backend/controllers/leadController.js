@@ -1,17 +1,6 @@
 const leadService = require('../services/leadService');
 const agentService = require('../services/agentService');
-
-async function getAgentIdCondition(user) {
-  if (user.isAdmin || user.isItinerary) {
-    return undefined;
-  }
-  if (user.isManager) {
-    const team = await agentService.getMyTeam(user.userId);
-    const teamIds = team.map(agent => agent.id || agent._id.toString());
-    return [user.userId, ...teamIds];
-  }
-  return user.userId;
-}
+const { getAgentIdCondition } = agentService;
 
 function sanitizeLeadForItinerary(leadDoc) {
   if (!leadDoc) return leadDoc;

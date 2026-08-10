@@ -5,6 +5,8 @@ const Booking = require('../models/Booking');
 const { formatDoc } = require('../utils/helpers');
 const { ensureCurrentMonthMetrics } = require('./agentService');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
+const { generateBookingId, generatePaymentId } = require('../controllers/bookingController');
 
 async function getLeads(agentIdCondition = undefined) {
   let leads = await Lead.findAll();
@@ -30,7 +32,7 @@ async function getLeads(agentIdCondition = undefined) {
     });
 
     const leadIds = Array.from(leadIdSet);
-    const bookings = await Booking.find({ leadId: { $in: leadIds } }).lean();
+    const bookings = leadIds.length > 0 ? await Booking.find({ leadId: { $in: leadIds } }).lean() : [];
 
     const bookingsMap = {};
     bookings.forEach(b => {
@@ -55,16 +57,33 @@ async function getLeads(agentIdCondition = undefined) {
         }
       });
 
+      const legacyTrips = Array.isArray(l.trips) ? l.trips : [];
       const seen = new Set();
-      l.trips = matchedBookings.filter(b => {
+      const mergedTrips = [];
+
+      matchedBookings.forEach(b => {
         const bId = b.bookingId || (b._id && b._id.toString());
-        if (!bId || seen.has(bId)) return false;
-        seen.add(bId);
-        return true;
+        if (bId && !seen.has(bId.toString())) {
+          seen.add(bId.toString());
+          mergedTrips.push(b);
+        }
       });
+
+      legacyTrips.forEach(t => {
+        if (t && typeof t === 'object') {
+          const tId = t.bookingId || (t._id && t._id.toString()) || t.id;
+          if (!tId || !seen.has(tId.toString())) {
+            if (tId) seen.add(tId.toString());
+            mergedTrips.push(t);
+          }
+        }
+      });
+
+      l.trips = mergedTrips;
     });
   } catch (err) {
     console.error('Failed to fetch and stitch bookings in getLeads:', err);
+    formattedLeads.forEach(l => { l.trips = []; });
   }
 
   return formattedLeads;
@@ -357,13 +376,29 @@ async function getLeadById(id, agentIdCondition = undefined) {
 
     const bookings = await Booking.find({ leadId: { $in: possibleKeys } }).lean();
     
+    const legacyTrips = Array.isArray(formattedLead.trips) ? formattedLead.trips : [];
     const seen = new Set();
-    formattedLead.trips = (bookings || []).filter(b => {
+    const mergedTrips = [];
+
+    (bookings || []).forEach(b => {
       const bId = b.bookingId || (b._id && b._id.toString());
-      if (!bId || seen.has(bId)) return false;
-      seen.add(bId);
-      return true;
+      if (bId && !seen.has(bId.toString())) {
+        seen.add(bId.toString());
+        mergedTrips.push(b);
+      }
     });
+
+    legacyTrips.forEach(t => {
+      if (t && typeof t === 'object') {
+        const tId = t.bookingId || (t._id && t._id.toString()) || t.id;
+        if (!tId || !seen.has(tId.toString())) {
+          if (tId) seen.add(tId.toString());
+          mergedTrips.push(t);
+        }
+      }
+    });
+
+    formattedLead.trips = mergedTrips;
   } catch (err) {
     console.error('Failed to fetch and stitch bookings in getLeadById:', err);
     formattedLead.trips = [];
@@ -500,7 +535,7 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   const totalAmount = Number(bookingDetails.totalAmount);
   const paidAmount = Number(bookingDetails.paidAmount);
-  const dueAmount = Number(bookingDetails.dueAmount);
+  const dueAmount = Math.max(0, totalAmount - paidAmount);
   const noOfPax = Number(bookingDetails.noOfPax);
 
   const sanitizedBookingDetails = {
@@ -519,9 +554,9 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   };
 
   // Create or update standalone Booking document in ft_booking_system
-  const bookingId = bookingDetails.bookingId || ('BK-' + Math.random().toString(36).substring(2, 8).toUpperCase());
-  const paymentId = bookingDetails.paymentId || ('PAY-' + Math.random().toString(36).substring(2, 8).toUpperCase());
-  const transactionId = bookingDetails.transactionId || ('TXN-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+  const bookingId = bookingDetails.bookingId || (await generateBookingId());
+  const paymentId = bookingDetails.paymentId || (await generatePaymentId());
+  const transactionId = bookingDetails.transactionId || ('TXN-' + crypto.randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase());
 
   const newBooking = new Booking({
     bookingId,
@@ -544,8 +579,6 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     adults: noOfPax || 1,
     children: 0
   });
-
-  await newBooking.save();
 
   const updateData = {
     status: 'Booked'
@@ -571,6 +604,22 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   }
   if (!result) {
     throw new Error("Lead not found or unauthorized");
+  }
+
+  try {
+    await newBooking.save();
+  } catch (saveError) {
+    if (saveError.code === 11000) {
+      const isTxn = (saveError.keyPattern && saveError.keyPattern.transactionId) || (saveError.errmsg && saveError.errmsg.includes('transactionId')) || (saveError.message && saveError.message.includes('transactionId'));
+      const isBkg = (saveError.keyPattern && saveError.keyPattern.bookingId) || (saveError.errmsg && saveError.errmsg.includes('bookingId')) || (saveError.message && saveError.message.includes('bookingId'));
+      const isPay = (saveError.keyPattern && saveError.keyPattern.paymentId) || (saveError.errmsg && saveError.errmsg.includes('paymentId')) || (saveError.message && saveError.message.includes('paymentId'));
+
+      if (isTxn) throw new Error('Transaction ID must be unique across all bookings.');
+      if (isBkg) throw new Error('Booking ID must be unique.');
+      if (isPay) throw new Error('Payment ID must be unique.');
+      throw new Error('A booking with this unique key already exists.');
+    }
+    throw saveError;
   }
 
   // Increment booking count for assigned agents if lead was not previously booked
