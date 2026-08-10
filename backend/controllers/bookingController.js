@@ -190,12 +190,20 @@ async function createBooking(req, res) {
       await newBooking.save();
     } catch (saveError) {
       if (saveError.code === 11000) {
-        if (saveError.keyPattern && saveError.keyPattern.transactionId) {
+        const isTxn = (saveError.keyPattern && saveError.keyPattern.transactionId) || (saveError.errmsg && saveError.errmsg.includes('transactionId')) || (saveError.message && saveError.message.includes('transactionId'));
+        const isBkg = (saveError.keyPattern && saveError.keyPattern.bookingId) || (saveError.errmsg && saveError.errmsg.includes('bookingId')) || (saveError.message && saveError.message.includes('bookingId'));
+        const isPay = (saveError.keyPattern && saveError.keyPattern.paymentId) || (saveError.errmsg && saveError.errmsg.includes('paymentId')) || (saveError.message && saveError.message.includes('paymentId'));
+
+        if (isTxn) {
           return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
         }
-        if (saveError.keyPattern && saveError.keyPattern.bookingId) {
+        if (isBkg) {
           return res.status(400).json({ success: false, error: 'Booking ID must be unique.' });
         }
+        if (isPay) {
+          return res.status(400).json({ success: false, error: 'Payment ID must be unique.' });
+        }
+        return res.status(400).json({ success: false, error: 'A booking with this unique key already exists.' });
       }
       throw saveError;
     }
@@ -369,12 +377,20 @@ async function editBooking(req, res) {
       await booking.save();
     } catch (saveError) {
       if (saveError.code === 11000) {
-        if (saveError.keyPattern && saveError.keyPattern.transactionId) {
+        const isTxn = (saveError.keyPattern && saveError.keyPattern.transactionId) || (saveError.errmsg && saveError.errmsg.includes('transactionId')) || (saveError.message && saveError.message.includes('transactionId'));
+        const isBkg = (saveError.keyPattern && saveError.keyPattern.bookingId) || (saveError.errmsg && saveError.errmsg.includes('bookingId')) || (saveError.message && saveError.message.includes('bookingId'));
+        const isPay = (saveError.keyPattern && saveError.keyPattern.paymentId) || (saveError.errmsg && saveError.errmsg.includes('paymentId')) || (saveError.message && saveError.message.includes('paymentId'));
+
+        if (isTxn) {
           return res.status(400).json({ success: false, error: 'Transaction ID must be unique across all bookings.' });
         }
-        if (saveError.keyPattern && saveError.keyPattern.bookingId) {
+        if (isBkg) {
           return res.status(400).json({ success: false, error: 'Booking ID must be unique.' });
         }
+        if (isPay) {
+          return res.status(400).json({ success: false, error: 'Payment ID must be unique.' });
+        }
+        return res.status(400).json({ success: false, error: 'A booking with this unique key already exists.' });
       }
       throw saveError;
     }
