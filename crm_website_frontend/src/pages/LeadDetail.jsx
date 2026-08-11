@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
 import { uploadFileToCloudinary } from '../utils/uploadHelper';
+import FocusTrap from 'focus-trap-react';
 
 const STATUS_OPTIONS = [
   { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
@@ -14,7 +15,7 @@ const STATUS_OPTIONS = [
   { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
 
-export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], statuses = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI }) {
+export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], statuses = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI, createBookingAPI, editBookingAPI, getBookingAPI }) {
   const defaultProducts = ["Meghalaya Package", "Hampta Pass Trek", "Rishikesh Activities", "Spiti Package", "Ladakh Package", "Kerala Trip"];
   const availableProducts = (products && products.length > 0) ? products : defaultProducts;
   const availableStatuses = (statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value);
@@ -29,20 +30,28 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [isUploading, setIsUploading] = useState(false);
 
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [editingBookingId, setEditingBookingId] = useState(null);
   const [bookingForm, setBookingForm] = useState({
-    fullName: '',
-    emailId: '',
-    contactNumber: '',
-    emergencyContactNumber: '',
+    travellerName: '',
+    travellerEmail: '',
+    travellerPhone: '',
+    adults: 1,
+    children: 0,
     packageName: '',
-    totalAmount: '',
-    paidAmount: '',
-    dueAmount: '',
+    location: '',
     startDate: '',
     endDate: '',
-    noOfPax: ''
+    totalAmount: '',
+    paidAmount: '',
+    dueAmount: 0,
+    transactionId: '',
+    paymentMode: 'Kalpana BOI',
+    status: 'Pending',
+    screenshotFile: null,
+    screenshotPreview: null
   });
   const [isBooking, setIsBooking] = useState(false);
+  const [isLoadingBooking, setIsLoadingBooking] = useState(false);
 
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [productInput, setProductInput] = useState('');
@@ -453,18 +462,25 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         toast.error("Itinerary Team members cannot book leads");
         return;
       }
+      setEditingBookingId(null);
       setBookingForm({
-        fullName: lead.name || '',
-        emailId: lead.mailId || '',
-        contactNumber: lead.phone || '',
-        emergencyContactNumber: lead.bookingDetails?.emergencyContactNumber || '',
-        packageName: lead.product || lead.bookingDetails?.packageName || '',
-        totalAmount: lead.bookingDetails?.totalAmount ?? '',
-        paidAmount: lead.bookingDetails?.paidAmount ?? '',
-        dueAmount: lead.bookingDetails?.dueAmount ?? '',
-        startDate: lead.bookingDetails?.startDate ? formatDate(lead.bookingDetails.startDate) : '',
-        endDate: lead.bookingDetails?.endDate ? formatDate(lead.bookingDetails.endDate) : '',
-        noOfPax: lead.bookingDetails?.noOfPax ?? ''
+        travellerName: lead.name || '',
+        travellerEmail: lead.mailId || lead.email || lead.travellerEmail || '',
+        travellerPhone: lead.phone || '',
+        adults: lead.numberOfPersons || 1,
+        children: 0,
+        packageName: lead.product || '',
+        location: lead.destination || lead.location || lead.destinationLocation || '',
+        startDate: '',
+        endDate: '',
+        totalAmount: '',
+        paidAmount: '',
+        dueAmount: 0,
+        transactionId: '',
+        paymentMode: 'Kalpana BOI',
+        status: 'Pending',
+        screenshotFile: null,
+        screenshotPreview: null
       });
       setShowBookingModal(true);
       return;
@@ -483,20 +499,156 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const submitBooking = async (e) => {
     e.preventDefault();
-    if (!bookLeadAPI) return;
+
+    if (!bookingForm.travellerName || !bookingForm.travellerName.trim()) {
+      toast.error("Full Name is required.");
+      return;
+    }
+    if (!bookingForm.travellerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bookingForm.travellerEmail.trim())) {
+      toast.error("Valid Email ID is required.");
+      return;
+    }
+    const cleanPhone = (bookingForm.travellerPhone || '').trim();
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      toast.error("Phone Number must be exactly 10 digits starting with 6, 7, 8, or 9.");
+      return;
+    }
+    const adultsNum = parseInt(bookingForm.adults, 10);
+    const childrenNum = parseInt(bookingForm.children, 10);
+    if (isNaN(adultsNum) || adultsNum < 0) {
+      toast.error("Adults count must be 0 or greater.");
+      return;
+    }
+    if (isNaN(childrenNum) || childrenNum < 0) {
+      toast.error("Children count must be 0 or greater.");
+      return;
+    }
+    if (!bookingForm.packageName || !bookingForm.packageName.trim()) {
+      toast.error("Package Name is required.");
+      return;
+    }
+    if (!bookingForm.location || !bookingForm.location.trim()) {
+      toast.error("Destination Location is required.");
+      return;
+    }
+    if (!bookingForm.startDate || !bookingForm.endDate) {
+      toast.error("Start Date and End Date are required.");
+      return;
+    }
+    if (new Date(bookingForm.endDate) < new Date(bookingForm.startDate)) {
+      toast.error("End Date cannot be earlier than Start Date.");
+      return;
+    }
+    const tot = parseFloat(bookingForm.totalAmount);
+    const pd = parseFloat(bookingForm.paidAmount);
+    if (isNaN(tot) || tot < 0) {
+      toast.error("Total Amount must be a non-negative number.");
+      return;
+    }
+    if (isNaN(pd) || pd < 0) {
+      toast.error("Paid Amount must be a non-negative number.");
+      return;
+    }
+    if (pd > tot) {
+      toast.error("Paid Amount cannot exceed Total Amount.");
+      return;
+    }
+    const isEdit = !!editingBookingId;
+    const cleanTxn = (bookingForm.transactionId || '').trim();
+
+    if (!isEdit) {
+      if (!cleanTxn || !/^[a-zA-Z0-9_-]+$/.test(cleanTxn)) {
+        toast.error("Transaction ID is required (only letters, numbers, underscore, hyphen allowed).");
+        return;
+      }
+      if (!bookingForm.screenshotFile) {
+        toast.error("Transaction screenshot file is mandatory for booking.");
+        return;
+      }
+    }
+
     setIsBooking(true);
-    const updated = await bookLeadAPI(lead.id, {
-      ...bookingForm,
-      totalAmount: Number(bookingForm.totalAmount) || 0,
-      paidAmount: Number(bookingForm.paidAmount) || 0,
-      dueAmount: Number(bookingForm.dueAmount) || 0,
-      noOfPax: Number(bookingForm.noOfPax) || 0,
-    });
+
+    const formData = new FormData();
+    formData.append('travellerName', bookingForm.travellerName.trim());
+    formData.append('travellerEmail', bookingForm.travellerEmail.trim());
+    formData.append('travellerPhone', cleanPhone);
+    formData.append('adults', adultsNum);
+    formData.append('children', childrenNum);
+    formData.append('packageName', bookingForm.packageName.trim());
+    formData.append('location', bookingForm.location.trim());
+    formData.append('startDate', bookingForm.startDate);
+    formData.append('endDate', bookingForm.endDate);
+    formData.append('totalAmount', tot);
+    formData.append('paidAmount', pd);
+    if (cleanTxn) formData.append('transactionId', cleanTxn);
+    if (bookingForm.paymentMode) formData.append('paymentMode', bookingForm.paymentMode);
+    if (bookingForm.status) formData.append('status', bookingForm.status);
+    formData.append('leadId', lead.id);
+    if (bookingForm.screenshotFile) {
+      formData.append('screenshot', bookingForm.screenshotFile);
+    }
+
+    let result = null;
+    if (isEdit && editBookingAPI) {
+      result = await editBookingAPI(editingBookingId, formData);
+    } else if (createBookingAPI) {
+      result = await createBookingAPI(formData);
+    }
     setIsBooking(false);
-    if (updated) {
-      setLead(updated);
-      syncLeadToParent(updated);
+
+    if (result) {
       setShowBookingModal(false);
+      setEditingBookingId(null);
+
+      const tripObj = {
+        bookingId: result.bookingId,
+        travellerName: result.travellerName,
+        travellerEmail: result.travellerEmail,
+        travellerPhone: result.travellerPhone,
+        adults: result.adults,
+        children: result.children,
+        packageName: result.packageName,
+        location: result.location,
+        startDate: result.startDate,
+        endDate: result.endDate,
+        totalAmount: result.totalAmount,
+        paidAmount: result.paidAmount,
+        dueAmount: result.dueAmount,
+        transactionId: result.transactionId,
+        paymentMode: result.paymentMode,
+        screenshot: result.screenshot,
+        status: result.status || 'Booked',
+        createdAt: result.createdAt || new Date()
+      };
+
+      const existingTrips = Array.isArray(lead.trips) ? lead.trips : [];
+      let updatedTrips;
+      if (isEdit) {
+        updatedTrips = existingTrips.map(t => {
+          if ((t.bookingId && t.bookingId === editingBookingId) || t._id === editingBookingId) {
+            return { ...t, ...tripObj };
+          }
+          return t;
+        });
+      } else {
+        updatedTrips = [...existingTrips, tripObj];
+      }
+
+      const shouldUpdateBookingDetails = !isEdit || (lead.bookingDetails && lead.bookingDetails.bookingId === editingBookingId);
+
+      const updatedLead = {
+        ...lead,
+        status: 'Booked',
+        trips: updatedTrips,
+        bookingDetails: shouldUpdateBookingDetails ? {
+          ...lead.bookingDetails,
+          ...tripObj
+        } : lead.bookingDetails
+      };
+
+      setLead(updatedLead);
+      syncLeadToParent(updatedLead);
     }
   };
 
@@ -1073,7 +1225,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               Trip Information
             </h2>
             <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 text-xs font-bold rounded-full">
-              {((lead.trips && lead.trips.length > 0) ? lead.trips.length : ((lead.bookingDetails && (lead.status === 'Booked' || lead.bookingDetails.packageName)) ? 1 : 0))} Recorded
+              {lead.trips?.length || 0} Recorded
             </span>
           </div>
 
@@ -1098,13 +1250,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         {/* Content: Simple Trip List */}
         {isTripSectionOpen && (
           <div className="p-4">
-            {(!lead.trips || lead.trips.length === 0) && (!lead.bookingDetails || (lead.status !== 'Booked' && !lead.bookingDetails.packageName)) ? (
+            {(!lead.trips || lead.trips.length === 0) ? (
               <div className="p-6 text-center text-gray-500 dark:text-slate-400 text-xs font-medium">
                 No trips recorded for this lead yet.
               </div>
             ) : (
               <div className="space-y-3">
-                {(lead.trips && lead.trips.length > 0 ? lead.trips : [lead.bookingDetails]).map((trip, idx) => {
+                {(lead.trips || []).map((trip, idx) => {
                   if (!trip) return null;
                   const originalIndex = lead.trips && lead.trips.length > 0 ? idx : 0;
                   return (
@@ -1160,28 +1312,110 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                           </div>
                         </div>
 
-                        {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
+                        {!user?.isItinerary && (
                           <button
+                            type="button"
+                            disabled={!trip.bookingId}
                             onClick={() => {
-                              setBookingForm({
-                                fullName: trip.fullName || lead.name || '',
-                                emailId: trip.emailId || lead.mailId || '',
-                                contactNumber: trip.contactNumber || lead.phone || '',
-                                emergencyContactNumber: trip.emergencyContactNumber || '',
-                                packageName: trip.packageName || lead.product || '',
-                                totalAmount: trip.totalAmount || '',
-                                paidAmount: trip.paidAmount || '',
-                                dueAmount: trip.dueAmount || '',
-                                startDate: trip.startDate ? new Date(trip.startDate).toISOString().substring(0, 10) : '',
-                                endDate: trip.endDate ? new Date(trip.endDate).toISOString().substring(0, 10) : '',
-                                noOfPax: trip.noOfPax || '1',
-                                tripIndex: originalIndex,
-                                tripId: trip.tripId || undefined
-                              });
-                              setShowBookingModal(true);
+                              try {
+                                const lookupKey = trip.bookingId;
+                                setEditingBookingId(trip.bookingId);
+
+                                let startDt = '';
+                                let endDt = '';
+                                if (trip.startDate) {
+                                  startDt = formatDate(trip.startDate);
+                                }
+                                if (trip.endDate) {
+                                  endDt = formatDate(trip.endDate);
+                                }
+
+                                const tot = (trip.totalAmount !== undefined && trip.totalAmount !== null) ? trip.totalAmount : (lead.bookingDetails?.totalAmount ?? '');
+                                const pd = (trip.paidAmount !== undefined && trip.paidAmount !== null) ? trip.paidAmount : (lead.bookingDetails?.paidAmount ?? '');
+                                const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : (trip.dueAmount ?? lead.bookingDetails?.dueAmount ?? 0);
+                                const txn = trip.transactionId || trip.paymentId || (Array.isArray(trip.payments) && trip.payments[0] ? (trip.payments[0].details || trip.payments[0].transactionId) : '') || trip.details || lead.bookingDetails?.transactionId || lead.bookingDetails?.paymentId || lead.bookingDetails?.details || '';
+                                const payMode = trip.paymentMode || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].paymentMode : '') || lead.bookingDetails?.paymentMode || 'Kalpana BOI';
+                                const ssPreview = trip.screenshot || trip.screenshotUrl || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].attachment : '') || lead.bookingDetails?.screenshot || lead.bookingDetails?.screenshotUrl || lead.bookingDetails?.attachment || null;
+
+                                setBookingForm({
+                                  travellerName: trip.travellerName || trip.fullName || lead.name || '',
+                                  travellerEmail: trip.travellerEmail || trip.emailId || trip.email || lead.mailId || lead.email || '',
+                                  travellerPhone: trip.travellerPhone || trip.contactNumber || trip.phone || lead.phone || '',
+                                  adults: trip.adults ?? trip.noOfPax ?? lead.numberOfPersons ?? 1,
+                                  children: trip.children ?? 0,
+                                  packageName: trip.packageName || lead.product || '',
+                                  location: trip.location || trip.destination || trip.destinationLocation || lead.destination || lead.location || '',
+                                  startDate: startDt,
+                                  endDate: endDt,
+                                  totalAmount: tot,
+                                  paidAmount: pd,
+                                  dueAmount: due,
+                                  transactionId: txn,
+                                  paymentMode: payMode,
+                                  status: trip.status || lead.bookingDetails?.status || 'Pending',
+                                  screenshotFile: null,
+                                  screenshotPreview: ssPreview
+                                });
+                                setShowBookingModal(true);
+
+                                if (getBookingAPI && lookupKey) {
+                                  setIsLoadingBooking(true);
+                                  const queryOptions = {};
+                                  if (trip.packageName) queryOptions.packageName = trip.packageName;
+                                  
+                                  getBookingAPI(lookupKey, queryOptions).then(res => {
+                                    setEditingBookingId(currentId => {
+                                      if (currentId !== lookupKey) return currentId;
+                                      
+                                      if (res) {
+                                        let fetchedStart = '';
+                                        let fetchedEnd = '';
+                                        if (res.startDate) {
+                                          fetchedStart = formatDate(res.startDate);
+                                        }
+                                        if (res.endDate) {
+                                          fetchedEnd = formatDate(res.endDate);
+                                        }
+
+                                        setBookingForm(prev => ({
+                                          ...prev,
+                                          travellerName: res.travellerName || res.fullName || prev.travellerName,
+                                          travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
+                                          travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
+                                          adults: res.adults ?? res.noOfPax ?? prev.adults,
+                                          children: res.children ?? prev.children,
+                                          packageName: res.packageName || prev.packageName,
+                                          location: res.location || res.destination || res.destinationLocation || prev.location,
+                                          startDate: fetchedStart || prev.startDate,
+                                          endDate: fetchedEnd || prev.endDate,
+                                          totalAmount: res.totalAmount ?? prev.totalAmount,
+                                          paidAmount: res.paidAmount ?? prev.paidAmount,
+                                          dueAmount: res.dueAmount ?? prev.dueAmount,
+                                          transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
+                                          paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
+                                          status: res.status || prev.status,
+                                          screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
+                                        }));
+                                      }
+                                      
+                                      setIsLoadingBooking(false);
+                                      return currentId;
+                                    });
+                                  }).catch(err => {
+                                    console.error("Error fetching booking details:", err);
+                                    setEditingBookingId(currentId => {
+                                      if (currentId === lookupKey) setIsLoadingBooking(false);
+                                      return currentId;
+                                    });
+                                  });
+                                }
+                              } catch (err) {
+                                console.error("Error opening edit modal:", err);
+                                setShowBookingModal(true);
+                              }
                             }}
-                            className="p-2 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-600 dark:text-slate-300 transition-colors cursor-pointer flex items-center gap-1 font-bold text-xs"
-                            title="Edit Trip Details"
+                            className={`p-2 border rounded-lg flex items-center gap-1 font-bold text-xs transition-colors ${!trip.bookingId ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100 cursor-pointer dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700'}`}
+                            title={!trip.bookingId ? "Trip lacks a booking ID" : "Edit Trip Details"}
                           >
                             <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             Edit
@@ -1505,94 +1739,347 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       {/* Booking Form Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/50">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Booking Details</h3>
-              <button onClick={() => setShowBookingModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <form onSubmit={submitBooking} className="p-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <FocusTrap focusTrapOptions={{ escapeDeactivates: false, fallbackFocus: '.modal-content' }}>
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingBookingId ? `Edit Booking (${editingBookingId})` : 'Add New Booking'}
+            tabIndex="-1"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowBookingModal(false);
+                setEditingBookingId(null);
+              }
+            }}
+          >
+            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/60">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
-                  <input type="text" required value={bookingForm.fullName} onChange={e => setBookingForm({ ...bookingForm, fullName: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {editingBookingId ? `Edit Booking (${editingBookingId})` : 'Add New Booking'}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {editingBookingId ? 'Update traveller, trip, and payment verification details' : 'Fill in traveller, trip, and payment verification details'}
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Email ID</label>
-                  <input type="email" required value={bookingForm.emailId} onChange={e => setBookingForm({ ...bookingForm, emailId: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Contact Number</label>
-                  <input type="text" required value={bookingForm.contactNumber} onChange={e => setBookingForm({ ...bookingForm, contactNumber: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Emergency Contact Number</label>
-                  <input type="text" required value={bookingForm.emergencyContactNumber} onChange={e => setBookingForm({ ...bookingForm, emergencyContactNumber: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                <button 
+                  onClick={() => {
+                    setShowBookingModal(false);
+                    setEditingBookingId(null);
+                  }} 
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              <form onSubmit={submitBooking} className="p-6 overflow-y-auto flex-1 space-y-6">
+                <fieldset disabled={isLoadingBooking || isBooking} className="space-y-6 min-w-0">
+                  {/* Section 1: Traveller Information */}
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  1. Traveller Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Full Name *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={bookingForm.travellerName} 
+                      onChange={e => setBookingForm({ ...bookingForm, travellerName: e.target.value })} 
+                      placeholder="e.g. John Doe"
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Email ID *</label>
+                    <input 
+                      type="email" 
+                      required 
+                      value={bookingForm.travellerEmail} 
+                      onChange={e => setBookingForm({ ...bookingForm, travellerEmail: e.target.value })} 
+                      placeholder="john@example.com"
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Phone Number (10 digits) *</label>
+                    <input 
+                      type="tel" 
+                      required 
+                      maxLength={10}
+                      value={bookingForm.travellerPhone} 
+                      onChange={e => setBookingForm({ ...bookingForm, travellerPhone: e.target.value })} 
+                      placeholder="9876543210"
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Adults *</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      required 
+                      value={bookingForm.adults} 
+                      onChange={e => setBookingForm({ ...bookingForm, adults: e.target.value })} 
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Children *</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      required 
+                      value={bookingForm.children} 
+                      onChange={e => setBookingForm({ ...bookingForm, children: e.target.value })} 
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
                 </div>
               </div>
 
-              <hr className="border-gray-200 dark:border-slate-700 mb-6" />
+              <hr className="border-gray-200 dark:border-slate-700" />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Package Name</label>
-                  <select
-                    required
-                    value={bookingForm.packageName}
-                    onChange={e => setBookingForm({ ...bookingForm, packageName: e.target.value })}
-                    className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none font-medium cursor-pointer text-gray-900 dark:text-gray-100"
-                  >
-                    <option value="">Select a Product Package...</option>
-                    {availableProducts.map((p, idx) => (
-                      <option key={idx} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">No. of Pax</label>
-                  <input type="number" required value={bookingForm.noOfPax} onChange={e => setBookingForm({ ...bookingForm, noOfPax: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Start Date</label>
-                  <input type="date" required value={bookingForm.startDate} onChange={e => setBookingForm({ ...bookingForm, startDate: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">End Date</label>
-                  <input type="date" required value={bookingForm.endDate} onChange={e => setBookingForm({ ...bookingForm, endDate: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+              {/* Section 2: Trip & Package Details */}
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V8.065M12 3a9 9 0 100 18 9 9 0 000-18z" /></svg>
+                  2. Trip & Package Details
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Package Name *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={bookingForm.packageName} 
+                      onChange={e => setBookingForm({ ...bookingForm, packageName: e.target.value })} 
+                      placeholder="e.g. Classic Bali Adventure"
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Destination Location *</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={bookingForm.location} 
+                      onChange={e => setBookingForm({ ...bookingForm, location: e.target.value })} 
+                      placeholder="e.g. Ubud, Bali, Indonesia"
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Start Date *</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={bookingForm.startDate} 
+                      onChange={e => setBookingForm({ ...bookingForm, startDate: e.target.value })} 
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">End Date *</label>
+                    <input 
+                      type="date" 
+                      required 
+                      min={bookingForm.startDate}
+                      value={bookingForm.endDate} 
+                      onChange={e => setBookingForm({ ...bookingForm, endDate: e.target.value })} 
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
                 </div>
               </div>
 
-              <hr className="border-gray-200 dark:border-slate-700 mb-6" />
+              <hr className="border-gray-200 dark:border-slate-700" />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Total Amount (₹)</label>
-                  <input type="number" required value={bookingForm.totalAmount} onChange={e => setBookingForm({ ...bookingForm, totalAmount: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+              {/* Section 3: Billing & Transaction Verification */}
+              <div>
+                <h4 className="text-sm font-bold uppercase tracking-wider text-orange-600 dark:text-orange-400 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                  3. Billing & Transaction Verification
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Total Amount (₹) *</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      required 
+                      value={bookingForm.totalAmount} 
+                      onChange={e => {
+                        const tot = e.target.value;
+                        const pd = bookingForm.paidAmount;
+                        const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : 0;
+                        setBookingForm({ ...bookingForm, totalAmount: tot, dueAmount: due });
+                      }} 
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Paid Amount (₹) *</label>
+                    <input 
+                      type="number" 
+                      min={0}
+                      required 
+                      value={bookingForm.paidAmount} 
+                      onChange={e => {
+                        const pd = e.target.value;
+                        const tot = bookingForm.totalAmount;
+                        const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : 0;
+                        setBookingForm({ ...bookingForm, paidAmount: pd, dueAmount: due });
+                      }} 
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Calculated Due Amount (₹)</label>
+                    <input 
+                      type="number" 
+                      readOnly
+                      disabled
+                      value={bookingForm.dueAmount} 
+                      className="w-full text-sm bg-gray-100 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 rounded-lg px-3 py-2 text-gray-500 font-semibold cursor-not-allowed" 
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Paid Amount (₹)</label>
-                  <input type="number" required value={bookingForm.paidAmount} onChange={e => setBookingForm({ ...bookingForm, paidAmount: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Transaction ID {!editingBookingId && '*'}</label>
+                    <input 
+                      type="text" 
+                      required={!editingBookingId}
+                      value={bookingForm.transactionId} 
+                      onChange={e => setBookingForm({ ...bookingForm, transactionId: e.target.value })} 
+                      placeholder="TXN874291857"
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Payment Mode *</label>
+                    <select
+                      required
+                      value={bookingForm.paymentMode}
+                      onChange={e => setBookingForm({ ...bookingForm, paymentMode: e.target.value })}
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none font-medium cursor-pointer"
+                    >
+                      <option value="Kalpana BOI">Kalpana BOI</option>
+                      <option value="Kalpana PNB">Kalpana PNB</option>
+                      <option value="Babita AU">Babita AU</option>
+                      <option value="Hari Mohan BOB">Hari Mohan BOB</option>
+                      <option value="FT HDFC">FT HDFC</option>
+                      <option value="Pratyush SBI">Pratyush SBI</option>
+                    </select>
+                  </div>
                 </div>
+
+                {editingBookingId && (
+                  <div className="mb-4">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Booking Status</label>
+                    <select
+                      value={bookingForm.status || 'Pending'}
+                      onChange={e => setBookingForm({ ...bookingForm, status: e.target.value })}
+                      className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none font-medium cursor-pointer"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Booked">Booked</option>
+                      <option value="Cancelled">Cancelled</option>
+                      <option value="On Hold">On Hold</option>
+                      <option value="Confirmed">Confirmed</option>
+                      <option value="Partial Payment">Partial Payment</option>
+                      <option value="Payment Done">Payment Done</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Screenshot Upload */}
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Due Amount (₹)</label>
-                  <input type="number" required value={bookingForm.dueAmount} onChange={e => setBookingForm({ ...bookingForm, dueAmount: e.target.value })} className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 focus:ring-2 focus:ring-orange-500 outline-none" />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Transaction Screenshot (PNG/JPG/PDF, max 5MB) {editingBookingId ? '(Optional replacement)' : '*'}
+                  </label>
+                  <input 
+                    type="file" 
+                    required={!editingBookingId}
+                    accept="image/png, image/jpeg, image/jpg, application/pdf"
+                    onChange={e => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error("File size cannot exceed 5 MB.");
+                          e.target.value = '';
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setBookingForm(prev => ({
+                            ...prev,
+                            screenshotFile: file,
+                            screenshotPreview: reader.result
+                          }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 dark:file:bg-slate-700 dark:file:text-orange-300 cursor-pointer border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5"
+                  />
+                  {bookingForm.screenshotPreview && (
+                    <div className="mt-2 flex items-center gap-3 bg-gray-50 dark:bg-slate-900/50 p-2 rounded-lg border border-gray-200 dark:border-slate-700">
+                      {bookingForm.screenshotFile?.type === 'application/pdf' || bookingForm.screenshotPreview.endsWith('.pdf') ? (
+                        <span className="text-xs text-red-500 font-semibold flex items-center gap-1">📄 PDF screenshot attached</span>
+                      ) : (
+                        <img src={bookingForm.screenshotPreview} alt="Screenshot Preview" className="h-16 w-16 object-cover rounded-md border" />
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="mt-8 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowBookingModal(false)} className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 border border-transparent dark:border-slate-600 rounded-lg font-semibold text-sm transition-colors cursor-pointer">
+              {/* Buttons */}
+              <div className="pt-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    setShowBookingModal(false);
+                    setEditingBookingId(null);
+                  }} 
+                  className="px-5 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-200 rounded-lg font-semibold text-sm transition-colors cursor-pointer"
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={isBooking} className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold text-sm shadow transition-colors disabled:opacity-50 cursor-pointer">
-                  {isBooking ? 'Saving...' : 'Confirm Booking'}
+                <button 
+                  type="submit" 
+                  disabled={isBooking} 
+                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold text-sm shadow transition-colors disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                >
+                  {isBooking ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      {editingBookingId ? 'Saving Changes...' : 'Submitting Booking...'}
+                    </>
+                  ) : (
+                    editingBookingId ? 'Save Changes' : 'Submit Booking'
+                  )}
                 </button>
               </div>
+              </fieldset>
             </form>
           </div>
         </div>
-      )}
-    </div>
-  );
+      </FocusTrap>
+    )}
+  </div>
+);
 }
+

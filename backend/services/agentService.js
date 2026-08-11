@@ -363,6 +363,19 @@ async function getAgentMonthlyAttendance(agentId, month, year) {
   };
 }
 
+async function getAgentIdCondition(user) {
+  if (!user || user.isAdmin || user.isItinerary) {
+    return undefined;
+  }
+  const userIdStr = (user.userId || user.id || user._id)?.toString();
+  if (user.isManager) {
+    const team = await getMyTeam(userIdStr);
+    const teamIds = team.map(agent => (agent.id || agent._id)?.toString()).filter(Boolean);
+    return [userIdStr, ...teamIds];
+  }
+  return userIdStr;
+}
+
 module.exports = {
   getAgents,
   updateAgentStatus,
@@ -375,7 +388,8 @@ module.exports = {
   toggleItineraryRole,
   assignAgentsToManager,
   getMyTeam,
-  ensureCurrentMonthMetrics
+  ensureCurrentMonthMetrics,
+  getAgentIdCondition
 };
 
 async function toggleItineraryRole(id, isItinerary) {
