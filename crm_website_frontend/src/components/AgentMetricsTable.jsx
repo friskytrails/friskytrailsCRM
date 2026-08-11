@@ -6,11 +6,12 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const [loading, setLoading] = useState(false);
   const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0 });
 
-  // Calculate today's date in YYYY-MM-DD format based on local time
+  // Calculate today's date in YYYY-MM-DD format based on Asia/Kolkata timezone
   const getLocalDateString = (d = new Date()) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const nowIST = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const year = nowIST.getFullYear();
+    const month = String(nowIST.getMonth() + 1).padStart(2, '0');
+    const day = String(nowIST.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
@@ -45,7 +46,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
         attendance: agent?.attendance || ''
       });
     }
-  }, [agent, selectedMonth, isEditing]);
+  }, [agent, selectedMonth, isEditing, monthlyTarget, targetCompleted, bookingCount, displayTargetBooking]);
 
   // Fetch monthly attendance summary
   const fetchAttendanceSummary = async () => {
@@ -132,8 +133,9 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
           <input 
             type="month" 
             value={selectedMonth}
+            disabled={isEditing}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 

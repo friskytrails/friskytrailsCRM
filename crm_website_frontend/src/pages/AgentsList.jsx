@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const getAgentSlug = (ag) => (ag ? (ag.name || '').toLowerCase().replace(/\s+/g, '') : '');
+const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
+const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager }) {
   const [loadingAction, setLoadingAction] = useState({});

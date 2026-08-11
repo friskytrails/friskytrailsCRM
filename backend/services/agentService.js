@@ -258,10 +258,10 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     if (histIdx === -1) {
       user.historicalMetrics.push({ 
         month: monthPrefix, 
-        monthlyTarget: user.monthlyTarget || 0, 
-        targetCompleted: user.targetCompleted || 0,
-        bookingCount: user.bookingCount || 0,
-        targetBookingCount: user.targetBookingCount || 0
+        monthlyTarget: 0, 
+        targetCompleted: 0,
+        bookingCount: 0,
+        targetBookingCount: 0
       });
       histIdx = user.historicalMetrics.length - 1;
     }

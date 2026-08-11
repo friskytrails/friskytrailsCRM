@@ -193,7 +193,7 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
-                          to={`/agents/${(agent.name || '').toLowerCase().replace(/\s+/g, '') || agent.id}`} 
+                          to={`/agents/${(agent.name || '').toLowerCase().replace(/[\s-]+/g, '') || agent.id}`} 
                           className="inline-flex items-center justify-center px-4 py-2 text-xs font-bold text-white bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-700 rounded-md transition-colors"
                         >
                           View Leads

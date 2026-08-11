@@ -22,9 +22,16 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const getAgentSlug = (ag) => (ag ? (ag.name || '').toLowerCase().replace(/\s+/g, '') : '');
-  const decodedParam = decodeURIComponent(id || '').trim();
-  const normalizedParam = decodedParam.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
+  const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
+  const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
+  const decodedParam = (() => {
+    try {
+      return decodeURIComponent(id || '').trim();
+    } catch {
+      return (id || '').trim();
+    }
+  })();
+  const normalizedParam = normalizeAgentSlug(decodedParam);
 
   const agent = agents.find(a => 
     matchIds(a.id || a._id, id) || 

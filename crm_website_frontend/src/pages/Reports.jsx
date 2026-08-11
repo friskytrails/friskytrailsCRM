@@ -262,7 +262,7 @@ export default function Reports({ agents = [] }) {
               }).map(report => (
                 <tr key={report.agentId} className="border-b dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
                   <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                    <Link to={`/agents/${(report.name || '').toLowerCase().replace(/\s+/g, '') || report.agentId}`} className="text-orange-600 dark:text-orange-400 hover:underline font-bold">
+                    <Link to={`/agents/${(report.name || '').toLowerCase().replace(/[\s-]+/g, '') || report.agentId}`} className="text-orange-600 dark:text-orange-400 hover:underline font-bold">
                       {report.name}
                     </Link>
                   </td>

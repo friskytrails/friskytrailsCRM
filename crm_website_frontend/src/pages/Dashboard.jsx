@@ -172,15 +172,6 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
 
-  const getAgentLeadCount = (agentId) => {
-    const targetId = String(agentId || '');
-    return leads.filter((lead) => {
-      const st = lead.status || 'Fresh Leads';
-      const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
-      return !isBookedOrRejected && (lead.agentIds || []).some(id => String(id) === targetId);
-    }).length;
-  };
-
   const isInactiveLeadStatus = (status) => {
     const st = status || 'Fresh Leads';
     return (
@@ -192,6 +183,13 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       st === 'Non Responding Leads' ||
       st === 'Non Responding'
     );
+  };
+
+  const getAgentLeadCount = (agentId) => {
+    const targetId = String(agentId || '');
+    return leads.filter((lead) => {
+      return !isInactiveLeadStatus(lead.status) && (lead.agentIds || []).some(id => String(id) === targetId);
+    }).length;
   };
 
   const activeLeads = leads.filter(lead => !isInactiveLeadStatus(lead.status));
@@ -277,11 +275,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
   // Filter logic
   const filteredLeads = leads.filter((lead) => {
     const leadStatus = lead.status || 'Fresh Leads';
-    const isBookedOrRejected = leadStatus === 'Booked' || leadStatus === 'Rejected Leads' || leadStatus === 'Rejected';
-    const hasSearchQuery = searchQuery.trim().length > 0;
-
-    // Exclude Booked/Rejected leads by default from the main grid unless searching or explicitly filtering by status
-    if (filterStatus === 'all' && !hasSearchQuery && isBookedOrRejected) {
+    // Exclude inactive status leads by default from the main grid unless searching or explicitly filtering by status
+    if (filterStatus === 'all' && !hasSearchQuery && isInactiveLeadStatus(lead.status)) {
       return false;
     }
 
