@@ -81,7 +81,8 @@ async function ensureCurrentMonthMetrics(user) {
               month: prevMonthToArchive,
               monthlyTarget: currentDoc.monthlyTarget || 0,
               targetCompleted: currentDoc.targetCompleted || 0,
-              bookingCount: currentDoc.bookingCount || 0
+              bookingCount: currentDoc.bookingCount || 0,
+              targetBookingCount: currentDoc.targetBookingCount || 0
             }
           }
         };
@@ -211,7 +212,7 @@ async function updateAgentVerification(id, isVerified) {
   return formatDoc(user);
 }
 
-async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate, bookingCount) {
+async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, attendanceDate, bookingCount, targetBookingCount) {
   const user = await User.findById(id);
   if (!user) {
     throw createError("Agent not found", "NotFoundError");
@@ -230,6 +231,7 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     targetCompleted: user.targetCompleted,
     attendance: user.attendance,
     bookingCount: user.bookingCount,
+    targetBookingCount: user.targetBookingCount,
     historicalMetrics: JSON.parse(JSON.stringify(user.historicalMetrics || []))
   };
 
@@ -251,26 +253,34 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
   }
   
   // Historical metrics update
-  if (monthlyTarget !== undefined || targetCompleted !== undefined || bookingCount !== undefined) {
+  if (monthlyTarget !== undefined || targetCompleted !== undefined || bookingCount !== undefined || targetBookingCount !== undefined) {
     let histIdx = user.historicalMetrics.findIndex(m => m.month === monthPrefix);
     if (histIdx === -1) {
       user.historicalMetrics.push({ 
         month: monthPrefix, 
         monthlyTarget: user.monthlyTarget || 0, 
         targetCompleted: user.targetCompleted || 0,
-        bookingCount: user.bookingCount || 0
+        bookingCount: user.bookingCount || 0,
+        targetBookingCount: user.targetBookingCount || 0
       });
       histIdx = user.historicalMetrics.length - 1;
     }
     if (monthlyTarget !== undefined) user.historicalMetrics[histIdx].monthlyTarget = Number(monthlyTarget);
     if (targetCompleted !== undefined) user.historicalMetrics[histIdx].targetCompleted = Number(targetCompleted);
     if (bookingCount !== undefined) user.historicalMetrics[histIdx].bookingCount = Number(bookingCount);
+    if (targetBookingCount !== undefined) user.historicalMetrics[histIdx].targetBookingCount = Number(targetBookingCount);
   }
 
   if (bookingCount !== undefined) {
     const num = Number(bookingCount);
     if (!Number.isFinite(num) || num < 0) throw createError("Invalid bookingCount");
     if (monthPrefix === todayStr.substring(0, 7)) user.bookingCount = num;
+  }
+
+  if (targetBookingCount !== undefined) {
+    const num = Number(targetBookingCount);
+    if (!Number.isFinite(num) || num < 0) throw createError("Invalid targetBookingCount");
+    if (monthPrefix === todayStr.substring(0, 7)) user.targetBookingCount = num;
   }
 
   if (attendance !== undefined) {
@@ -299,6 +309,7 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
     user.targetCompleted = originalState.targetCompleted;
     user.attendance = originalState.attendance;
     user.bookingCount = originalState.bookingCount;
+    user.targetBookingCount = originalState.targetBookingCount;
     user.historicalMetrics = originalState.historicalMetrics;
     await user.save();
     throw new Error("Failed to persist attendance log, update rolled back. " + error.message);
@@ -327,6 +338,7 @@ async function getAgentMetrics(id) {
     monthlyTarget: user.monthlyTarget || 0,
     targetCompleted: user.targetCompleted || 0,
     bookingCount: user.bookingCount || 0,
+    targetBookingCount: user.targetBookingCount || 0,
     attendance: user.attendance || '',
     historicalMetrics: user.historicalMetrics || []
   };

@@ -181,6 +181,28 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     }).length;
   };
 
+  const isInactiveLeadStatus = (status) => {
+    const st = status || 'Fresh Leads';
+    return (
+      st === 'Booked' ||
+      st === 'Rejected Leads' ||
+      st === 'Rejected' ||
+      st === 'Future Leads' ||
+      st === 'Future' ||
+      st === 'Non Responding Leads' ||
+      st === 'Non Responding'
+    );
+  };
+
+  const activeLeads = leads.filter(lead => !isInactiveLeadStatus(lead.status));
+  const unassignedCount = activeLeads.filter(lead => {
+    return !(lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id))));
+  }).length;
+  const assignedCount = activeLeads.filter(lead => {
+    return lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)));
+  }).length;
+  const allActiveCount = activeLeads.length;
+
   const handleInlineAssign = async (leadId, newIds) => {
     await assignAgent(leadId, newIds);
   };
@@ -540,9 +562,9 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               onChange={(e) => setFilterAgent(e.target.value)}
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
-              <option value="unassigned">Unassigned Only (Default)</option>
-              <option value="assigned">Assigned Only</option>
-              <option value="all">Unassigned & Assigned (All)</option>
+              <option value="unassigned">Unassigned Only (Default) ({unassignedCount} {unassignedCount === 1 ? 'lead' : 'leads'})</option>
+              <option value="assigned">Assigned Only ({assignedCount} {assignedCount === 1 ? 'lead' : 'leads'})</option>
+              <option value="all">Unassigned & Assigned (All) ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
               {agents
                 .filter(agent => {
                   const st = agent.status || 'Active';
@@ -595,7 +617,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               onChange={(e) => setFilterStatus(e.target.value)}
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
-              <option value="all">All Statuses ({leads.length})</option>
+              <option value="all">Active Statuses ({allActiveCount})</option>
               {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => {
                 const count = leads.filter(l => (l.status || 'Fresh Leads') === st).length;
                 return (

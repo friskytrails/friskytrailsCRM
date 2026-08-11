@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+const getAgentSlug = (ag) => (ag ? (ag.name || '').toLowerCase().replace(/\s+/g, '') : '');
+
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager }) {
   const [loadingAction, setLoadingAction] = useState({});
   const [processedAgents, setProcessedAgents] = useState({});
@@ -183,7 +185,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
             </div>
             <div className="flex-1 min-w-0">
-              <Link to={`/agents/${agent.id}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
+              <Link to={`/agents/${getAgentSlug(agent)}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
                 {agent.name}
               </Link>
               <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{agent.email}</p>
@@ -226,7 +228,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-              <Link to={`/agents/${agent.id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
+              <Link to={`/agents/${getAgentSlug(agent)}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
               {agent.isItinerary && (
                 <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-900/50">Itinerary Team</span>
               )}
@@ -328,7 +330,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                         </div>
                         <div>
                           <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-                            <Link to={`/agents/${manager.id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
+                            <Link to={`/agents/${getAgentSlug(manager)}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
                             <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-900/50">Manager</span>
                             {status !== 'Active' && (
                               <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
@@ -459,7 +461,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                     {teamMembers.map(member => (
                       <li key={member.id}>
                         <Link 
-                          to={`/agents/${member.id}`}
+                          to={`/agents/${getAgentSlug(member)}`}
                           onClick={() => setViewTeamManager(null)}
                           className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-violet-50 dark:bg-slate-800/50 dark:hover:bg-slate-700/80 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-violet-200 dark:hover:border-violet-900/50 transition-all group cursor-pointer"
                         >

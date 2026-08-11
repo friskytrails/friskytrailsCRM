@@ -22,19 +22,33 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const decodedParam = decodeURIComponent(id || '');
+  const getAgentSlug = (ag) => (ag ? (ag.name || '').toLowerCase().replace(/\s+/g, '') : '');
+  const decodedParam = decodeURIComponent(id || '').trim();
+  const normalizedParam = decodedParam.toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
+
   const agent = agents.find(a => 
     matchIds(a.id || a._id, id) || 
     a.name === decodedParam || 
     a.name?.toLowerCase() === decodedParam.toLowerCase() ||
+    getAgentSlug(a) === normalizedParam ||
     encodeURIComponent(a.name) === id
   );
   
+  const isInactiveStatus = (status) => {
+    const st = status || 'Fresh Leads';
+    return (
+      st === 'Booked' ||
+      st === 'Rejected Leads' ||
+      st === 'Rejected' ||
+      st === 'Future Leads' ||
+      st === 'Future' ||
+      st === 'Non Responding Leads' ||
+      st === 'Non Responding'
+    );
+  };
+
   const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : [];
-  const activeAgentLeads = agentLeads.filter(l => {
-    const st = l.status || 'Fresh Leads';
-    return st !== 'Booked' && st !== 'Rejected Leads' && st !== 'Rejected';
-  });
+  const activeAgentLeads = agentLeads.filter(l => !isInactiveStatus(l.status));
   const hasSearchQuery = searchQuery.trim().length > 0;
   const activeScopeLeads = (filterStatus !== 'all' || hasSearchQuery) ? agentLeads : activeAgentLeads;
 
@@ -62,8 +76,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     const activeIds = (filteredAgentLeads || []).map(l => l.id || l._id);
     sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
     if (agent) {
-      const agentId = agent.id || agent._id;
-      sessionStorage.setItem('leadDetail_backUrl', `/agents/${agentId}`);
+      const agentSlug = getAgentSlug(agent) || agent.id;
+      sessionStorage.setItem('leadDetail_backUrl', `/agents/${agentSlug}`);
       sessionStorage.setItem('leadDetail_backLabel', `${agent.name}'s Board`);
     }
   }, [filteredAgentLeads, agent]);
@@ -95,7 +109,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => prevAgent && navigate(`/agents/${prevAgent.id}`)}
+            onClick={() => prevAgent && navigate(`/agents/${getAgentSlug(prevAgent)}`)}
             disabled={!prevAgent}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
             title={prevAgent ? `Previous Agent: ${prevAgent.name}` : 'First agent'}
@@ -106,7 +120,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
             Previous Agent
           </button>
           <button
-            onClick={() => nextAgent && navigate(`/agents/${nextAgent.id}`)}
+            onClick={() => nextAgent && navigate(`/agents/${getAgentSlug(nextAgent)}`)}
             disabled={!nextAgent}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
             title={nextAgent ? `Next Agent: ${nextAgent.name}` : 'Last agent'}

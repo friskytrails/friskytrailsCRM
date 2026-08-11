@@ -61,6 +61,11 @@ const UserSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  targetBookingCount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   attendance: {
     type: String,
     enum: ['P', 'A', ''],
@@ -78,7 +83,8 @@ const UserSchema = new mongoose.Schema({
     month: String, // "YYYY-MM"
     monthlyTarget: { type: Number, default: 0 },
     targetCompleted: { type: Number, default: 0 },
-    bookingCount: { type: Number, default: 0 }
+    bookingCount: { type: Number, default: 0 },
+    targetBookingCount: { type: Number, default: 0 }
   }],
   createdAt: {
     type: Date,
