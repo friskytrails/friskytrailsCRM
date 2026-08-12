@@ -1,3 +1,11 @@
+function getISTDateString(d = new Date()) {
+  const nowIST = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const year = nowIST.getFullYear();
+  const month = String(nowIST.getMonth() + 1).padStart(2, '0');
+  const day = String(nowIST.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // Helper to format MongoDB document _id to id
 function formatDoc(doc) {
   if (!doc) return null;
@@ -6,7 +14,7 @@ function formatDoc(doc) {
   
   // Lazy Reset pattern for attendance
   if (rest.attendance) {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getISTDateString();
     if (rest.attendanceDate !== todayStr) {
       rest.attendance = '';
     }

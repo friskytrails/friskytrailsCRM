@@ -6,11 +6,12 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const [loading, setLoading] = useState(false);
   const [attendanceSummary, setAttendanceSummary] = useState({ present: 0, absent: 0 });
 
-  // Calculate today's date in YYYY-MM-DD format based on local time
+  // Calculate today's date in YYYY-MM-DD format based on Asia/Kolkata timezone
   const getLocalDateString = (d = new Date()) => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const nowIST = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const year = nowIST.getFullYear();
+    const month = String(nowIST.getMonth() + 1).padStart(2, '0');
+    const day = String(nowIST.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
@@ -18,24 +19,34 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   const currentMonthPrefix = todayDateStr.substring(0, 7); // "YYYY-MM"
   const [selectedMonth, setSelectedMonth] = useState(currentMonthPrefix);
 
+  const historicalMetric = agent?.historicalMetrics?.find(m => m.month === selectedMonth);
+  const monthlyTarget = selectedMonth === currentMonthPrefix ? (agent?.monthlyTarget || 0) : (historicalMetric?.monthlyTarget || 0);
+  const targetCompleted = selectedMonth === currentMonthPrefix ? (agent?.targetCompleted || 0) : (historicalMetric?.targetCompleted || 0);
+  const bookingCount = selectedMonth === currentMonthPrefix ? (agent?.bookingCount || 0) : (historicalMetric?.bookingCount || 0);
+  const targetBookingCount = selectedMonth === currentMonthPrefix ? (agent?.targetBookingCount || 0) : (historicalMetric?.targetBookingCount || 0);
+  const totalLeads = agentLeads.length;
+  const displayTargetBooking = (targetBookingCount && Number(targetBookingCount) > 0) ? targetBookingCount : totalLeads;
+
   const [form, setForm] = useState({
-    monthlyTarget: agent?.monthlyTarget || 0,
-    targetCompleted: agent?.targetCompleted || 0,
-    bookingCount: agent?.bookingCount || 0,
+    monthlyTarget: monthlyTarget,
+    targetCompleted: targetCompleted,
+    bookingCount: bookingCount,
+    targetBookingCount: displayTargetBooking,
     attendance: agent?.attendance || ''
   });
 
-  // Update form if agent prop changes
+  // Update form if agent prop or selectedMonth changes
   useEffect(() => {
     if (!isEditing) {
       setForm({
-        monthlyTarget: agent?.monthlyTarget || 0,
-        targetCompleted: agent?.targetCompleted || 0,
-        bookingCount: agent?.bookingCount || 0,
+        monthlyTarget: monthlyTarget,
+        targetCompleted: targetCompleted,
+        bookingCount: bookingCount,
+        targetBookingCount: displayTargetBooking,
         attendance: agent?.attendance || ''
       });
     }
-  }, [agent, isEditing]);
+  }, [agent, selectedMonth, isEditing, monthlyTarget, targetCompleted, bookingCount, displayTargetBooking]);
 
   // Fetch monthly attendance summary
   const fetchAttendanceSummary = async () => {
@@ -67,6 +78,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
         monthlyTarget: form.monthlyTarget,
         targetCompleted: form.targetCompleted,
         bookingCount: form.bookingCount,
+        targetBookingCount: form.targetBookingCount,
       };
       
       if (selectedMonth === currentMonthPrefix) {
@@ -89,13 +101,6 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
     }
   };
 
-  const historicalMetric = agent?.historicalMetrics?.find(m => m.month === selectedMonth);
-  const monthlyTarget = selectedMonth === currentMonthPrefix ? (agent?.monthlyTarget || 0) : (historicalMetric?.monthlyTarget || 0);
-  const targetCompleted = selectedMonth === currentMonthPrefix ? (agent?.targetCompleted || 0) : (historicalMetric?.targetCompleted || 0);
-
-  const bookingCount = selectedMonth === currentMonthPrefix ? (agent?.bookingCount || 0) : (historicalMetric?.bookingCount || 0);
-  const totalLeads = agentLeads.length;
-
   let todayDisplay = '-';
   if (agent?.attendance === 'P') todayDisplay = 'Present';
   else if (agent?.attendance === 'A') todayDisplay = 'Absent';
@@ -106,7 +111,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   const metrics = [
     { label: 'Monthly Target', value: `${targetCompleted} / ${monthlyTarget}` },
-    { label: 'Booking Count', value: `${bookingCount} / ${totalLeads}` },
+    { label: 'Booking Count', value: `${bookingCount} / ${displayTargetBooking}` },
     { label: 'Today\'s Attendance', value: todayDisplay },
     { label: 'Monthly Attendance', value: monthlyAttendanceDisplay },
   ];
@@ -128,8 +133,9 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
           <input 
             type="month" 
             value={selectedMonth}
+            disabled={isEditing}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500"
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
 
@@ -142,6 +148,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                   monthlyTarget: monthlyTarget,
                   targetCompleted: targetCompleted,
                   bookingCount: bookingCount,
+                  targetBookingCount: displayTargetBooking,
                   attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                 });
               }}
@@ -159,6 +166,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                     monthlyTarget: monthlyTarget,
                     targetCompleted: targetCompleted,
                     bookingCount: bookingCount,
+                    targetBookingCount: displayTargetBooking,
                     attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                   });
                 }}
@@ -205,6 +213,15 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                 type="number"
                 value={form.bookingCount}
                 onChange={e => setForm({ ...form, bookingCount: e.target.value })}
+                className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
+              />
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600 dark:text-slate-300 font-medium">Target Booking Count</span>
+              <input
+                type="number"
+                value={form.targetBookingCount}
+                onChange={e => setForm({ ...form, targetBookingCount: e.target.value })}
                 className="w-28 text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-slate-200 transition-shadow"
               />
             </div>
