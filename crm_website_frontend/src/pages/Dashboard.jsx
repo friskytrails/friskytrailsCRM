@@ -272,7 +272,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
   const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)))).length;
   const unassignedLeads = totalLeads - assignedLeads;
 
-  const hasSearchQuery = searchQuery.trim().length > 0;
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const hasSearchQuery = normalizedSearchQuery.length > 0;
 
   // Filter logic
   const filteredLeads = leads.filter((lead) => {
@@ -284,11 +285,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
     const agentNames = (lead.agentIds || []).map(id => agents.find((a) => getAgentId(a) === String(id))?.name || "").join(" ");
     const matchesSearch =
-      (lead.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (lead.phone || '').includes(searchQuery) ||
-      (lead.origin || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (lead.destination || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agentNames.toLowerCase().includes(searchQuery.toLowerCase());
+      (lead.name || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (lead.phone || '').includes(normalizedSearchQuery) ||
+      (lead.origin || '').toLowerCase().includes(normalizedSearchQuery) ||
+      (lead.destination || '').toLowerCase().includes(normalizedSearchQuery) ||
+      agentNames.toLowerCase().includes(normalizedSearchQuery);
 
     // Active search query takes precedence to find any matching lead regardless of dropdown filter selections
     if (hasSearchQuery) {
