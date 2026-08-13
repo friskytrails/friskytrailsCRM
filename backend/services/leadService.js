@@ -726,7 +726,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
       throw new Error("Lead not found or unauthorized");
     }
-    return formatDoc(lead);
+    return await getLeadById(id, agentIdCondition);
   }
 
   // Manage callLogs for the current date in IST (Asia/Kolkata)

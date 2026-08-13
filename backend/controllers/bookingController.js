@@ -108,7 +108,7 @@ async function createBooking(req, res) {
     if (new Date(endDate) < new Date(startDate)) {
       return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
     }
-    console.log(totalAmount, paidAmount);
+
     const numTotal = parseFloat(totalAmount);
     const numPaid = parseFloat(paidAmount);
     if (isNaN(numTotal) || numTotal < 0) {
