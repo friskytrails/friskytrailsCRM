@@ -1269,9 +1269,11 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                         <div className="flex items-center gap-2">
                           <span className="font-extrabold text-gray-900 dark:text-white text-sm">
                             {trip.packageName || 'Trip Package'}
+                            {trip.location ? ` (${trip.location})` : ''}
                           </span>
                           <span className="text-[11px] text-gray-500 dark:text-slate-400 font-semibold">
-                            • {trip.noOfPax || 1} Pax
+                            • {trip.adults ?? trip.noOfPax ?? 1} Pax
+                            {trip.children > 0 ? ` (+${trip.children} Child)` : ''}
                           </span>
                         </div>
                         
@@ -1286,7 +1288,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                             <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                               <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
-                            {trip.fullName || lead.name} ({trip.contactNumber || lead.phone})
+                            {trip.travellerName || trip.fullName || lead.name} ({trip.travellerPhone || trip.contactNumber || lead.phone})
                           </span>
                           {trip.emergencyContactNumber && (
                             <span className="flex items-center gap-1 text-rose-500 font-semibold">
@@ -1304,123 +1306,128 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                         <div className="text-right">
                           <div className="text-[10px] text-gray-400 dark:text-slate-400 font-bold uppercase tracking-wider">Total / Due Balance</div>
                           <div className="font-bold text-gray-900 dark:text-slate-100 text-xs">
-                            ₹{Number(trip.totalAmount || 0).toLocaleString('en-IN')}
+                            ₹{Number(trip.totalAmount || trip.bookingDetails?.totalAmount || 0).toLocaleString('en-IN')}
                             <span className="text-gray-400 font-normal mx-1">|</span>
-                            <span className={Number(trip.dueAmount || 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
-                              Due: ₹{Number(trip.dueAmount || 0).toLocaleString('en-IN')}
+                            <span className={Number(trip.dueAmount || trip.bookingDetails?.dueAmount || 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
+                              Due: ₹{Number(trip.dueAmount || trip.bookingDetails?.dueAmount || 0).toLocaleString('en-IN')}
                             </span>
                           </div>
                         </div>
 
-                        {!user?.isItinerary && (
-                          <button
-                            type="button"
-                            disabled={!trip.bookingId}
-                            onClick={() => {
-                              try {
-                                const lookupKey = trip.bookingId;
-                                setEditingBookingId(trip.bookingId);
+                        {!user?.isItinerary && (() => {
+                          const tripKey = trip.bookingId || trip._id || trip.id || trip.transactionId || lead.bookingDetails?.bookingId || lead.phone;
+                          const hasValidKey = !!tripKey;
 
-                                let startDt = '';
-                                let endDt = '';
-                                if (trip.startDate) {
-                                  startDt = formatDate(trip.startDate);
-                                }
-                                if (trip.endDate) {
-                                  endDt = formatDate(trip.endDate);
-                                }
+                          return (
+                            <button
+                              type="button"
+                              disabled={!hasValidKey}
+                              onClick={() => {
+                                try {
+                                  const lookupKey = tripKey;
+                                  setEditingBookingId(lookupKey);
 
-                                const tot = (trip.totalAmount !== undefined && trip.totalAmount !== null) ? trip.totalAmount : (lead.bookingDetails?.totalAmount ?? '');
-                                const pd = (trip.paidAmount !== undefined && trip.paidAmount !== null) ? trip.paidAmount : (lead.bookingDetails?.paidAmount ?? '');
-                                const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : (trip.dueAmount ?? lead.bookingDetails?.dueAmount ?? 0);
-                                const txn = trip.transactionId || trip.paymentId || (Array.isArray(trip.payments) && trip.payments[0] ? (trip.payments[0].details || trip.payments[0].transactionId) : '') || trip.details || lead.bookingDetails?.transactionId || lead.bookingDetails?.paymentId || lead.bookingDetails?.details || '';
-                                const payMode = trip.paymentMode || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].paymentMode : '') || lead.bookingDetails?.paymentMode || 'Kalpana BOI';
-                                const ssPreview = trip.screenshot || trip.screenshotUrl || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].attachment : '') || lead.bookingDetails?.screenshot || lead.bookingDetails?.screenshotUrl || lead.bookingDetails?.attachment || null;
+                                  let startDt = '';
+                                  let endDt = '';
+                                  if (trip.startDate) {
+                                    startDt = formatDate(trip.startDate);
+                                  }
+                                  if (trip.endDate) {
+                                    endDt = formatDate(trip.endDate);
+                                  }
 
-                                setBookingForm({
-                                  travellerName: trip.travellerName || trip.fullName || lead.name || '',
-                                  travellerEmail: trip.travellerEmail || trip.emailId || trip.email || lead.mailId || lead.email || '',
-                                  travellerPhone: trip.travellerPhone || trip.contactNumber || trip.phone || lead.phone || '',
-                                  adults: trip.adults ?? trip.noOfPax ?? lead.numberOfPersons ?? 1,
-                                  children: trip.children ?? 0,
-                                  packageName: trip.packageName || lead.product || '',
-                                  location: trip.location || trip.destination || trip.destinationLocation || lead.destination || lead.location || '',
-                                  startDate: startDt,
-                                  endDate: endDt,
-                                  totalAmount: tot,
-                                  paidAmount: pd,
-                                  dueAmount: due,
-                                  transactionId: txn,
-                                  paymentMode: payMode,
-                                  status: trip.status || lead.bookingDetails?.status || 'Pending',
-                                  screenshotFile: null,
-                                  screenshotPreview: ssPreview
-                                });
-                                setShowBookingModal(true);
+                                  const tot = (trip.totalAmount !== undefined && trip.totalAmount !== null) ? trip.totalAmount : (lead.bookingDetails?.totalAmount ?? '');
+                                  const pd = (trip.paidAmount !== undefined && trip.paidAmount !== null) ? trip.paidAmount : (lead.bookingDetails?.paidAmount ?? '');
+                                  const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : (trip.dueAmount ?? lead.bookingDetails?.dueAmount ?? 0);
+                                  const txn = trip.transactionId || trip.paymentId || (Array.isArray(trip.payments) && trip.payments[0] ? (trip.payments[0].details || trip.payments[0].transactionId) : '') || trip.details || lead.bookingDetails?.transactionId || lead.bookingDetails?.paymentId || lead.bookingDetails?.details || '';
+                                  const payMode = trip.paymentMode || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].paymentMode : '') || lead.bookingDetails?.paymentMode || 'Kalpana BOI';
+                                  const ssPreview = trip.screenshot || trip.screenshotUrl || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].attachment : '') || lead.bookingDetails?.screenshot || lead.bookingDetails?.screenshotUrl || lead.bookingDetails?.attachment || null;
 
-                                if (getBookingAPI && lookupKey) {
-                                  setIsLoadingBooking(true);
-                                  const queryOptions = {};
-                                  if (trip.packageName) queryOptions.packageName = trip.packageName;
-                                  
-                                  getBookingAPI(lookupKey, queryOptions).then(res => {
-                                    setEditingBookingId(currentId => {
-                                      if (currentId !== lookupKey) return currentId;
-                                      
-                                      if (res) {
-                                        let fetchedStart = '';
-                                        let fetchedEnd = '';
-                                        if (res.startDate) {
-                                          fetchedStart = formatDate(res.startDate);
-                                        }
-                                        if (res.endDate) {
-                                          fetchedEnd = formatDate(res.endDate);
-                                        }
-
-                                        setBookingForm(prev => ({
-                                          ...prev,
-                                          travellerName: res.travellerName || res.fullName || prev.travellerName,
-                                          travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
-                                          travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
-                                          adults: res.adults ?? res.noOfPax ?? prev.adults,
-                                          children: res.children ?? prev.children,
-                                          packageName: res.packageName || prev.packageName,
-                                          location: res.location || res.destination || res.destinationLocation || prev.location,
-                                          startDate: fetchedStart || prev.startDate,
-                                          endDate: fetchedEnd || prev.endDate,
-                                          totalAmount: res.totalAmount ?? prev.totalAmount,
-                                          paidAmount: res.paidAmount ?? prev.paidAmount,
-                                          dueAmount: res.dueAmount ?? prev.dueAmount,
-                                          transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
-                                          paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
-                                          status: res.status || prev.status,
-                                          screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
-                                        }));
-                                      }
-                                      
-                                      setIsLoadingBooking(false);
-                                      return currentId;
-                                    });
-                                  }).catch(err => {
-                                    console.error("Error fetching booking details:", err);
-                                    setEditingBookingId(currentId => {
-                                      if (currentId === lookupKey) setIsLoadingBooking(false);
-                                      return currentId;
-                                    });
+                                  setBookingForm({
+                                    travellerName: trip.travellerName || trip.fullName || lead.name || '',
+                                    travellerEmail: trip.travellerEmail || trip.emailId || trip.email || lead.mailId || lead.email || '',
+                                    travellerPhone: trip.travellerPhone || trip.contactNumber || trip.phone || lead.phone || '',
+                                    adults: trip.adults ?? trip.noOfPax ?? lead.numberOfPersons ?? 1,
+                                    children: trip.children ?? 0,
+                                    packageName: trip.packageName || lead.product || '',
+                                    location: trip.location || trip.destination || trip.destinationLocation || lead.destination || lead.location || '',
+                                    startDate: startDt,
+                                    endDate: endDt,
+                                    totalAmount: tot,
+                                    paidAmount: pd,
+                                    dueAmount: due,
+                                    transactionId: txn,
+                                    paymentMode: payMode,
+                                    status: trip.status || lead.bookingDetails?.status || 'Pending',
+                                    screenshotFile: null,
+                                    screenshotPreview: ssPreview
                                   });
+                                  setShowBookingModal(true);
+
+                                  if (getBookingAPI && lookupKey) {
+                                    setIsLoadingBooking(true);
+                                    const queryOptions = {};
+                                    if (trip.packageName) queryOptions.packageName = trip.packageName;
+                                    
+                                    getBookingAPI(lookupKey, queryOptions).then(res => {
+                                      setEditingBookingId(currentId => {
+                                        if (currentId !== lookupKey) return currentId;
+                                        
+                                        if (res) {
+                                          let fetchedStart = '';
+                                          let fetchedEnd = '';
+                                          if (res.startDate) {
+                                            fetchedStart = formatDate(res.startDate);
+                                          }
+                                          if (res.endDate) {
+                                            fetchedEnd = formatDate(res.endDate);
+                                          }
+
+                                          setBookingForm(prev => ({
+                                            ...prev,
+                                            travellerName: res.travellerName || res.fullName || prev.travellerName,
+                                            travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
+                                            travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
+                                            adults: res.adults ?? res.noOfPax ?? prev.adults,
+                                            children: res.children ?? prev.children,
+                                            packageName: res.packageName || prev.packageName,
+                                            location: res.location || res.destination || res.destinationLocation || prev.location,
+                                            startDate: fetchedStart || prev.startDate,
+                                            endDate: fetchedEnd || prev.endDate,
+                                            totalAmount: res.totalAmount ?? prev.totalAmount,
+                                            paidAmount: res.paidAmount ?? prev.paidAmount,
+                                            dueAmount: res.dueAmount ?? prev.dueAmount,
+                                            transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
+                                            paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
+                                            status: res.status || prev.status,
+                                            screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
+                                          }));
+                                        }
+                                        
+                                        setIsLoadingBooking(false);
+                                        return currentId;
+                                      });
+                                    }).catch(err => {
+                                      console.error("Error fetching booking details:", err);
+                                      setEditingBookingId(currentId => {
+                                        if (currentId === lookupKey) setIsLoadingBooking(false);
+                                        return currentId;
+                                      });
+                                    });
+                                  }
+                                } catch (err) {
+                                  console.error("Error opening edit modal:", err);
+                                  setShowBookingModal(true);
                                 }
-                              } catch (err) {
-                                console.error("Error opening edit modal:", err);
-                                setShowBookingModal(true);
-                              }
-                            }}
-                            className={`p-2 border rounded-lg flex items-center gap-1 font-bold text-xs transition-colors ${!trip.bookingId ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100 cursor-pointer dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700'}`}
-                            title={!trip.bookingId ? "Trip lacks a booking ID" : "Edit Trip Details"}
-                          >
-                            <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                            Edit
-                          </button>
-                        )}
+                              }}
+                              className={`p-2 border rounded-lg flex items-center gap-1 font-bold text-xs transition-colors ${!hasValidKey ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100 cursor-pointer dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700'}`}
+                              title={!hasValidKey ? "Trip lacks an identifier" : "Edit Trip Details"}
+                            >
+                              <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              Edit
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

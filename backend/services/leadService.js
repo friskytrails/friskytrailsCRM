@@ -236,7 +236,7 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     throw new Error("Lead not found or unauthorized");
   }
 
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function assignLead(id, agentIds) {
@@ -272,7 +272,7 @@ async function assignLead(id, agentIds) {
     throw new Error("Lead not found");
   }
 
-  return formatDoc(result);
+  return await getLeadById(id);
 }
 
 async function addNote(id, text, userId, imageUrl, agentIdCondition) {
@@ -315,7 +315,7 @@ async function addNote(id, text, userId, imageUrl, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
@@ -346,7 +346,7 @@ async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function getLeadById(id, agentIdCondition = undefined) {
@@ -412,7 +412,7 @@ async function updateLabels(id, labels, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateDates(id, dates, agentIdCondition) {
@@ -443,7 +443,7 @@ async function updateDates(id, dates, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateReminder(id, reminderDate, agentIdCondition) {
@@ -458,7 +458,7 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateStatus(id, status, agentIdCondition) {
@@ -480,7 +480,7 @@ async function updateStatus(id, status, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function bookLead(id, bookingDetails, agentIdCondition) {
@@ -672,7 +672,7 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     }
   }
 
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateBooking(id, bookingData, agentIdCondition) {
@@ -781,7 +781,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return formatDoc(result);
+  return await getLeadById(id, agentIdCondition);
 }
 
 module.exports = {

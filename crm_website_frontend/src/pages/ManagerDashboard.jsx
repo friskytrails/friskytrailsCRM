@@ -75,7 +75,8 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
     const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
     if (!isBookedOrRejected) {
       (lead.agentIds || []).forEach(agentId => {
-        acc[agentId] = (acc[agentId] || 0) + 1;
+        const key = String(agentId);
+        acc[key] = (acc[key] || 0) + 1;
       });
     }
     return acc;
