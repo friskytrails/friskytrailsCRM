@@ -303,7 +303,7 @@ function App() {
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        toast.success("Booking created successfully in ft_booking_system!");
+        toast.success("New booking created successfully");
         const leadId = formData.get('leadId');
         if (leadId) {
           try {
@@ -509,7 +509,7 @@ function App() {
       });
       if (response.ok) {
         const updatedAgent = await response.json();
-        
+
         // If demoted, refresh the agents list to show that their team members are unassigned
         if (!isManager) {
           const agentsRes = await fetch(`${API_URL}/agents`, { headers: getAuthHeaders() });
@@ -520,7 +520,7 @@ function App() {
         } else {
           setAgents((prev) => prev.map(agent => agent.id === agentId ? updatedAgent : agent));
         }
-        
+
         toast.success(isManager ? `${updatedAgent.name} is now a Manager.` : `${updatedAgent.name} has been demoted to Agent.`);
         return updatedAgent;
       } else {
@@ -623,23 +623,23 @@ function App() {
 
             <Route
               path="/leads/:id"
-              element={<LeadDetail 
-                      API_URL={API_URL} 
-                      token={token} 
-                      user={user} 
-                      setLeads={setLeads} 
-                      leads={leads} 
-                      agents={agents} 
-                      products={products}
-                      statuses={statuses}
-                      updateLeadStatus={updateLeadStatus} 
-                      bookLeadAPI={bookLeadAPI}
-                      createBookingAPI={createBookingAPI}
-                      editBookingAPI={editBookingAPI}
-                      getBookingAPI={getBookingAPI}
-                      updateLeadBooking={updateLeadBooking}
-                      assignAgent={assignAgent}
-                    />} />
+              element={<LeadDetail
+                API_URL={API_URL}
+                token={token}
+                user={user}
+                setLeads={setLeads}
+                leads={leads}
+                agents={agents}
+                products={products}
+                statuses={statuses}
+                updateLeadStatus={updateLeadStatus}
+                bookLeadAPI={bookLeadAPI}
+                createBookingAPI={createBookingAPI}
+                editBookingAPI={editBookingAPI}
+                getBookingAPI={getBookingAPI}
+                updateLeadBooking={updateLeadBooking}
+                assignAgent={assignAgent}
+              />} />
             <Route
               path="/profile"
               element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} handleLogout={handleLogout} />} />

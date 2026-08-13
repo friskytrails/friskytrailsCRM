@@ -57,7 +57,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
     if (!isBookedOrRejected) {
       (lead.agentIds || []).forEach(agentId => {
-        acc[agentId] = (acc[agentId] || 0) + 1;
+        const key = String(agentId);
+        acc[key] = (acc[key] || 0) + 1;
       });
     }
     return acc;
@@ -175,7 +176,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   };
 
   const renderAgentCard = (agent, isPendingView = false) => {
-    const count = agentLeadCounts[agent.id] || 0;
+    const agId = String(agent.id || agent._id || '');
+    const count = agentLeadCounts[agId] || agentLeadCounts[agent.id] || agentLeadCounts[agent._id] || 0;
     const status = agent.status || 'Active';
 
     if (isPendingView) {

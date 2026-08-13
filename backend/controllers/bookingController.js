@@ -108,7 +108,7 @@ async function createBooking(req, res) {
     if (new Date(endDate) < new Date(startDate)) {
       return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
     }
-
+    console.log(totalAmount, paidAmount);
     const numTotal = parseFloat(totalAmount);
     const numPaid = parseFloat(paidAmount);
     if (isNaN(numTotal) || numTotal < 0) {
@@ -147,10 +147,6 @@ async function createBooking(req, res) {
     let targetLead = null;
     if (leadId) {
       const strLeadId = leadId.toString();
-      if (!mongoose.Types.ObjectId.isValid(strLeadId) || strLeadId.length !== 24) {
-        return res.status(400).json({ success: false, error: 'Invalid leadId format. Must be a 24-character hex ObjectId.' });
-      }
-
       targetLead = await Lead.findById(strLeadId);
       if (!targetLead) {
         return res.status(400).json({ success: false, error: 'Target lead not found.' });
@@ -345,46 +341,40 @@ async function editBooking(req, res) {
 
     const updates = req.body;
 
-    // Non-admin users are restricted to editing startDate and endDate
-    if (!isAdmin) {
-      if (updates.startDate) {
-        if (isNaN(Date.parse(updates.startDate))) {
-          return res.status(400).json({ success: false, error: 'Invalid Start Date.' });
-        }
-        booking.startDate = new Date(updates.startDate);
+    // Apply updates
+    if (updates.travellerName) booking.travellerName = updates.travellerName.trim();
+    if (updates.travellerEmail) booking.travellerEmail = updates.travellerEmail.trim().toLowerCase();
+    if (updates.travellerPhone) booking.travellerPhone = updates.travellerPhone.trim();
+    if (updates.packageName) booking.packageName = updates.packageName.trim();
+    if (updates.location) booking.location = updates.location.trim();
+    if (updates.startDate) {
+      if (isNaN(Date.parse(updates.startDate))) {
+        return res.status(400).json({ success: false, error: 'Invalid Start Date.' });
       }
-      if (updates.endDate) {
-        if (isNaN(Date.parse(updates.endDate))) {
-          return res.status(400).json({ success: false, error: 'Invalid End Date.' });
-        }
-        booking.endDate = new Date(updates.endDate);
-      }
-      if (booking.endDate < booking.startDate) {
-        return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
-      }
-    } else {
-      // Admin update logic
-      if (updates.travellerName) booking.travellerName = updates.travellerName.trim();
-      if (updates.travellerEmail) booking.travellerEmail = updates.travellerEmail.trim().toLowerCase();
-      if (updates.travellerPhone) booking.travellerPhone = updates.travellerPhone.trim();
-      if (updates.packageName) booking.packageName = updates.packageName.trim();
-      if (updates.location) booking.location = updates.location.trim();
-      if (updates.startDate) booking.startDate = new Date(updates.startDate);
-      if (updates.endDate) booking.endDate = new Date(updates.endDate);
-      if (updates.totalAmount !== undefined) booking.totalAmount = parseFloat(updates.totalAmount);
-      if (updates.paidAmount !== undefined) {
-        const newPaid = parseFloat(updates.paidAmount);
-        booking.paidAmount = newPaid;
-      }
-      if (updates.totalAmount !== undefined || updates.paidAmount !== undefined) {
-        booking.dueAmount = Math.max(0, (booking.totalAmount || 0) - (booking.paidAmount || 0));
-      }
-      if (updates.adults !== undefined) booking.adults = parseInt(updates.adults, 10);
-      if (updates.children !== undefined) booking.children = parseInt(updates.children, 10);
-      if (updates.status) booking.status = updates.status;
-      if (updates.tripStatus) booking.tripStatus = updates.tripStatus;
-      if (updates.transactionId) booking.transactionId = updates.transactionId.trim();
+      booking.startDate = new Date(updates.startDate);
     }
+    if (updates.endDate) {
+      if (isNaN(Date.parse(updates.endDate))) {
+        return res.status(400).json({ success: false, error: 'Invalid End Date.' });
+      }
+      booking.endDate = new Date(updates.endDate);
+    }
+    if (booking.endDate < booking.startDate) {
+      return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
+    }
+    if (updates.totalAmount !== undefined) booking.totalAmount = parseFloat(updates.totalAmount);
+    if (updates.paidAmount !== undefined) {
+      const newPaid = parseFloat(updates.paidAmount);
+      booking.paidAmount = newPaid;
+    }
+    if (updates.totalAmount !== undefined || updates.paidAmount !== undefined) {
+      booking.dueAmount = Math.max(0, (booking.totalAmount || 0) - (booking.paidAmount || 0));
+    }
+    if (updates.adults !== undefined) booking.adults = parseInt(updates.adults, 10);
+    if (updates.children !== undefined) booking.children = parseInt(updates.children, 10);
+    if (updates.status) booking.status = updates.status;
+    if (updates.tripStatus) booking.tripStatus = updates.tripStatus;
+    if (updates.transactionId) booking.transactionId = updates.transactionId.trim();
 
     // Optional replacement screenshot upload
     if (req.file) {
