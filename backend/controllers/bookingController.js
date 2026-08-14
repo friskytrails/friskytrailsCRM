@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { getAgentIdCondition } = require('../services/agentService');
 
-// Generate unique bookingId: "BK-" + 6 random uppercase chars
+// Generate unique bookingId: "FT" + 6 random uppercase chars
 async function generateBookingId() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let bookingId = '';
@@ -16,7 +16,7 @@ async function generateBookingId() {
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    bookingId = 'BK-' + code;
+    bookingId = 'FT' + code;
     const found = await Booking.findOne({ bookingId });
     if (!found) exists = false;
   }
