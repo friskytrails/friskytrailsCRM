@@ -94,9 +94,11 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
           <div className="p-1">
             {agents
               .filter(agent => {
+                const isSelected = selectedAgentIds.includes(agent.id);
                 const isActive = (agent.status || 'Active') === 'Active' && agent.isVerified !== false;
                 const isItinerary = agent.isItinerary || agent.role === 'itinerary';
-                return isActive && !isItinerary;
+                const isPresent = agent.attendance !== 'A';
+                return isSelected || (isActive && !isItinerary && isPresent);
               })
               .map(agent => {
                 const isSelected = selectedAgentIds.includes(agent.id);
@@ -124,9 +126,11 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
                 );
               })}
             {agents.filter(agent => {
+              const isSelected = selectedAgentIds.includes(agent.id);
               const isActive = (agent.status || 'Active') === 'Active' && agent.isVerified !== false;
               const isItinerary = agent.isItinerary || agent.role === 'itinerary';
-              return isActive && !isItinerary;
+              const isPresent = agent.attendance !== 'A';
+              return isSelected || (isActive && !isItinerary && isPresent);
             }).length === 0 && (
               <div className="px-2 py-2 text-xs text-gray-500 text-center">No agents available</div>
             )}

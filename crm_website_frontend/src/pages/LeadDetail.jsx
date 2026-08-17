@@ -1306,16 +1306,16 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                         <div className="text-right">
                           <div className="text-[10px] text-gray-400 dark:text-slate-400 font-bold uppercase tracking-wider">Total / Due Balance</div>
                           <div className="font-bold text-gray-900 dark:text-slate-100 text-xs">
-                            ₹{Number(trip.totalAmount || trip.bookingDetails?.totalAmount || 0).toLocaleString('en-IN')}
+                            ₹{Number(trip.totalAmount ?? trip.bookingDetails?.totalAmount ?? 0).toLocaleString('en-IN')}
                             <span className="text-gray-400 font-normal mx-1">|</span>
-                            <span className={Number(trip.dueAmount || trip.bookingDetails?.dueAmount || 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
-                              Due: ₹{Number(trip.dueAmount || trip.bookingDetails?.dueAmount || 0).toLocaleString('en-IN')}
+                            <span className={Number(trip.dueAmount ?? trip.bookingDetails?.dueAmount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
+                              Due: ₹{Number(trip.dueAmount ?? trip.bookingDetails?.dueAmount ?? 0).toLocaleString('en-IN')}
                             </span>
                           </div>
                         </div>
 
                         {!user?.isItinerary && (() => {
-                          const tripKey = trip.bookingId || trip._id || trip.id || trip.transactionId || lead.bookingDetails?.bookingId || lead.phone;
+                          const tripKey = trip.bookingId || trip._id || trip.id || trip.transactionId;
                           const hasValidKey = !!tripKey;
 
                           return (
