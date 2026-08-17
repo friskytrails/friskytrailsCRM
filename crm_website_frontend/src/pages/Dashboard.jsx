@@ -602,10 +602,15 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               onChange={(e) => setFilterProduct(e.target.value)}
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
-              <option value="all">All Packages</option>
-              {Array.from(new Set([...(products || []), ...leads.map(l => l.product).filter(Boolean)])).map(prod => (
-                <option key={prod} value={prod}>{prod}</option>
-              ))}
+              <option value="all">All Packages ({activeLeads.length} {activeLeads.length === 1 ? 'lead' : 'leads'})</option>
+              {Array.from(new Set([...(products || []), ...leads.map(l => l.product).filter(Boolean)])).map(prod => {
+                const count = activeLeads.filter(l => (l.product || 'Other') === prod).length;
+                return (
+                  <option key={prod} value={prod}>
+                    {prod} ({count} {count === 1 ? 'lead' : 'leads'})
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -616,11 +621,11 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               onChange={(e) => setFilterStatus(e.target.value)}
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
-              <option value="all">Active Statuses ({allActiveCount})</option>
+              <option value="all">Active Statuses ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
               {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => {
                 const count = leads.filter(l => (l.status || 'Fresh Leads') === st).length;
                 return (
-                  <option key={st} value={st}>{st} ({count})</option>
+                  <option key={st} value={st}>{st} ({count} {count === 1 ? 'lead' : 'leads'})</option>
                 );
               })}
             </select>

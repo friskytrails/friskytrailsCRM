@@ -648,11 +648,11 @@ function App() {
             />
             <Route
               path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} loading={loadingData} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents/:id"
-              element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} refreshAgents={refreshAgents} /> : <Navigate to="/" replace />}
+              element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} refreshAgents={refreshAgents} loading={loadingData} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/manager-dashboard"
