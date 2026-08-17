@@ -116,6 +116,100 @@ async function ensureCurrentMonthMetrics(user) {
   return false;
 }
 
+async function recordBookingForAgents(agentIds, totalAmount = 0) {
+  if (!Array.isArray(agentIds) || agentIds.length === 0) return;
+  const numAmount = Number(totalAmount) || 0;
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
+  for (const agentId of agentIds) {
+    if (!agentId) continue;
+    try {
+      const agentUser = await User.findById(agentId);
+      if (agentUser && !agentUser.isAdmin) {
+        await ensureCurrentMonthMetrics(agentUser);
+
+        const updated = await User.Model.findOneAndUpdate(
+          { _id: agentId },
+          { 
+            $inc: { 
+              bookingCount: 1, 
+              targetCompleted: numAmount 
+            } 
+          },
+          { new: true }
+        );
+
+        if (updated) {
+          let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
+          if (histIdx !== -1) {
+            await User.Model.updateOne(
+              { _id: agentId, "historicalMetrics.month": currentMonthStr },
+              { 
+                $set: { 
+                  "historicalMetrics.$.bookingCount": updated.bookingCount,
+                  "historicalMetrics.$.targetCompleted": updated.targetCompleted 
+                } 
+              }
+            );
+          } else {
+            await User.Model.updateOne(
+              { _id: agentId },
+              {
+                $push: {
+                  historicalMetrics: {
+                    month: currentMonthStr,
+                    monthlyTarget: updated.monthlyTarget || 0,
+                    targetCompleted: updated.targetCompleted || 0,
+                    bookingCount: updated.bookingCount,
+                    targetBookingCount: updated.targetBookingCount || 0
+                  }
+                }
+              }
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to record booking metrics for agent ${agentId}:`, e);
+    }
+  }
+}
+
+async function adjustAgentTargetRevenue(agentIds, amountDelta) {
+  if (!Array.isArray(agentIds) || agentIds.length === 0 || !amountDelta || isNaN(amountDelta)) return;
+  const delta = Number(amountDelta);
+  if (delta === 0) return;
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
+  for (const agentId of agentIds) {
+    if (!agentId) continue;
+    try {
+      const agentUser = await User.findById(agentId);
+      if (agentUser && !agentUser.isAdmin) {
+        await ensureCurrentMonthMetrics(agentUser);
+        const updated = await User.Model.findOneAndUpdate(
+          { _id: agentId },
+          { $inc: { targetCompleted: delta } },
+          { new: true }
+        );
+        if (updated) {
+          let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
+          if (histIdx !== -1) {
+            await User.Model.updateOne(
+              { _id: agentId, "historicalMetrics.month": currentMonthStr },
+              { $set: { "historicalMetrics.$.targetCompleted": updated.targetCompleted } }
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to adjust agent target revenue for agent ${agentId}:`, e);
+    }
+  }
+}
+
 async function getAgents() {
   const agents = await User.findAgents();
   for (const agent of agents) {
@@ -401,7 +495,9 @@ module.exports = {
   assignAgentsToManager,
   getMyTeam,
   ensureCurrentMonthMetrics,
-  getAgentIdCondition
+  getAgentIdCondition,
+  recordBookingForAgents,
+  adjustAgentTargetRevenue
 };
 
 async function toggleItineraryRole(id, isItinerary) {

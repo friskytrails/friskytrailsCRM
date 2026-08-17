@@ -2,7 +2,7 @@
 const Lead = require('../models/Lead');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
-const { getAgentIdCondition } = require('../services/agentService');
+const { getAgentIdCondition, recordBookingForAgents, adjustAgentTargetRevenue } = require('../services/agentService');
 
 // Generate unique bookingId: "FT" + 6 random uppercase chars
 async function generateBookingId() {
@@ -80,14 +80,12 @@ async function createBooking(req, res) {
       return res.status(400).json({ success: false, error: 'Phone Number must be exactly 10 digits starting with 6, 7, 8, or 9.' });
     }
 
-    const numAdults = parseInt(adults, 10);
-    const numChildren = parseInt(children, 10);
-    if (isNaN(numAdults) || numAdults < 0) {
-      return res.status(400).json({ success: false, error: 'Adults count must be a non-negative integer.' });
-    }
-    if (isNaN(numChildren) || numChildren < 0) {
-      return res.status(400).json({ success: false, error: 'Children count must be a non-negative integer.' });
-    }
+    const rawAdults = adults !== undefined ? adults : (req.body.noOfPax !== undefined ? req.body.noOfPax : (req.body.numberOfPersons !== undefined ? req.body.numberOfPersons : 1));
+    let numAdults = parseInt(rawAdults, 10);
+    let numChildren = parseInt(children !== undefined ? children : 0, 10);
+    if (isNaN(numAdults) || numAdults < 0) numAdults = 1;
+    if (isNaN(numChildren) || numChildren < 0) numChildren = 0;
+    if (numAdults === 0 && numChildren === 0) numAdults = 1;
 
     if (!packageName || !packageName.trim()) {
       return res.status(400).json({ success: false, error: 'Package Name is required.' });
@@ -235,12 +233,26 @@ async function createBooking(req, res) {
     let leadSyncStatus = 'Not Attempted';
     if (targetLead) {
       try {
+        const wasBooked = targetLead.status === 'Booked';
         targetLead.status = 'Booked';
         await targetLead.save();
         leadSyncStatus = 'Success';
+
+        if (!wasBooked) {
+          const agentsToUpdate = (Array.isArray(targetLead.agentIds) && targetLead.agentIds.length > 0)
+            ? targetLead.agentIds
+            : [req.user.userId || req.user.id || req.user._id].filter(Boolean);
+          
+          await recordBookingForAgents(agentsToUpdate, numTotal);
+        }
       } catch (leadErr) {
         console.error('Failed to sync CRM lead status:', leadErr);
         leadSyncStatus = 'Failed: Error syncing lead';
+      }
+    } else {
+      const creatorId = req.user.userId || req.user.id || req.user._id;
+      if (creatorId) {
+        await recordBookingForAgents([creatorId], numTotal);
       }
     }
 
@@ -362,6 +374,7 @@ async function editBooking(req, res) {
     if (booking.endDate < booking.startDate) {
       return res.status(400).json({ success: false, error: 'End Date cannot be earlier than Start Date.' });
     }
+    const oldTotal = booking.totalAmount || 0;
     if (updates.totalAmount !== undefined) booking.totalAmount = parseFloat(updates.totalAmount);
     if (updates.paidAmount !== undefined) {
       const newPaid = parseFloat(updates.paidAmount);
@@ -370,8 +383,29 @@ async function editBooking(req, res) {
     if (updates.totalAmount !== undefined || updates.paidAmount !== undefined) {
       booking.dueAmount = Math.max(0, (booking.totalAmount || 0) - (booking.paidAmount || 0));
     }
-    if (updates.adults !== undefined) booking.adults = parseInt(updates.adults, 10);
-    if (updates.children !== undefined) booking.children = parseInt(updates.children, 10);
+    const amountDelta = (booking.totalAmount || 0) - oldTotal;
+    if (updates.totalAmount !== undefined && amountDelta !== 0) {
+      const agentsToUpdate = (Array.isArray(booking.assignedTo) && booking.assignedTo.length > 0)
+        ? booking.assignedTo
+        : [booking.createdBy].filter(Boolean);
+      await adjustAgentTargetRevenue(agentsToUpdate, amountDelta);
+    }
+    if (updates.adults !== undefined || updates.noOfPax !== undefined || updates.numberOfPersons !== undefined) {
+      const rawVal = updates.adults !== undefined ? updates.adults : (updates.noOfPax !== undefined ? updates.noOfPax : updates.numberOfPersons);
+      const parsedAdults = parseInt(rawVal, 10);
+      if (!isNaN(parsedAdults) && parsedAdults >= 0) {
+        booking.adults = parsedAdults;
+      }
+    }
+    if (updates.children !== undefined) {
+      const parsedChildren = parseInt(updates.children, 10);
+      if (!isNaN(parsedChildren) && parsedChildren >= 0) {
+        booking.children = parsedChildren;
+      }
+    }
+    if ((booking.adults || 0) === 0 && (booking.children || 0) === 0) {
+      booking.adults = 1;
+    }
     if (updates.status) booking.status = updates.status;
     if (updates.tripStatus) booking.tripStatus = updates.tripStatus;
     if (updates.transactionId) booking.transactionId = updates.transactionId.trim();

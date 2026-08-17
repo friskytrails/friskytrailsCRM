@@ -566,7 +566,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               {agents
                 .filter(agent => {
                   const st = agent.status || 'Active';
-                  return st !== 'Inactive' && st !== 'Former Employee';
+                  const isItinerary = agent.isItinerary || agent.role === 'itinerary';
+                  return st !== 'Inactive' && st !== 'Former Employee' && !isItinerary;
                 })
                 .map((agent) => {
                   const agentId = getAgentId(agent);

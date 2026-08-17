@@ -52,10 +52,22 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     );
   });
 
+  const isInactiveStatus = (status) => {
+    const st = status || 'Fresh Leads';
+    return (
+      st === 'Booked' ||
+      st === 'Rejected Leads' ||
+      st === 'Rejected' ||
+      st === 'Future Leads' ||
+      st === 'Future' ||
+      st === 'Non Responding Leads' ||
+      st === 'Non Responding'
+    );
+  };
+
   const agentLeadCounts = leads.reduce((acc, lead) => {
     const st = lead.status || 'Fresh Leads';
-    const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
-    if (!isBookedOrRejected) {
+    if (!isInactiveStatus(st)) {
       (lead.agentIds || []).forEach(agentId => {
         const key = String(agentId);
         acc[key] = (acc[key] || 0) + 1;

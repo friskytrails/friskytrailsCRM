@@ -9,18 +9,9 @@ const matchIds = (id1, id2) => {
   return norm1 !== '' && norm1 === norm2;
 };
 
-export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics }) {
+export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics, refreshAgents }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [filterStatus, setFilterStatus] = useState(() => {
-    return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
-  });
-  
-  useEffect(() => {
-    sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
-  }, [filterStatus]);
-
-  const [searchQuery, setSearchQuery] = useState('');
 
   const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
   const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
@@ -33,13 +24,37 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   })();
   const normalizedParam = normalizeAgentSlug(decodedParam);
 
-  const agent = agents.find(a => 
+  const agent = (agents || []).find(a => 
     matchIds(a.id || a._id, id) || 
     a.name === decodedParam || 
     a.name?.toLowerCase() === decodedParam.toLowerCase() ||
     getAgentSlug(a) === normalizedParam ||
     encodeURIComponent(a.name) === id
   );
+
+  useEffect(() => {
+    if (refreshAgents && agent) {
+      refreshAgents(agent.id || agent._id);
+    }
+  }, [id, agent?.id]);
+
+  const [filterStatus, setFilterStatus] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
+  });
+  const [filterProduct, setFilterProduct] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterProduct') || 'all';
+  });
+  const [filterAge, setFilterAge] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterAge') || 'all';
+  });
+  
+  useEffect(() => {
+    sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
+    sessionStorage.setItem('agentLeads_filterProduct', filterProduct);
+    sessionStorage.setItem('agentLeads_filterAge', filterAge);
+  }, [filterStatus, filterProduct, filterAge]);
+
+  const [searchQuery, setSearchQuery] = useState('');
   
   const isInactiveStatus = (status) => {
     const st = status || 'Fresh Leads';
@@ -57,11 +72,31 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : [];
   const activeAgentLeads = agentLeads.filter(l => !isInactiveStatus(l.status));
   const hasSearchQuery = searchQuery.trim().length > 0;
+  const getAgeInDays = (createdAt) => {
+    if (!createdAt) return 1;
+    const diffTime = Math.max(0, new Date() - new Date(createdAt));
+    return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  const checkAgeFilter = (age, filter) => {
+    if (filter === 'all') return true;
+    if (filter === '1-4') return age >= 1 && age <= 4;
+    if (filter === '5-7') return age >= 5 && age <= 7;
+    if (filter === '8-10') return age >= 8 && age <= 10;
+    if (filter === '10-20') return age > 10 && age <= 20;
+    if (filter === '20-30') return age > 20 && age <= 30;
+    if (filter === '30+') return age > 30;
+    return true;
+  };
+
   const activeScopeLeads = (filterStatus !== 'all' || hasSearchQuery) ? agentLeads : activeAgentLeads;
+  const statusScopedLeads = filterStatus === 'all' ? activeAgentLeads : agentLeads.filter(l => (l.status || 'Fresh Leads') === filterStatus);
 
   const filteredAgentLeads = activeScopeLeads.filter(lead => {
     const st = lead.status || 'Fresh Leads';
     const query = searchQuery.trim().toLowerCase();
+    const age = getAgeInDays(lead.createdAt);
+
     const matchesSearch = !hasSearchQuery ||
       (lead.name || '').toLowerCase().includes(query) ||
       (lead.phone || '').includes(query) ||
@@ -74,8 +109,10 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     }
 
     const matchesStatus = filterStatus === 'all' || st === filterStatus;
+    const matchesProduct = filterProduct === 'all' || (lead.product || 'Other') === filterProduct;
+    const matchesAge = checkAgeFilter(age, filterAge);
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesProduct && matchesAge;
   });
 
   // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
@@ -99,6 +136,16 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
   const defaultStatusList = ["Fresh Leads", "Interested Leads", "Pre Prospect Leads", "Prospect Leads", "Booked", "Rejected Leads"];
   const availableStatuses = (statuses && statuses.length > 0) ? statuses : defaultStatusList;
+
+  const availableProducts = Array.from(new Set(statusScopedLeads.map(l => l.product || 'Other'))).filter(Boolean).sort();
+  const ageOptions = [
+    { label: '1 to 4 Days', value: '1-4' },
+    { label: '5 to 7 Days', value: '5-7' },
+    { label: '8 to 10 Days', value: '8-10' },
+    { label: '10 to 20 Days', value: '10-20' },
+    { label: '20 to 30 Days', value: '20-30' },
+    { label: '30+ Days', value: '30+' }
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -159,7 +206,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       </div>
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Assigned Leads</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto flex-wrap sm:justify-end">
           <div className="relative w-full sm:w-64">
             <input
               type="text"
@@ -182,6 +229,32 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
               const count = agentLeads.filter(l => (l.status || 'Fresh Leads') === st).length;
               return (
                 <option key={st} value={st}>{st} ({count})</option>
+              );
+            })}
+          </select>
+          <select
+            value={filterProduct}
+            onChange={(e) => setFilterProduct(e.target.value)}
+            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+          >
+            <option value="all">All Packages ({statusScopedLeads.length})</option>
+            {availableProducts.map(prod => {
+              const count = statusScopedLeads.filter(l => (l.product || 'Other') === prod).length;
+              return (
+                <option key={prod} value={prod}>{prod} ({count})</option>
+              );
+            })}
+          </select>
+          <select
+            value={filterAge}
+            onChange={(e) => setFilterAge(e.target.value)}
+            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+          >
+            <option value="all">All Ages ({statusScopedLeads.length})</option>
+            {ageOptions.map(opt => {
+              const count = statusScopedLeads.filter(l => checkAgeFilter(getAgeInDays(l.createdAt), opt.value)).length;
+              return (
+                <option key={opt.value} value={opt.value}>{opt.label} ({count})</option>
               );
             })}
           </select>

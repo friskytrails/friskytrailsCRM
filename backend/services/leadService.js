@@ -3,7 +3,7 @@ const User = require('../models/User');
 const GlobalConfig = require('../models/GlobalConfig');
 const Booking = require('../models/Booking');
 const { formatDoc } = require('../utils/helpers');
-const { ensureCurrentMonthMetrics } = require('./agentService');
+const { ensureCurrentMonthMetrics, recordBookingForAgents } = require('./agentService');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { generateBookingId, generatePaymentId } = require('../controllers/bookingController');
@@ -535,8 +535,10 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   const totalAmount = Number(bookingDetails.totalAmount);
   const paidAmount = Number(bookingDetails.paidAmount);
-  const dueAmount = Math.max(0, totalAmount - paidAmount);
-  const noOfPax = Number(bookingDetails.noOfPax);
+  const rawPax = bookingDetails.noOfPax !== undefined ? bookingDetails.noOfPax : (bookingDetails.adults !== undefined ? bookingDetails.adults : (bookingDetails.numberOfPersons !== undefined ? bookingDetails.numberOfPersons : 1));
+  const noOfPax = Number(rawPax) || 1;
+  const numAdults = bookingDetails.adults !== undefined ? Number(bookingDetails.adults) : noOfPax;
+  const numChildren = bookingDetails.children !== undefined ? Number(bookingDetails.children) : 0;
 
   const sanitizedBookingDetails = {
     ...bookingDetails,
@@ -550,7 +552,9 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     totalAmount,
     paidAmount,
     dueAmount,
-    noOfPax
+    noOfPax,
+    adults: numAdults,
+    children: numChildren
   };
 
   // Create or update standalone Booking document in ft_booking_system
@@ -576,8 +580,8 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     travellerPhone: contactNumber || existingLead.phone,
     status: 'Booked',
     tripStatus: 'Booked',
-    adults: noOfPax || 1,
-    children: 0
+    adults: numAdults || 1,
+    children: numChildren || 0
   });
 
   const updateData = {
@@ -622,54 +626,10 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw saveError;
   }
 
-  // Increment booking count for assigned agents if lead was not previously booked
+  // Increment booking count & targetCompleted for assigned agents if lead was not previously booked
   if (existingLead.status !== 'Booked' && Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0) {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
-
-    for (const agentId of existingLead.agentIds) {
-      try {
-        const agentUser = await User.findById(agentId);
-        if (agentUser && !agentUser.isAdmin) {
-          await ensureCurrentMonthMetrics(agentUser);
-
-          const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-          const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
-
-          const updated = await User.Model.findOneAndUpdate(
-            { _id: agentId },
-            { $inc: { bookingCount: 1 } },
-            { new: true }
-          );
-
-          if (updated) {
-            let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
-            if (histIdx !== -1) {
-              await User.Model.updateOne(
-                { _id: agentId, "historicalMetrics.month": currentMonthStr },
-                { $set: { "historicalMetrics.$.bookingCount": updated.bookingCount } }
-              );
-            } else {
-              await User.Model.updateOne(
-                { _id: agentId },
-                {
-                  $push: {
-                    historicalMetrics: {
-                      month: currentMonthStr,
-                      monthlyTarget: updated.monthlyTarget || 0,
-                      targetCompleted: updated.targetCompleted || 0,
-                      bookingCount: updated.bookingCount
-                    }
-                  }
-                }
-              );
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Failed to update agent booking count:", e);
-      }
-    }
+    const totalAmount = Number(bookingDetails.totalAmount) || 0;
+    await recordBookingForAgents(existingLead.agentIds, totalAmount);
   }
 
   return await getLeadById(id, agentIdCondition);
