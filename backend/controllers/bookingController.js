@@ -182,6 +182,10 @@ async function createBooking(req, res) {
       verified: false
     };
 
+    const assignedAgents = (targetLead && Array.isArray(targetLead.agentIds) && targetLead.agentIds.length > 0)
+      ? targetLead.agentIds
+      : (req.user.userId ? [req.user.userId] : []);
+
     const newBooking = new Booking({
       bookingId,
       leadId,
@@ -201,7 +205,7 @@ async function createBooking(req, res) {
       createdBy: req.user.userId || req.user.id || req.user._id,
       status: 'Pending',
       tripStatus: 'Pending',
-      assignedTo: req.user.userId ? [req.user.userId] : [],
+      assignedTo: assignedAgents,
       adults: numAdults,
       children: numChildren,
       payments: [initialPayment]
@@ -385,10 +389,29 @@ async function editBooking(req, res) {
     }
     const amountDelta = (booking.totalAmount || 0) - oldTotal;
     if (updates.totalAmount !== undefined && amountDelta !== 0) {
-      const agentsToUpdate = (Array.isArray(booking.assignedTo) && booking.assignedTo.length > 0)
+      let agentsToUpdate = (Array.isArray(booking.assignedTo) && booking.assignedTo.length > 0)
         ? booking.assignedTo
-        : [booking.createdBy].filter(Boolean);
-      await adjustAgentTargetRevenue(agentsToUpdate, amountDelta);
+        : [];
+
+      if (agentsToUpdate.length === 0 && booking.leadId) {
+        try {
+          const associatedLead = await Lead.findById(booking.leadId.toString());
+          if (associatedLead && Array.isArray(associatedLead.agentIds) && associatedLead.agentIds.length > 0) {
+            agentsToUpdate = associatedLead.agentIds;
+            booking.assignedTo = associatedLead.agentIds;
+          }
+        } catch (leadFindErr) {
+          console.error('Error resolving lead agentIds for booking edit:', leadFindErr);
+        }
+      }
+
+      if (agentsToUpdate.length === 0 && booking.createdBy) {
+        agentsToUpdate = [booking.createdBy].filter(Boolean);
+      }
+
+      if (agentsToUpdate.length > 0) {
+        await adjustAgentTargetRevenue(agentsToUpdate, amountDelta);
+      }
     }
     if (updates.adults !== undefined || updates.noOfPax !== undefined || updates.numberOfPersons !== undefined) {
       const rawVal = updates.adults !== undefined ? updates.adults : (updates.noOfPax !== undefined ? updates.noOfPax : updates.numberOfPersons);

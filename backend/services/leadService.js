@@ -562,6 +562,14 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
   const paymentId = bookingDetails.paymentId || (await generatePaymentId());
   const transactionId = bookingDetails.transactionId || ('TXN-' + crypto.randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase());
 
+  const assignedAgents = (Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0)
+    ? existingLead.agentIds
+    : [];
+
+  const createdByUser = (agentIdCondition && !Array.isArray(agentIdCondition))
+    ? agentIdCondition
+    : (Array.isArray(agentIdCondition) && agentIdCondition[0]) || (assignedAgents[0] || null);
+
   const newBooking = new Booking({
     bookingId,
     paymentId,
@@ -580,6 +588,8 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     travellerPhone: contactNumber || existingLead.phone,
     status: 'Booked',
     tripStatus: 'Booked',
+    assignedTo: assignedAgents,
+    createdBy: createdByUser,
     adults: numAdults || 1,
     children: numChildren || 0
   });
@@ -690,10 +700,8 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   }
 
   // Manage callLogs for the current date in IST (Asia/Kolkata)
-  const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const istDate = new Date(utc + (3600000 * 5.5));
-  const todayDate = istDate.toISOString().split('T')[0];
+  // Use Intl.DateTimeFormat for reliable IST date, regardless of server timezone
+  const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   
   let query = {};
   if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
