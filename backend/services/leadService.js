@@ -493,12 +493,17 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw new Error("Invalid booking details");
   }
 
+  const hasPaxField = bookingDetails.noOfPax !== undefined || bookingDetails.adults !== undefined || bookingDetails.numberOfPersons !== undefined;
+  if (!hasPaxField) {
+    throw new Error("Passenger count ('noOfPax', 'adults', or 'numberOfPersons') is required for booking.");
+  }
+
   const requiredFields = [
     'fullName', 'emailId', 'contactNumber', 'emergencyContactNumber',
-    'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'
+    'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount'
   ];
 
-  const numericFields = ['totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'];
+  const numericFields = ['totalAmount', 'paidAmount', 'dueAmount'];
   const dateFields = ['startDate', 'endDate'];
 
   for (const field of requiredFields) {
@@ -535,10 +540,21 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   const totalAmount = Number(bookingDetails.totalAmount);
   const paidAmount = Number(bookingDetails.paidAmount);
-  const rawPax = bookingDetails.noOfPax !== undefined ? bookingDetails.noOfPax : (bookingDetails.adults !== undefined ? bookingDetails.adults : (bookingDetails.numberOfPersons !== undefined ? bookingDetails.numberOfPersons : 1));
-  const noOfPax = Number(rawPax) || 1;
-  const numAdults = bookingDetails.adults !== undefined ? Number(bookingDetails.adults) : noOfPax;
-  const numChildren = bookingDetails.children !== undefined ? Number(bookingDetails.children) : 0;
+
+  const rawChildren = bookingDetails.children !== undefined ? Number(bookingDetails.children) : 0;
+  const numChildren = (!isNaN(rawChildren) && rawChildren >= 0) ? rawChildren : 0;
+
+  const rawAdults = bookingDetails.adults !== undefined ? Number(bookingDetails.adults) : (bookingDetails.noOfPax !== undefined ? Number(bookingDetails.noOfPax) : (bookingDetails.numberOfPersons !== undefined ? Number(bookingDetails.numberOfPersons) : undefined));
+  let numAdults;
+  if (rawAdults !== undefined && !isNaN(rawAdults) && rawAdults >= 0) {
+    numAdults = rawAdults;
+  } else {
+    numAdults = numChildren > 0 ? 0 : 1;
+  }
+  if (numAdults === 0 && numChildren === 0) {
+    numAdults = 1;
+  }
+  const noOfPax = numAdults + numChildren;
 
   const sanitizedBookingDetails = {
     ...bookingDetails,
@@ -590,8 +606,8 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     tripStatus: 'Booked',
     assignedTo: assignedAgents,
     createdBy: createdByUser,
-    adults: numAdults || 1,
-    children: numChildren || 0
+    adults: numAdults,
+    children: numChildren
   });
 
   const updateData = {

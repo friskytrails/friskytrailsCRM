@@ -58,6 +58,24 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     sessionStorage.setItem(`dashboard_${userId}_filterProduct`, filterProduct);
   }, [filterProduct, userId]);
 
+  useEffect(() => {
+    if (!agents || agents.length === 0) return;
+    const specialOptions = ['unassigned', 'assigned', 'all'];
+    if (specialOptions.includes(filterAgent)) return;
+
+    const isEligible = agents.some(agent => {
+      const st = agent.status || 'Active';
+      const isItinerary = agent.isItinerary || agent.role === 'itinerary';
+      const isEligibleAgent = st !== 'Inactive' && st !== 'Former Employee' && !isItinerary;
+      const agentId = String(agent.id || agent._id || '');
+      return isEligibleAgent && agentId === String(filterAgent);
+    });
+
+    if (!isEligible) {
+      setFilterAgent('unassigned');
+    }
+  }, [agents, filterAgent]);
+
   const [liveStatus, setLiveStatus] = useState([]);
   const [liveActivity, setLiveActivity] = useState([]);
   const [currentTime, setCurrentTime] = useState(Date.now());

@@ -80,11 +80,12 @@ async function createBooking(req, res) {
       return res.status(400).json({ success: false, error: 'Phone Number must be exactly 10 digits starting with 6, 7, 8, or 9.' });
     }
 
-    const rawAdults = adults !== undefined ? adults : (req.body.noOfPax !== undefined ? req.body.noOfPax : (req.body.numberOfPersons !== undefined ? req.body.numberOfPersons : 1));
-    let numAdults = parseInt(rawAdults, 10);
     let numChildren = parseInt(children !== undefined ? children : 0, 10);
-    if (isNaN(numAdults) || numAdults < 0) numAdults = 1;
     if (isNaN(numChildren) || numChildren < 0) numChildren = 0;
+
+    const rawAdults = adults !== undefined ? adults : (req.body.noOfPax !== undefined ? req.body.noOfPax : (req.body.numberOfPersons !== undefined ? req.body.numberOfPersons : undefined));
+    let numAdults = parseInt(rawAdults !== undefined ? rawAdults : (numChildren > 0 ? 0 : 1), 10);
+    if (isNaN(numAdults) || numAdults < 0) numAdults = numChildren > 0 ? 0 : 1;
     if (numAdults === 0 && numChildren === 0) numAdults = 1;
 
     if (!packageName || !packageName.trim()) {

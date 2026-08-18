@@ -129,45 +129,41 @@ async function recordBookingForAgents(agentIds, totalAmount = 0) {
       if (agentUser && !agentUser.isAdmin) {
         await ensureCurrentMonthMetrics(agentUser);
 
-        const updated = await User.Model.findOneAndUpdate(
-          { _id: agentId },
+        // Try atomic update if historicalMetrics for current month already exists
+        let updated = await User.Model.findOneAndUpdate(
+          { _id: agentId, "historicalMetrics.month": currentMonthStr },
           { 
             $inc: { 
               bookingCount: 1, 
-              targetCompleted: numAmount 
+              targetCompleted: numAmount,
+              "historicalMetrics.$.bookingCount": 1,
+              "historicalMetrics.$.targetCompleted": numAmount
             } 
           },
           { new: true }
         );
 
-        if (updated) {
-          let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
-          if (histIdx !== -1) {
-            await User.Model.updateOne(
-              { _id: agentId, "historicalMetrics.month": currentMonthStr },
-              { 
-                $set: { 
-                  "historicalMetrics.$.bookingCount": updated.bookingCount,
-                  "historicalMetrics.$.targetCompleted": updated.targetCompleted 
-                } 
-              }
-            );
-          } else {
-            await User.Model.updateOne(
-              { _id: agentId },
-              {
-                $push: {
-                  historicalMetrics: {
-                    month: currentMonthStr,
-                    monthlyTarget: updated.monthlyTarget || 0,
-                    targetCompleted: updated.targetCompleted || 0,
-                    bookingCount: updated.bookingCount,
-                    targetBookingCount: updated.targetBookingCount || 0
-                  }
+        // If historicalMetrics for current month was not present, push it atomically
+        if (!updated) {
+          await User.Model.findOneAndUpdate(
+            { _id: agentId },
+            {
+              $inc: {
+                bookingCount: 1,
+                targetCompleted: numAmount
+              },
+              $push: {
+                historicalMetrics: {
+                  month: currentMonthStr,
+                  monthlyTarget: agentUser.monthlyTarget || 0,
+                  targetCompleted: (agentUser.targetCompleted || 0) + numAmount,
+                  bookingCount: (agentUser.bookingCount || 0) + 1,
+                  targetBookingCount: agentUser.targetBookingCount || 0
                 }
               }
-            );
-          }
+            },
+            { new: true }
+          );
         }
       }
     } catch (e) {
@@ -189,19 +185,37 @@ async function adjustAgentTargetRevenue(agentIds, amountDelta) {
       const agentUser = await User.findById(agentId);
       if (agentUser && !agentUser.isAdmin) {
         await ensureCurrentMonthMetrics(agentUser);
-        const updated = await User.Model.findOneAndUpdate(
-          { _id: agentId },
-          { $inc: { targetCompleted: delta } },
+
+        // Try atomic increment if historicalMetrics for current month exists
+        let updated = await User.Model.findOneAndUpdate(
+          { _id: agentId, "historicalMetrics.month": currentMonthStr },
+          {
+            $inc: {
+              targetCompleted: delta,
+              "historicalMetrics.$.targetCompleted": delta
+            }
+          },
           { new: true }
         );
-        if (updated) {
-          let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
-          if (histIdx !== -1) {
-            await User.Model.updateOne(
-              { _id: agentId, "historicalMetrics.month": currentMonthStr },
-              { $set: { "historicalMetrics.$.targetCompleted": updated.targetCompleted } }
-            );
-          }
+
+        // If not found in historicalMetrics, create the current month entry atomically
+        if (!updated) {
+          await User.Model.findOneAndUpdate(
+            { _id: agentId },
+            {
+              $inc: { targetCompleted: delta },
+              $push: {
+                historicalMetrics: {
+                  month: currentMonthStr,
+                  monthlyTarget: agentUser.monthlyTarget || 0,
+                  targetCompleted: (agentUser.targetCompleted || 0) + delta,
+                  bookingCount: agentUser.bookingCount || 0,
+                  targetBookingCount: agentUser.targetBookingCount || 0
+                }
+              }
+            },
+            { new: true }
+          );
         }
       }
     } catch (e) {
