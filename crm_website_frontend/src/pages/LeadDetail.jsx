@@ -467,7 +467,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         travellerName: lead.name || '',
         travellerEmail: lead.mailId || lead.email || lead.travellerEmail || '',
         travellerPhone: lead.phone || '',
-        adults: lead.numberOfPersons || 1,
+        adults: (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : (Number(lead.bookingDetails?.noOfPax) > 0 ? Number(lead.bookingDetails.noOfPax) : 1)),
         children: 0,
         packageName: lead.product || '',
         location: lead.destination || lead.location || lead.destinationLocation || '',
@@ -515,12 +515,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
     const adultsNum = parseInt(bookingForm.adults, 10);
     const childrenNum = parseInt(bookingForm.children, 10);
-    if (isNaN(adultsNum) || adultsNum < 0) {
-      toast.error("Adults count must be 0 or greater.");
-      return;
-    }
-    if (isNaN(childrenNum) || childrenNum < 0) {
-      toast.error("Children count must be 0 or greater.");
+    const validAdults = (!isNaN(adultsNum) && adultsNum >= 0) ? adultsNum : 1;
+    const validChildren = (!isNaN(childrenNum) && childrenNum >= 0) ? childrenNum : 0;
+    if (validAdults === 0 && validChildren === 0) {
+      toast.error("Total passengers must be at least 1.");
       return;
     }
     if (!bookingForm.packageName || !bookingForm.packageName.trim()) {
@@ -573,8 +571,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     formData.append('travellerName', bookingForm.travellerName.trim());
     formData.append('travellerEmail', bookingForm.travellerEmail.trim());
     formData.append('travellerPhone', cleanPhone);
-    formData.append('adults', adultsNum);
-    formData.append('children', childrenNum);
+    formData.append('adults', validAdults);
+    formData.append('children', validChildren);
+    formData.append('noOfPax', validAdults + validChildren);
+    formData.append('numberOfPersons', validAdults + validChildren);
     formData.append('packageName', bookingForm.packageName.trim());
     formData.append('location', bookingForm.location.trim());
     formData.append('startDate', bookingForm.startDate);
@@ -606,8 +606,9 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         travellerName: result.travellerName,
         travellerEmail: result.travellerEmail,
         travellerPhone: result.travellerPhone,
-        adults: result.adults,
-        children: result.children,
+        adults: result.adults !== undefined ? result.adults : validAdults,
+        children: result.children !== undefined ? result.children : validChildren,
+        noOfPax: result.noOfPax !== undefined ? result.noOfPax : (validAdults + validChildren),
         packageName: result.packageName,
         location: result.location,
         startDate: result.startDate,
@@ -1272,8 +1273,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                             {trip.location ? ` (${trip.location})` : ''}
                           </span>
                           <span className="text-[11px] text-gray-500 dark:text-slate-400 font-semibold">
-                            • {trip.adults ?? trip.noOfPax ?? 1} Pax
-                            {trip.children > 0 ? ` (+${trip.children} Child)` : ''}
+                            • {(() => {
+                              const adultCount = (Number(trip.adults) > 0)
+                                ? Number(trip.adults)
+                                : (Number(trip.noOfPax) > 0 ? Number(trip.noOfPax) : (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : 1));
+                              const childCount = Number(trip.children) || 0;
+                              const totalPax = adultCount + childCount;
+                              return `${totalPax} Pax${childCount > 0 ? ` (${adultCount} Adult${adultCount > 1 ? 's' : ''}, ${childCount} Child${childCount > 1 ? 'ren' : ''})` : ''}`;
+                            })()}
                           </span>
                         </div>
                         
@@ -1342,13 +1349,17 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                                   const txn = trip.transactionId || trip.paymentId || (Array.isArray(trip.payments) && trip.payments[0] ? (trip.payments[0].details || trip.payments[0].transactionId) : '') || trip.details || lead.bookingDetails?.transactionId || lead.bookingDetails?.paymentId || lead.bookingDetails?.details || '';
                                   const payMode = trip.paymentMode || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].paymentMode : '') || lead.bookingDetails?.paymentMode || 'Kalpana BOI';
                                   const ssPreview = trip.screenshot || trip.screenshotUrl || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].attachment : '') || lead.bookingDetails?.screenshot || lead.bookingDetails?.screenshotUrl || lead.bookingDetails?.attachment || null;
+                                  const tripChildCount = (trip.children !== undefined && !isNaN(Number(trip.children))) ? Number(trip.children) : 0;
+                                  const tripExplicitAdults = (trip.adults !== undefined && trip.adults !== null && !isNaN(Number(trip.adults))) ? Number(trip.adults) : undefined;
+                                  const tripFallbackPax = (Number(trip.noOfPax) > 0 ? Number(trip.noOfPax) : (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : undefined));
+                                  const tripResolvedAdults = tripExplicitAdults !== undefined ? tripExplicitAdults : (tripFallbackPax !== undefined ? tripFallbackPax : (tripChildCount > 0 ? 0 : 1));
 
                                   setBookingForm({
                                     travellerName: trip.travellerName || trip.fullName || lead.name || '',
                                     travellerEmail: trip.travellerEmail || trip.emailId || trip.email || lead.mailId || lead.email || '',
                                     travellerPhone: trip.travellerPhone || trip.contactNumber || trip.phone || lead.phone || '',
-                                    adults: trip.adults ?? trip.noOfPax ?? lead.numberOfPersons ?? 1,
-                                    children: trip.children ?? 0,
+                                    adults: tripResolvedAdults,
+                                    children: tripChildCount,
                                     packageName: trip.packageName || lead.product || '',
                                     location: trip.location || trip.destination || trip.destinationLocation || lead.destination || lead.location || '',
                                     startDate: startDt,
@@ -1383,13 +1394,18 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                                             fetchedEnd = formatDate(res.endDate);
                                           }
 
+                                          const resChildCount = (res.children !== undefined && !isNaN(Number(res.children))) ? Number(res.children) : 0;
+                                          const resExplicitAdults = (res.adults !== undefined && res.adults !== null && !isNaN(Number(res.adults))) ? Number(res.adults) : undefined;
+                                          const resFallbackPax = (Number(res.noOfPax) > 0 ? Number(res.noOfPax) : undefined);
+                                          const resResolvedAdults = resExplicitAdults !== undefined ? resExplicitAdults : (resFallbackPax !== undefined ? resFallbackPax : (resChildCount > 0 ? 0 : 1));
+
                                           setBookingForm(prev => ({
                                             ...prev,
                                             travellerName: res.travellerName || res.fullName || prev.travellerName,
                                             travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
                                             travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
-                                            adults: res.adults ?? res.noOfPax ?? prev.adults,
-                                            children: res.children ?? prev.children,
+                                            adults: resResolvedAdults,
+                                            children: resChildCount,
                                             packageName: res.packageName || prev.packageName,
                                             location: res.location || res.destination || res.destinationLocation || prev.location,
                                             startDate: fetchedStart || prev.startDate,

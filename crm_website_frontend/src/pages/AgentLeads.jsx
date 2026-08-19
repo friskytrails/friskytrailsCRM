@@ -9,18 +9,9 @@ const matchIds = (id1, id2) => {
   return norm1 !== '' && norm1 === norm2;
 };
 
-export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics }) {
+export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics, refreshAgents, loading }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [filterStatus, setFilterStatus] = useState(() => {
-    return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
-  });
-  
-  useEffect(() => {
-    sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
-  }, [filterStatus]);
-
-  const [searchQuery, setSearchQuery] = useState('');
 
   const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
   const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
@@ -33,13 +24,37 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   })();
   const normalizedParam = normalizeAgentSlug(decodedParam);
 
-  const agent = agents.find(a => 
+  const agent = (agents || []).find(a => 
     matchIds(a.id || a._id, id) || 
     a.name === decodedParam || 
     a.name?.toLowerCase() === decodedParam.toLowerCase() ||
     getAgentSlug(a) === normalizedParam ||
     encodeURIComponent(a.name) === id
   );
+
+  useEffect(() => {
+    if (refreshAgents && agent) {
+      refreshAgents(agent.id || agent._id);
+    }
+  }, [id, agent?.id]);
+
+  const [filterStatus, setFilterStatus] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
+  });
+  const [filterProduct, setFilterProduct] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterProduct') || 'all';
+  });
+  const [filterAge, setFilterAge] = useState(() => {
+    return sessionStorage.getItem('agentLeads_filterAge') || 'all';
+  });
+  
+  useEffect(() => {
+    sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
+    sessionStorage.setItem('agentLeads_filterProduct', filterProduct);
+    sessionStorage.setItem('agentLeads_filterAge', filterAge);
+  }, [filterStatus, filterProduct, filterAge]);
+
+  const [searchQuery, setSearchQuery] = useState('');
   
   const isInactiveStatus = (status) => {
     const st = status || 'Fresh Leads';
@@ -57,11 +72,31 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : [];
   const activeAgentLeads = agentLeads.filter(l => !isInactiveStatus(l.status));
   const hasSearchQuery = searchQuery.trim().length > 0;
+  const getAgeInDays = (createdAt) => {
+    if (!createdAt) return 1;
+    const diffTime = Math.max(0, new Date() - new Date(createdAt));
+    return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  };
+
+  const checkAgeFilter = (age, filter) => {
+    if (filter === 'all') return true;
+    if (filter === '1-4') return age >= 1 && age <= 4;
+    if (filter === '5-7') return age >= 5 && age <= 7;
+    if (filter === '8-10') return age >= 8 && age <= 10;
+    if (filter === '10-20') return age > 10 && age <= 20;
+    if (filter === '20-30') return age > 20 && age <= 30;
+    if (filter === '30+') return age > 30;
+    return true;
+  };
+
   const activeScopeLeads = (filterStatus !== 'all' || hasSearchQuery) ? agentLeads : activeAgentLeads;
+  const statusScopedLeads = filterStatus === 'all' ? activeAgentLeads : agentLeads.filter(l => (l.status || 'Fresh Leads') === filterStatus);
 
   const filteredAgentLeads = activeScopeLeads.filter(lead => {
     const st = lead.status || 'Fresh Leads';
     const query = searchQuery.trim().toLowerCase();
+    const age = getAgeInDays(lead.createdAt);
+
     const matchesSearch = !hasSearchQuery ||
       (lead.name || '').toLowerCase().includes(query) ||
       (lead.phone || '').includes(query) ||
@@ -74,8 +109,10 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     }
 
     const matchesStatus = filterStatus === 'all' || st === filterStatus;
+    const matchesProduct = filterProduct === 'all' || (lead.product || 'Other') === filterProduct;
+    const matchesAge = checkAgeFilter(age, filterAge);
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesProduct && matchesAge;
   });
 
   // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
@@ -89,16 +126,54 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     }
   }, [filteredAgentLeads, agent]);
 
+  if (loading || (!agent && (!agents || agents.length === 0))) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center justify-center min-h-[400px]">
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Loading agent board...</p>
+      </div>
+    );
+  }
+
   if (!agent) {
-    return <div className="p-8 text-center text-gray-500">Agent not found</div>;
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-400 mb-4">
+          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Agent Not Found</h3>
+        <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">The requested agent could not be found or may have been removed.</p>
+        <button
+          onClick={() => navigate('/agents')}
+          className="mt-6 inline-flex items-center px-4 py-2 text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white shadow-sm transition-all cursor-pointer"
+        >
+          Back to Team List
+        </button>
+      </div>
+    );
   }
   
-  const currentAgentIndex = (agents || []).findIndex(a => a.id === agent.id);
-  const prevAgent = currentAgentIndex > 0 ? agents[currentAgentIndex - 1] : null;
-  const nextAgent = currentAgentIndex >= 0 && currentAgentIndex < (agents || []).length - 1 ? agents[currentAgentIndex + 1] : null;
+  const activeNavAgents = (agents || []).filter(a => {
+    const status = a.status || 'Active';
+    return status === 'Active' && !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected';
+  });
+
+  const currentAgentIndex = activeNavAgents.findIndex(a => matchIds(a.id || a._id, agent.id || agent._id));
+  const prevAgent = currentAgentIndex > 0 ? activeNavAgents[currentAgentIndex - 1] : null;
+  const nextAgent = currentAgentIndex >= 0 && currentAgentIndex < activeNavAgents.length - 1 ? activeNavAgents[currentAgentIndex + 1] : null;
 
   const defaultStatusList = ["Fresh Leads", "Interested Leads", "Pre Prospect Leads", "Prospect Leads", "Booked", "Rejected Leads"];
   const availableStatuses = (statuses && statuses.length > 0) ? statuses : defaultStatusList;
+
+  const availableProducts = Array.from(new Set(statusScopedLeads.map(l => l.product || 'Other'))).filter(Boolean).sort();
+  const ageOptions = [
+    { label: '1 to 4 Days', value: '1-4' },
+    { label: '5 to 7 Days', value: '5-7' },
+    { label: '8 to 10 Days', value: '8-10' },
+    { label: '10 to 20 Days', value: '10-20' },
+    { label: '20 to 30 Days', value: '20-30' },
+    { label: '30+ Days', value: '30+' }
+  ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -116,7 +191,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => prevAgent && navigate(`/agents/${getAgentSlug(prevAgent)}`)}
+            onClick={() => prevAgent && navigate(`/agents/${prevAgent.id || prevAgent._id}`)}
             disabled={!prevAgent}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
             title={prevAgent ? `Previous Agent: ${prevAgent.name}` : 'First agent'}
@@ -127,7 +202,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
             Previous Agent
           </button>
           <button
-            onClick={() => nextAgent && navigate(`/agents/${getAgentSlug(nextAgent)}`)}
+            onClick={() => nextAgent && navigate(`/agents/${nextAgent.id || nextAgent._id}`)}
             disabled={!nextAgent}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
             title={nextAgent ? `Next Agent: ${nextAgent.name}` : 'Last agent'}
@@ -159,7 +234,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       </div>
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Assigned Leads</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto flex-wrap sm:justify-end">
           <div className="relative w-full sm:w-64">
             <input
               type="text"
@@ -177,11 +252,37 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
             onChange={(e) => setFilterStatus(e.target.value)}
             className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
           >
-            <option value="all">Active Statuses ({activeAgentLeads.length})</option>
+            <option value="all">Active Statuses ({activeAgentLeads.length} {activeAgentLeads.length === 1 ? 'lead' : 'leads'})</option>
             {availableStatuses.map(st => {
               const count = agentLeads.filter(l => (l.status || 'Fresh Leads') === st).length;
               return (
-                <option key={st} value={st}>{st} ({count})</option>
+                <option key={st} value={st}>{st} ({count} {count === 1 ? 'lead' : 'leads'})</option>
+              );
+            })}
+          </select>
+          <select
+            value={filterProduct}
+            onChange={(e) => setFilterProduct(e.target.value)}
+            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+          >
+            <option value="all">All Packages ({availableProducts.length} {availableProducts.length === 1 ? 'Package' : 'Packages'}, {statusScopedLeads.length} {statusScopedLeads.length === 1 ? 'Lead' : 'Leads'})</option>
+            {availableProducts.map(prod => {
+              const count = statusScopedLeads.filter(l => (l.product || 'Other') === prod).length;
+              return (
+                <option key={prod} value={prod}>{prod} ({count} {count === 1 ? 'lead' : 'leads'})</option>
+              );
+            })}
+          </select>
+          <select
+            value={filterAge}
+            onChange={(e) => setFilterAge(e.target.value)}
+            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+          >
+            <option value="all">All Ages ({statusScopedLeads.length} {statusScopedLeads.length === 1 ? 'lead' : 'leads'})</option>
+            {ageOptions.map(opt => {
+              const count = statusScopedLeads.filter(l => checkAgeFilter(getAgeInDays(l.createdAt), opt.value)).length;
+              return (
+                <option key={opt.value} value={opt.value}>{opt.label} ({count} {count === 1 ? 'lead' : 'leads'})</option>
               );
             })}
           </select>

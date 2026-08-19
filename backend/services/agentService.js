@@ -116,6 +116,114 @@ async function ensureCurrentMonthMetrics(user) {
   return false;
 }
 
+async function recordBookingForAgents(agentIds, totalAmount = 0) {
+  if (!Array.isArray(agentIds) || agentIds.length === 0) return;
+  const numAmount = Number(totalAmount) || 0;
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
+  for (const agentId of agentIds) {
+    if (!agentId) continue;
+    try {
+      const agentUser = await User.findById(agentId);
+      if (agentUser && !agentUser.isAdmin) {
+        await ensureCurrentMonthMetrics(agentUser);
+
+        // Try atomic update if historicalMetrics for current month already exists
+        let updated = await User.Model.findOneAndUpdate(
+          { _id: agentId, "historicalMetrics.month": currentMonthStr },
+          { 
+            $inc: { 
+              bookingCount: 1, 
+              targetCompleted: numAmount,
+              "historicalMetrics.$.bookingCount": 1,
+              "historicalMetrics.$.targetCompleted": numAmount
+            } 
+          },
+          { new: true }
+        );
+
+        // If historicalMetrics for current month was not present, push it atomically
+        if (!updated) {
+          await User.Model.findOneAndUpdate(
+            { _id: agentId },
+            {
+              $inc: {
+                bookingCount: 1,
+                targetCompleted: numAmount
+              },
+              $push: {
+                historicalMetrics: {
+                  month: currentMonthStr,
+                  monthlyTarget: agentUser.monthlyTarget || 0,
+                  targetCompleted: (agentUser.targetCompleted || 0) + numAmount,
+                  bookingCount: (agentUser.bookingCount || 0) + 1,
+                  targetBookingCount: agentUser.targetBookingCount || 0
+                }
+              }
+            },
+            { new: true }
+          );
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to record booking metrics for agent ${agentId}:`, e);
+    }
+  }
+}
+
+async function adjustAgentTargetRevenue(agentIds, amountDelta) {
+  if (!Array.isArray(agentIds) || agentIds.length === 0 || !amountDelta || isNaN(amountDelta)) return;
+  const delta = Number(amountDelta);
+  if (delta === 0) return;
+  const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
+
+  for (const agentId of agentIds) {
+    if (!agentId) continue;
+    try {
+      const agentUser = await User.findById(agentId);
+      if (agentUser && !agentUser.isAdmin) {
+        await ensureCurrentMonthMetrics(agentUser);
+
+        // Try atomic increment if historicalMetrics for current month exists
+        let updated = await User.Model.findOneAndUpdate(
+          { _id: agentId, "historicalMetrics.month": currentMonthStr },
+          {
+            $inc: {
+              targetCompleted: delta,
+              "historicalMetrics.$.targetCompleted": delta
+            }
+          },
+          { new: true }
+        );
+
+        // If not found in historicalMetrics, create the current month entry atomically
+        if (!updated) {
+          await User.Model.findOneAndUpdate(
+            { _id: agentId },
+            {
+              $inc: { targetCompleted: delta },
+              $push: {
+                historicalMetrics: {
+                  month: currentMonthStr,
+                  monthlyTarget: agentUser.monthlyTarget || 0,
+                  targetCompleted: (agentUser.targetCompleted || 0) + delta,
+                  bookingCount: agentUser.bookingCount || 0,
+                  targetBookingCount: agentUser.targetBookingCount || 0
+                }
+              }
+            },
+            { new: true }
+          );
+        }
+      }
+    } catch (e) {
+      console.error(`Failed to adjust agent target revenue for agent ${agentId}:`, e);
+    }
+  }
+}
+
 async function getAgents() {
   const agents = await User.findAgents();
   for (const agent of agents) {
@@ -401,7 +509,9 @@ module.exports = {
   assignAgentsToManager,
   getMyTeam,
   ensureCurrentMonthMetrics,
-  getAgentIdCondition
+  getAgentIdCondition,
+  recordBookingForAgents,
+  adjustAgentTargetRevenue
 };
 
 async function toggleItineraryRole(id, isItinerary) {

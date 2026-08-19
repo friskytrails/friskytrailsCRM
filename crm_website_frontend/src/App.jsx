@@ -268,6 +268,45 @@ function App() {
     }
   };
 
+  const refreshAgents = async (agentId) => {
+    if (!token) return;
+    try {
+      if (agentId) {
+        const res = await fetch(`${API_URL}/agents/${agentId}/metrics`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const metrics = await res.json();
+          setAgents((prev) => prev.map(a => {
+            if (String(a.id || a._id) === String(agentId)) {
+              return {
+                ...a,
+                monthlyTarget: metrics.monthlyTarget !== undefined ? metrics.monthlyTarget : a.monthlyTarget,
+                targetCompleted: metrics.targetCompleted !== undefined ? metrics.targetCompleted : a.targetCompleted,
+                bookingCount: metrics.bookingCount !== undefined ? metrics.bookingCount : a.bookingCount,
+                targetBookingCount: metrics.targetBookingCount !== undefined ? metrics.targetBookingCount : a.targetBookingCount,
+                attendance: metrics.attendance !== undefined ? metrics.attendance : a.attendance,
+                historicalMetrics: metrics.historicalMetrics || a.historicalMetrics
+              };
+            }
+            return a;
+          }));
+          return;
+        }
+      }
+
+      const agentsRes = await fetch(`${API_URL}/agents`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (agentsRes.ok) {
+        const agentsData = await agentsRes.json();
+        setAgents(agentsData);
+      }
+    } catch (e) {
+      console.error("Failed to refresh agents:", e);
+    }
+  };
+
   const bookLeadAPI = async (leadId, bookingDetails) => {
     try {
       const response = await fetch(`${API_URL}/leads/${leadId}/book`, {
@@ -278,6 +317,7 @@ function App() {
       if (response.ok) {
         const updatedLead = await response.json();
         setLeads((prev) => prev.map(lead => lead.id === leadId ? updatedLead : lead));
+        (updatedLead?.agentIds || []).forEach(aid => refreshAgents(aid));
         toast.success("Lead booked successfully.");
         return updatedLead;
       } else {
@@ -304,6 +344,7 @@ function App() {
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success("New booking created successfully");
+        refreshAgents();
         const leadId = formData.get('leadId');
         if (leadId) {
           try {
@@ -342,6 +383,7 @@ function App() {
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success("Booking updated successfully!");
+        refreshAgents();
         return data.data;
       } else {
         toast.error(`Failed to edit booking: ${data.error || response.statusText}`);
@@ -606,11 +648,11 @@ function App() {
             />
             <Route
               path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} /> : <Navigate to="/" replace />}
+              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} loading={loadingData} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/agents/:id"
-              element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} /> : <Navigate to="/" replace />}
+              element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} refreshAgents={refreshAgents} loading={loadingData} /> : <Navigate to="/" replace />}
             />
             <Route
               path="/manager-dashboard"

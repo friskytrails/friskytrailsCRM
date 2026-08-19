@@ -3,7 +3,7 @@ const User = require('../models/User');
 const GlobalConfig = require('../models/GlobalConfig');
 const Booking = require('../models/Booking');
 const { formatDoc } = require('../utils/helpers');
-const { ensureCurrentMonthMetrics } = require('./agentService');
+const { ensureCurrentMonthMetrics, recordBookingForAgents } = require('./agentService');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { generateBookingId, generatePaymentId } = require('../controllers/bookingController');
@@ -493,12 +493,17 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw new Error("Invalid booking details");
   }
 
+  const hasPaxField = bookingDetails.noOfPax !== undefined || bookingDetails.adults !== undefined || bookingDetails.numberOfPersons !== undefined;
+  if (!hasPaxField) {
+    throw new Error("Passenger count ('noOfPax', 'adults', or 'numberOfPersons') is required for booking.");
+  }
+
   const requiredFields = [
     'fullName', 'emailId', 'contactNumber', 'emergencyContactNumber',
-    'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'
+    'packageName', 'startDate', 'endDate', 'totalAmount', 'paidAmount', 'dueAmount'
   ];
 
-  const numericFields = ['totalAmount', 'paidAmount', 'dueAmount', 'noOfPax'];
+  const numericFields = ['totalAmount', 'paidAmount', 'dueAmount'];
   const dateFields = ['startDate', 'endDate'];
 
   for (const field of requiredFields) {
@@ -535,8 +540,21 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 
   const totalAmount = Number(bookingDetails.totalAmount);
   const paidAmount = Number(bookingDetails.paidAmount);
-  const dueAmount = Math.max(0, totalAmount - paidAmount);
-  const noOfPax = Number(bookingDetails.noOfPax);
+
+  const rawChildren = bookingDetails.children !== undefined ? Number(bookingDetails.children) : 0;
+  const numChildren = (!isNaN(rawChildren) && rawChildren >= 0) ? rawChildren : 0;
+
+  const rawAdults = bookingDetails.adults !== undefined ? Number(bookingDetails.adults) : (bookingDetails.noOfPax !== undefined ? Number(bookingDetails.noOfPax) : (bookingDetails.numberOfPersons !== undefined ? Number(bookingDetails.numberOfPersons) : undefined));
+  let numAdults;
+  if (rawAdults !== undefined && !isNaN(rawAdults) && rawAdults >= 0) {
+    numAdults = rawAdults;
+  } else {
+    numAdults = numChildren > 0 ? 0 : 1;
+  }
+  if (numAdults === 0 && numChildren === 0) {
+    numAdults = 1;
+  }
+  const noOfPax = numAdults + numChildren;
 
   const sanitizedBookingDetails = {
     ...bookingDetails,
@@ -550,13 +568,23 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     totalAmount,
     paidAmount,
     dueAmount,
-    noOfPax
+    noOfPax,
+    adults: numAdults,
+    children: numChildren
   };
 
   // Create or update standalone Booking document in ft_booking_system
   const bookingId = bookingDetails.bookingId || (await generateBookingId());
   const paymentId = bookingDetails.paymentId || (await generatePaymentId());
   const transactionId = bookingDetails.transactionId || ('TXN-' + crypto.randomUUID().replace(/-/g, '').substring(0, 8).toUpperCase());
+
+  const assignedAgents = (Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0)
+    ? existingLead.agentIds
+    : [];
+
+  const createdByUser = (agentIdCondition && !Array.isArray(agentIdCondition))
+    ? agentIdCondition
+    : (Array.isArray(agentIdCondition) && agentIdCondition[0]) || (assignedAgents[0] || null);
 
   const newBooking = new Booking({
     bookingId,
@@ -576,8 +604,10 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     travellerPhone: contactNumber || existingLead.phone,
     status: 'Booked',
     tripStatus: 'Booked',
-    adults: noOfPax || 1,
-    children: 0
+    assignedTo: assignedAgents,
+    createdBy: createdByUser,
+    adults: numAdults,
+    children: numChildren
   });
 
   const updateData = {
@@ -622,54 +652,10 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     throw saveError;
   }
 
-  // Increment booking count for assigned agents if lead was not previously booked
+  // Increment booking count & targetCompleted for assigned agents if lead was not previously booked
   if (existingLead.status !== 'Booked' && Array.isArray(existingLead.agentIds) && existingLead.agentIds.length > 0) {
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
-
-    for (const agentId of existingLead.agentIds) {
-      try {
-        const agentUser = await User.findById(agentId);
-        if (agentUser && !agentUser.isAdmin) {
-          await ensureCurrentMonthMetrics(agentUser);
-
-          const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-          const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
-
-          const updated = await User.Model.findOneAndUpdate(
-            { _id: agentId },
-            { $inc: { bookingCount: 1 } },
-            { new: true }
-          );
-
-          if (updated) {
-            let histIdx = (updated.historicalMetrics || []).findIndex(m => m.month === currentMonthStr);
-            if (histIdx !== -1) {
-              await User.Model.updateOne(
-                { _id: agentId, "historicalMetrics.month": currentMonthStr },
-                { $set: { "historicalMetrics.$.bookingCount": updated.bookingCount } }
-              );
-            } else {
-              await User.Model.updateOne(
-                { _id: agentId },
-                {
-                  $push: {
-                    historicalMetrics: {
-                      month: currentMonthStr,
-                      monthlyTarget: updated.monthlyTarget || 0,
-                      targetCompleted: updated.targetCompleted || 0,
-                      bookingCount: updated.bookingCount
-                    }
-                  }
-                }
-              );
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Failed to update agent booking count:", e);
-      }
-    }
+    const totalAmount = Number(bookingDetails.totalAmount) || 0;
+    await recordBookingForAgents(existingLead.agentIds, totalAmount);
   }
 
   return await getLeadById(id, agentIdCondition);
@@ -730,10 +716,8 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   }
 
   // Manage callLogs for the current date in IST (Asia/Kolkata)
-  const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const istDate = new Date(utc + (3600000 * 5.5));
-  const todayDate = istDate.toISOString().split('T')[0];
+  // Use Intl.DateTimeFormat for reliable IST date, regardless of server timezone
+  const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   
   let query = {};
   if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {

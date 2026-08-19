@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
 const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
 
-export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager }) {
+export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager, loading }) {
   const [loadingAction, setLoadingAction] = useState({});
   const [processedAgents, setProcessedAgents] = useState({});
   const [assignModalManager, setAssignModalManager] = useState(null); // manager object or null
@@ -18,6 +18,15 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     sessionStorage.setItem('leadDetail_backUrl', '/agents');
     sessionStorage.setItem('leadDetail_backLabel', 'Active Team');
   }, []);
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center justify-center min-h-[400px]">
+        <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm font-semibold text-gray-500 dark:text-slate-400">Loading team data...</p>
+      </div>
+    );
+  }
 
   const pendingAgentsList = agents.filter(a => a.status === 'Pending');
   const managersList = agents.filter(a => a.isManager && a.status !== 'Pending');
@@ -52,10 +61,22 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     );
   });
 
+  const isInactiveStatus = (status) => {
+    const st = status || 'Fresh Leads';
+    return (
+      st === 'Booked' ||
+      st === 'Rejected Leads' ||
+      st === 'Rejected' ||
+      st === 'Future Leads' ||
+      st === 'Future' ||
+      st === 'Non Responding Leads' ||
+      st === 'Non Responding'
+    );
+  };
+
   const agentLeadCounts = leads.reduce((acc, lead) => {
     const st = lead.status || 'Fresh Leads';
-    const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
-    if (!isBookedOrRejected) {
+    if (!isInactiveStatus(st)) {
       (lead.agentIds || []).forEach(agentId => {
         const key = String(agentId);
         acc[key] = (acc[key] || 0) + 1;
@@ -188,7 +209,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
             </div>
             <div className="flex-1 min-w-0">
-              <Link to={`/agents/${getAgentSlug(agent)}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
+              <Link to={`/agents/${agent.id || agent._id}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
                 {agent.name}
               </Link>
               <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{agent.email}</p>
@@ -231,7 +252,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-              <Link to={`/agents/${getAgentSlug(agent)}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
+              <Link to={`/agents/${agent.id || agent._id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
               {agent.isItinerary && (
                 <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-900/50">Itinerary Team</span>
               )}
@@ -333,7 +354,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                         </div>
                         <div>
                           <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-                            <Link to={`/agents/${getAgentSlug(manager)}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
+                            <Link to={`/agents/${manager.id || manager._id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
                             <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-900/50">Manager</span>
                             {status !== 'Active' && (
                               <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
@@ -464,7 +485,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                     {teamMembers.map(member => (
                       <li key={member.id}>
                         <Link 
-                          to={`/agents/${getAgentSlug(member)}`}
+                          to={`/agents/${member.id || member._id}`}
                           onClick={() => setViewTeamManager(null)}
                           className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-violet-50 dark:bg-slate-800/50 dark:hover:bg-slate-700/80 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-violet-200 dark:hover:border-violet-900/50 transition-all group cursor-pointer"
                         >
