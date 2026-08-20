@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
@@ -39,24 +39,13 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
   }, [userId]);
 
   useEffect(() => {
-    sessionStorage.setItem(`dashboard_${userId}_searchQuery`, searchQuery);
-  }, [searchQuery, userId]);
-
-  useEffect(() => {
-    sessionStorage.setItem(`dashboard_${userId}_filterAgent`, filterAgent);
-  }, [filterAgent, userId]);
-
-  useEffect(() => {
-    sessionStorage.setItem(`dashboard_${userId}_sortBy`, sortBy);
-  }, [sortBy, userId]);
-
-  useEffect(() => {
-    sessionStorage.setItem(`dashboard_${userId}_filterStatus`, filterStatus);
-  }, [filterStatus, userId]);
-
-  useEffect(() => {
-    sessionStorage.setItem(`dashboard_${userId}_filterProduct`, filterProduct);
-  }, [filterProduct, userId]);
+    const prefix = `dashboard_${userId}_`;
+    sessionStorage.setItem(`${prefix}searchQuery`, searchQuery);
+    sessionStorage.setItem(`${prefix}filterAgent`, filterAgent);
+    sessionStorage.setItem(`${prefix}sortBy`, sortBy);
+    sessionStorage.setItem(`${prefix}filterStatus`, filterStatus);
+    sessionStorage.setItem(`${prefix}filterProduct`, filterProduct);
+  }, [searchQuery, filterAgent, sortBy, filterStatus, filterProduct, userId]);
 
   useEffect(() => {
     if (!agents || agents.length === 0) return;
@@ -203,21 +192,51 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     );
   };
 
+  const agentLeadCounts = useMemo(() => {
+    const counts = {};
+    (leads || []).forEach(lead => {
+      if (!isInactiveLeadStatus(lead.status)) {
+        (lead.agentIds || []).forEach(id => {
+          const targetId = String(id || '');
+          counts[targetId] = (counts[targetId] || 0) + 1;
+        });
+      }
+    });
+    return counts;
+  }, [leads]);
+
   const getAgentLeadCount = (agentId) => {
-    const targetId = String(agentId || '');
-    return leads.filter((lead) => {
-      return !isInactiveLeadStatus(lead.status) && (lead.agentIds || []).some(id => String(id) === targetId);
-    }).length;
+    return agentLeadCounts[String(agentId || '')] || 0;
   };
 
-  const activeLeads = leads.filter(lead => !isInactiveLeadStatus(lead.status));
-  const unassignedCount = activeLeads.filter(lead => {
-    return !(lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id))));
-  }).length;
-  const assignedCount = activeLeads.filter(lead => {
-    return lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)));
-  }).length;
-  const allActiveCount = activeLeads.length;
+  const { activeLeads, unassignedCount, assignedCount, allActiveCount, totalLeads, assignedLeads, unassignedLeads } = useMemo(() => {
+    const total = (leads || []).length;
+    const active = [];
+    let assigned = 0;
+    let activeAssigned = 0;
+
+    const agentIdSet = new Set((agents || []).map(a => getAgentId(a)).filter(Boolean));
+
+    (leads || []).forEach(lead => {
+      const isLeadAssigned = lead.agentIds && lead.agentIds.some(id => agentIdSet.has(String(id)));
+      if (isLeadAssigned) assigned++;
+
+      if (!isInactiveLeadStatus(lead.status)) {
+        active.push(lead);
+        if (isLeadAssigned) activeAssigned++;
+      }
+    });
+
+    return {
+      activeLeads: active,
+      unassignedCount: active.length - activeAssigned,
+      assignedCount: activeAssigned,
+      allActiveCount: active.length,
+      totalLeads: total,
+      assignedLeads: assigned,
+      unassignedLeads: total - assigned
+    };
+  }, [leads, agents]);
 
   const handleInlineAssign = async (leadId, newIds) => {
     await assignAgent(leadId, newIds);
@@ -285,68 +304,108 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     }
   };
 
-  // Metrics calculations
-  const totalLeads = leads.length;
-  const assignedLeads = leads.filter(lead => (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)))).length;
-  const unassignedLeads = totalLeads - assignedLeads;
+  // Filter logic (Memoized)
+  const filteredLeads = useMemo(() => {
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+    const hasSearchQuery = normalizedSearchQuery.length > 0;
+    const agentMap = new Map((agents || []).map(a => [getAgentId(a), a.name || '']));
+    const agentIdSet = new Set((agents || []).map(a => getAgentId(a)).filter(Boolean));
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const hasSearchQuery = normalizedSearchQuery.length > 0;
+    return (leads || []).filter((lead) => {
+      const leadStatus = lead.status || 'Fresh Leads';
+      // Exclude inactive status leads by default from the main grid unless searching or explicitly filtering by status
+      if (filterStatus === 'all' && !hasSearchQuery && isInactiveLeadStatus(lead.status)) {
+        return false;
+      }
 
-  // Filter logic
-  const filteredLeads = leads.filter((lead) => {
-    const leadStatus = lead.status || 'Fresh Leads';
-    // Exclude inactive status leads by default from the main grid unless searching or explicitly filtering by status
-    if (filterStatus === 'all' && !hasSearchQuery && isInactiveLeadStatus(lead.status)) {
-      return false;
-    }
+      const agentNames = (lead.agentIds || []).map(id => agentMap.get(String(id)) || "").join(" ");
+      const matchesSearch =
+        (lead.name || '').toLowerCase().includes(normalizedSearchQuery) ||
+        (lead.phone || '').includes(normalizedSearchQuery) ||
+        (lead.origin || '').toLowerCase().includes(normalizedSearchQuery) ||
+        (lead.destination || '').toLowerCase().includes(normalizedSearchQuery) ||
+        agentNames.toLowerCase().includes(normalizedSearchQuery);
 
-    const agentNames = (lead.agentIds || []).map(id => agents.find((a) => getAgentId(a) === String(id))?.name || "").join(" ");
-    const matchesSearch =
-      (lead.name || '').toLowerCase().includes(normalizedSearchQuery) ||
-      (lead.phone || '').includes(normalizedSearchQuery) ||
-      (lead.origin || '').toLowerCase().includes(normalizedSearchQuery) ||
-      (lead.destination || '').toLowerCase().includes(normalizedSearchQuery) ||
-      agentNames.toLowerCase().includes(normalizedSearchQuery);
+      // Active search query takes precedence to find any matching lead regardless of dropdown filter selections
+      if (hasSearchQuery) {
+        return matchesSearch;
+      }
 
-    // Active search query takes precedence to find any matching lead regardless of dropdown filter selections
-    if (hasSearchQuery) {
-      return matchesSearch;
-    }
+      const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agentIdSet.has(String(id)));
 
-    const isLeadAssigned = lead.agentIds && (lead.agentIds || []).some(id => agents.some(a => getAgentId(a) === String(id)));
+      const matchesAgent =
+        filterAgent === 'all' ||
+        (filterAgent === 'unassigned' && !isLeadAssigned) ||
+        (filterAgent === 'assigned' && isLeadAssigned) ||
+        (lead.agentIds || []).some(id => String(id) === String(filterAgent));
 
-    const matchesAgent =
-      filterAgent === 'all' ||
-      (filterAgent === 'unassigned' && !isLeadAssigned) ||
-      (filterAgent === 'assigned' && isLeadAssigned) ||
-      (lead.agentIds || []).some(id => String(id) === String(filterAgent));
+      const matchesStatus =
+        filterStatus === 'all' ||
+        leadStatus === filterStatus;
 
-    const matchesStatus =
-      filterStatus === 'all' ||
-      leadStatus === filterStatus;
+      const matchesProduct =
+        filterProduct === 'all' ||
+        lead.product === filterProduct;
 
-    const matchesProduct =
-      filterProduct === 'all' ||
-      lead.product === filterProduct;
+      return matchesSearch && matchesAgent && matchesStatus && matchesProduct;
+    });
+  }, [leads, agents, searchQuery, filterAgent, filterStatus, filterProduct]);
 
-    return matchesSearch && matchesAgent && matchesStatus && matchesProduct;
-  });
+  // Sort logic (Memoized)
+  const sortedLeads = useMemo(() => {
+    return [...filteredLeads].sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+        case 'name-asc':
+          return (a.name || '').localeCompare(b.name || '');
+        case 'name-desc':
+          return (b.name || '').localeCompare(a.name || '');
+        case 'newest':
+        default:
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      }
+    });
+  }, [filteredLeads, sortBy]);
 
-  // Sort logic
-  const sortedLeads = [...filteredLeads].sort((a, b) => {
-    switch (sortBy) {
-      case 'oldest':
-        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
-      case 'name-asc':
-        return (a.name || '').localeCompare(b.name || '');
-      case 'name-desc':
-        return (b.name || '').localeCompare(a.name || '');
-      case 'newest':
-      default:
-        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-    }
-  });
+  // Frontend Pagination (50 items batch, search and filter preserving)
+  const [visibleCount, setVisibleCount] = useState(50);
+
+  // Reset visible count whenever filters change
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy]);
+
+  const visibleLeads = useMemo(() => {
+    return sortedLeads.slice(0, visibleCount);
+  }, [sortedLeads, visibleCount]);
+
+  // Precomputed option lists for filter dropdowns (zero repeated scans)
+  const productOptions = useMemo(() => {
+    const prodSet = new Set(products || []);
+    (leads || []).forEach(l => {
+      if (l.product) prodSet.add(l.product);
+    });
+    return Array.from(prodSet);
+  }, [products, leads]);
+
+  const productCounts = useMemo(() => {
+    const counts = {};
+    (activeLeads || []).forEach(l => {
+      const prod = l.product || 'Other';
+      counts[prod] = (counts[prod] || 0) + 1;
+    });
+    return counts;
+  }, [activeLeads]);
+
+  const statusCounts = useMemo(() => {
+    const counts = {};
+    (leads || []).forEach(l => {
+      const st = l.status || 'Fresh Leads';
+      counts[st] = (counts[st] || 0) + 1;
+    });
+    return counts;
+  }, [leads]);
 
   // Sync current filtered/sorted lead IDs to sessionStorage for lead detail next/prev navigation
   useEffect(() => {
@@ -354,25 +413,33 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
     sessionStorage.setItem('leadDetail_backUrl', '/');
     sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
-  }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, leads, agents]);
+  }, [searchQuery, filterAgent, filterStatus, filterProduct, sortBy, sortedLeads]);
 
-  const filteredLiveStatus = liveStatus.filter(status => {
-    const ag = (agents || []).find(a => String(a.id || a._id) === String(status.agentId) || a.name === status.name);
-    if (ag) {
-      const st = ag.status || 'Active';
-      return st !== 'Inactive' && st !== 'Former Employee';
-    }
-    return true;
-  });
+  const filteredLiveStatus = useMemo(() => {
+    const agentMap = new Map((agents || []).map(a => [String(a.id || a._id || ''), a]));
+    const agentNameMap = new Map((agents || []).map(a => [a.name, a]));
+    return (liveStatus || []).filter(status => {
+      const ag = agentMap.get(String(status.agentId)) || agentNameMap.get(status.name);
+      if (ag) {
+        const st = ag.status || 'Active';
+        return st !== 'Inactive' && st !== 'Former Employee';
+      }
+      return true;
+    });
+  }, [liveStatus, agents]);
 
-  const filteredLiveActivity = liveActivity.filter(act => {
-    const ag = (agents || []).find(a => String(a.id || a._id) === String(act.agentId) || a.name === act.name);
-    if (ag) {
-      const st = ag.status || 'Active';
-      return st !== 'Inactive' && st !== 'Former Employee';
-    }
-    return true;
-  });
+  const filteredLiveActivity = useMemo(() => {
+    const agentMap = new Map((agents || []).map(a => [String(a.id || a._id || ''), a]));
+    const agentNameMap = new Map((agents || []).map(a => [a.name, a]));
+    return (liveActivity || []).filter(act => {
+      const ag = agentMap.get(String(act.agentId)) || agentNameMap.get(act.name);
+      if (ag) {
+        const st = ag.status || 'Active';
+        return st !== 'Inactive' && st !== 'Former Employee';
+      }
+      return true;
+    });
+  }, [liveActivity, agents]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -621,8 +688,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
               className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
             >
               <option value="all">All Packages ({activeLeads.length} {activeLeads.length === 1 ? 'lead' : 'leads'})</option>
-              {Array.from(new Set([...(products || []), ...leads.map(l => l.product).filter(Boolean)])).map(prod => {
-                const count = activeLeads.filter(l => (l.product || 'Other') === prod).length;
+              {productOptions.map(prod => {
+                const count = productCounts[prod] || 0;
                 return (
                   <option key={prod} value={prod}>
                     {prod} ({count} {count === 1 ? 'lead' : 'leads'})
@@ -641,7 +708,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
             >
               <option value="all">Active Statuses ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
               {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => {
-                const count = leads.filter(l => (l.status || 'Fresh Leads') === st).length;
+                const count = statusCounts[st] || 0;
                 return (
                   <option key={st} value={st}>{st} ({count} {count === 1 ? 'lead' : 'leads'})</option>
                 );
@@ -674,7 +741,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
         </div>
       ) : viewMode === 'card' ? (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 items-start">
-          {sortedLeads.map((lead) => {
+          {visibleLeads.map((lead) => {
             const currentAgentIds = lead.agentIds || [];
 
 
@@ -863,7 +930,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
         </div>
       ) : (
         <div className="mt-8 space-y-4">
-          {sortedLeads.map((lead) => {
+          {visibleLeads.map((lead) => {
             const currentAgentIds = lead.agentIds || [];
 
 
@@ -1047,6 +1114,25 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
         </div>
       )
       }
+
+      {/* Pagination Load More Controls */}
+      {sortedLeads.length > visibleCount && (
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button
+            onClick={() => setVisibleCount(prev => prev + 50)}
+            className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-2"
+          >
+            <span>Load More Leads</span>
+            <span className="text-orange-200 text-[11px]">({visibleCount} of {sortedLeads.length})</span>
+          </button>
+          <button
+            onClick={() => setVisibleCount(sortedLeads.length)}
+            className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Show All ({sortedLeads.length})
+          </button>
+        </div>
+      )}
 
       {/* Edit Lead Modal */}
       {editingLead && (

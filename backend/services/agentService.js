@@ -122,8 +122,8 @@ async function recordBookingForAgents(agentIds, totalAmount = 0) {
   const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
 
-  for (const agentId of agentIds) {
-    if (!agentId) continue;
+  await Promise.all(agentIds.map(async (agentId) => {
+    if (!agentId) return;
     try {
       const agentUser = await User.findById(agentId);
       if (agentUser && !agentUser.isAdmin) {
@@ -169,7 +169,7 @@ async function recordBookingForAgents(agentIds, totalAmount = 0) {
     } catch (e) {
       console.error(`Failed to record booking metrics for agent ${agentId}:`, e);
     }
-  }
+  }));
 }
 
 async function adjustAgentTargetRevenue(agentIds, amountDelta) {
@@ -179,8 +179,8 @@ async function adjustAgentTargetRevenue(agentIds, amountDelta) {
   const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
   const currentMonthStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}`;
 
-  for (const agentId of agentIds) {
-    if (!agentId) continue;
+  await Promise.all(agentIds.map(async (agentId) => {
+    if (!agentId) return;
     try {
       const agentUser = await User.findById(agentId);
       if (agentUser && !agentUser.isAdmin) {
@@ -221,14 +221,12 @@ async function adjustAgentTargetRevenue(agentIds, amountDelta) {
     } catch (e) {
       console.error(`Failed to adjust agent target revenue for agent ${agentId}:`, e);
     }
-  }
+  }));
 }
 
 async function getAgents() {
   const agents = await User.findAgents();
-  for (const agent of agents) {
-    await ensureCurrentMonthMetrics(agent);
-  }
+  await Promise.all(agents.map(agent => ensureCurrentMonthMetrics(agent)));
   return agents.map(formatDoc);
 }
 
