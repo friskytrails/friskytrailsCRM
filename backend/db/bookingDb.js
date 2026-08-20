@@ -20,35 +20,19 @@ async function connectBookingDB() {
     const primaryUri = config.MONGODB_URI;
     const customUri = config.BOOKING_MONGODB_URI;
 
-    // Helper to create and await connection
-    const tryConnect = (uri, isFallback = false) => {
-      return new Promise((resolve, reject) => {
-        const label = isFallback ? 'Primary cluster (ft_booking_system)' : 'BOOKING_MONGODB_URI';
-        console.log(`Connecting to Secondary MongoDB [${label}]...`);
-
-        const conn = mongoose.createConnection(uri, {
-          dbName: 'ft_booking_system',
-          serverSelectionTimeoutMS: 5000,
-          connectTimeoutMS: 5000
-        });
-
-        conn.once('open', () => {
-          console.log(`Successfully connected to Secondary MongoDB [${label}]!`);
-          resolve(conn);
-        });
-
-        conn.once('error', (err) => {
-          console.error(`Connection failed for Secondary MongoDB [${label}]:`, err.message);
-          conn.close().catch(() => {});
-          reject(err);
-        });
-      });
+    const connOpts = {
+      dbName: 'ft_booking_system',
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000
     };
 
     try {
       if (customUri) {
         try {
-          bookingDbConnection = await tryConnect(customUri, false);
+          console.log('Connecting to Secondary MongoDB [BOOKING_MONGODB_URI]...');
+          const conn = mongoose.createConnection(customUri, connOpts);
+          bookingDbConnection = await conn.asPromise();
+          console.log('Successfully connected to Secondary MongoDB [BOOKING_MONGODB_URI]!');
           isConnecting = false;
           return bookingDbConnection;
         } catch (customErr) {
@@ -57,7 +41,10 @@ async function connectBookingDB() {
       }
 
       if (primaryUri) {
-        bookingDbConnection = await tryConnect(primaryUri, true);
+        console.log('Connecting to Secondary MongoDB [Primary cluster (ft_booking_system)]...');
+        const conn = mongoose.createConnection(primaryUri, connOpts);
+        bookingDbConnection = await conn.asPromise();
+        console.log('Successfully connected to Secondary MongoDB [Primary cluster (ft_booking_system)]!');
         isConnecting = false;
         return bookingDbConnection;
       }

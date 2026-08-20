@@ -1,22 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import toast, { Toaster } from "react-hot-toast";
 import Navbar from './components/Navbar';
-import Dashboard from './pages/Dashboard';
-import AddLead from './pages/AddLead';
-import AgentsList from './pages/AgentsList';
-import AgentLeads from './pages/AgentLeads';
 import Login from './pages/Login';
-import LeadDetail from "./pages/LeadDetail";
-import Profile from './pages/Profile';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import Reports from './pages/Reports';
-import GlobalSettings from './pages/GlobalSettings';
-import ManagerDashboard from './pages/ManagerDashboard';
-import BugReports from './pages/BugReports';
 import './index.css';
+
+// Lazy-loaded authenticated pages for code splitting
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AddLead = lazy(() => import('./pages/AddLead'));
+const AgentsList = lazy(() => import('./pages/AgentsList'));
+const AgentLeads = lazy(() => import('./pages/AgentLeads'));
+const LeadDetail = lazy(() => import('./pages/LeadDetail'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Reports = lazy(() => import('./pages/Reports'));
+const GlobalSettings = lazy(() => import('./pages/GlobalSettings'));
+const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
+const BugReports = lazy(() => import('./pages/BugReports'));
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
 
@@ -344,8 +346,9 @@ function App() {
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success("New booking created successfully");
-        refreshAgents();
-        const leadId = formData.get('leadId');
+        const bookingAgentId = formData.get ? (formData.get('agentId') || formData.get('agentIds')) : (data?.data?.agentId || null);
+        refreshAgents(bookingAgentId || undefined);
+        const leadId = formData.get ? formData.get('leadId') : null;
         if (leadId) {
           try {
             const leadRes = await fetch(`${API_URL}/leads/${leadId}`, {
@@ -383,7 +386,8 @@ function App() {
       const data = await response.json();
       if (response.ok && data.success) {
         toast.success("Booking updated successfully!");
-        refreshAgents();
+        const bookingAgentId = formData.get ? (formData.get('agentId') || formData.get('agentIds')) : (data?.data?.agentId || null);
+        refreshAgents(bookingAgentId || undefined);
         return data.data;
       } else {
         toast.error(`Failed to edit booking: ${data.error || response.statusText}`);
@@ -632,67 +636,74 @@ function App() {
         <Navbar darkMode={darkMode} setDarkMode={setDarkMode} user={user} handleLogout={handleLogout} agents={agents} />
         <Toaster position='top-center' />
         <main>
-          <Routes>
-            <Route
-              path="/"
-              element={<Dashboard leads={leads} agents={agents} products={products} statuses={statuses} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
-            />
+          <Suspense fallback={
+            <div className="min-h-[60vh] flex flex-col items-center justify-center">
+              <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+              <p className="mt-3 text-xs font-semibold text-gray-400">Loading...</p>
+            </div>
+          }>
+            <Routes>
+              <Route
+                path="/"
+                element={<Dashboard leads={leads} agents={agents} products={products} statuses={statuses} assignAgent={assignAgent} addNote={addNote} deleteNote={deleteNote} updateLead={updateLead} updateLeadStatus={updateLeadStatus} updateLeadBooking={updateLeadBooking} user={user} loading={loadingData} />}
+              />
 
-            <Route
-              path="/add-lead"
-              element={user?.isItinerary ? <Navigate to="/" replace /> : <AddLead addLead={addLead} user={user} products={products} />}
-            />
-            <Route
-              path="/settings"
-              element={user?.isAdmin ? <GlobalSettings products={products} setProducts={setProducts} statuses={statuses} setStatuses={setStatuses} API_URL={API_URL} token={token} /> : <Navigate to="/" replace />}
-            />
-            <Route
-              path="/agents"
-              element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} loading={loadingData} /> : <Navigate to="/" replace />}
-            />
-            <Route
-              path="/agents/:id"
-              element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} refreshAgents={refreshAgents} loading={loadingData} /> : <Navigate to="/" replace />}
-            />
-            <Route
-              path="/manager-dashboard"
-              element={user?.isManager && !user?.isAdmin ? <ManagerDashboard user={user} token={token} leads={leads} /> : <Navigate to="/" replace />}
-            />
-            <Route
-              path="/reports"
-              element={user?.isAdmin ? <Reports leads={leads} agents={agents} /> : <Navigate to="/" replace />}
-            />
+              <Route
+                path="/add-lead"
+                element={user?.isItinerary ? <Navigate to="/" replace /> : <AddLead addLead={addLead} user={user} products={products} />}
+              />
+              <Route
+                path="/settings"
+                element={user?.isAdmin ? <GlobalSettings products={products} setProducts={setProducts} statuses={statuses} setStatuses={setStatuses} API_URL={API_URL} token={token} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/agents"
+                element={user?.isAdmin ? <AgentsList agents={agents} leads={leads} updateAgentStatus={updateAgentStatus} updateAgentVerification={updateAgentVerification} updateAgentMetrics={updateAgentMetrics} toggleManagerRole={toggleManagerRole} toggleItineraryRole={toggleItineraryRole} assignAgentsToManager={assignAgentsToManager} loading={loadingData} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/agents/:id"
+                element={(user?.isAdmin || user?.isManager) ? <AgentLeads leads={leads} agents={agents} statuses={statuses} updateAgentMetrics={updateAgentMetrics} refreshAgents={refreshAgents} loading={loadingData} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/manager-dashboard"
+                element={user?.isManager && !user?.isAdmin ? <ManagerDashboard user={user} token={token} leads={leads} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/reports"
+                element={user?.isAdmin ? <Reports leads={leads} agents={agents} /> : <Navigate to="/" replace />}
+              />
 
-            <Route
-              path="/leads/:id"
-              element={<LeadDetail 
-                      API_URL={API_URL} 
-                      token={token} 
-                      user={user} 
-                      setLeads={setLeads} 
-                      leads={leads} 
-                      agents={agents} 
-                      products={products}
-                      statuses={statuses}
-                      updateLeadStatus={updateLeadStatus} 
-                      bookLeadAPI={bookLeadAPI}
-                      createBookingAPI={createBookingAPI}
-                      editBookingAPI={editBookingAPI}
-                      getBookingAPI={getBookingAPI}
-                      updateLeadBooking={updateLeadBooking}
-                      assignAgent={assignAgent}
-                    />} />
-            <Route
-              path="/profile"
-              element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} handleLogout={handleLogout} />} />
-            <Route
-              path="/bug-reports"
-              element={<BugReports token={token} API_URL={API_URL} user={user} />} />
-            <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
-            <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
-            {/* Redirect any other path to dashboard */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route
+                path="/leads/:id"
+                element={<LeadDetail 
+                        API_URL={API_URL} 
+                        token={token} 
+                        user={user} 
+                        setLeads={setLeads} 
+                        leads={leads} 
+                        agents={agents} 
+                        products={products}
+                        statuses={statuses}
+                        updateLeadStatus={updateLeadStatus} 
+                        bookLeadAPI={bookLeadAPI}
+                        createBookingAPI={createBookingAPI}
+                        editBookingAPI={editBookingAPI}
+                        getBookingAPI={getBookingAPI}
+                        updateLeadBooking={updateLeadBooking}
+                        assignAgent={assignAgent}
+                      />} />
+              <Route
+                path="/profile"
+                element={<Profile user={user} setUser={setUser} token={token} API_URL={API_URL} handleLogout={handleLogout} />} />
+              <Route
+                path="/bug-reports"
+                element={<BugReports token={token} API_URL={API_URL} user={user} />} />
+              <Route path="/forgot-password" element={<ForgotPassword API_URL={API_URL} />} />
+              <Route path="/reset-password" element={<ResetPassword API_URL={API_URL} setToken={setToken} setUser={setUser} />} />
+              {/* Redirect any other path to dashboard */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </Router>

@@ -8,19 +8,17 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { generateBookingId, generatePaymentId } = require('../controllers/bookingController');
 
-async function getLeads(agentIdCondition = undefined) {
-  let leads = await Lead.findAll();
-  if (agentIdCondition !== undefined) {
-    if (Array.isArray(agentIdCondition)) {
-      leads = leads.filter(lead => lead.agentIds && lead.agentIds.some(id => agentIdCondition.includes(id)));
-    } else {
-      leads = leads.filter(lead => lead.agentIds && lead.agentIds.includes(agentIdCondition));
-    }
-  }
+/**
+ * Shared helper: fetches bookings from the Booking collection and merges them
+ * with any legacy trips already embedded on lead documents. Deduplicates by
+ * bookingId. Works for both single leads and arrays of leads.
+ *
+ * @param {Array} formattedLeads – array of formatted lead objects (from formatDoc)
+ * @returns {Promise<void>} – mutates each lead's `.trips` in place
+ */
+async function stitchBookingsForLeads(formattedLeads) {
+  if (!formattedLeads || formattedLeads.length === 0) return;
 
-  const formattedLeads = leads.map(formatDoc);
-
-  // Dynamically fetch and stitch bookings
   try {
     const leadIdSet = new Set();
     formattedLeads.forEach(l => {
@@ -82,9 +80,27 @@ async function getLeads(agentIdCondition = undefined) {
       l.trips = mergedTrips;
     });
   } catch (err) {
-    console.error('Failed to fetch and stitch bookings in getLeads:', err);
+    console.error('Failed to fetch and stitch bookings:', err);
     formattedLeads.forEach(l => { l.trips = []; });
   }
+}
+
+async function getLeads(agentIdCondition = undefined) {
+  // Push agent filter to MongoDB query instead of loading all leads into memory
+  let query = {};
+  if (agentIdCondition !== undefined) {
+    if (Array.isArray(agentIdCondition)) {
+      query.agentIds = { $in: agentIdCondition };
+    } else {
+      query.agentIds = agentIdCondition;
+    }
+  }
+
+  const leads = await Lead.Model.find(query).lean();
+  const formattedLeads = leads.map(formatDoc);
+
+  // Dynamically fetch and stitch bookings
+  await stitchBookingsForLeads(formattedLeads);
 
   return formattedLeads;
 }
@@ -366,43 +382,8 @@ async function getLeadById(id, agentIdCondition = undefined) {
 
   const formattedLead = formatDoc(lead);
 
-  // Dynamically fetch and stitch bookings
-  try {
-    const possibleKeys = [
-      formattedLead._id ? formattedLead._id.toString() : null,
-      formattedLead.id ? formattedLead.id.toString() : null,
-      formattedLead.leadId !== undefined && formattedLead.leadId !== null ? formattedLead.leadId.toString() : null
-    ].filter(Boolean);
-
-    const bookings = await Booking.find({ leadId: { $in: possibleKeys } }).lean();
-    
-    const legacyTrips = Array.isArray(formattedLead.trips) ? formattedLead.trips : [];
-    const seen = new Set();
-    const mergedTrips = [];
-
-    (bookings || []).forEach(b => {
-      const bId = b.bookingId || (b._id && b._id.toString());
-      if (bId && !seen.has(bId.toString())) {
-        seen.add(bId.toString());
-        mergedTrips.push(b);
-      }
-    });
-
-    legacyTrips.forEach(t => {
-      if (t && typeof t === 'object') {
-        const tId = t.bookingId || (t._id && t._id.toString()) || t.id;
-        if (!tId || !seen.has(tId.toString())) {
-          if (tId) seen.add(tId.toString());
-          mergedTrips.push(t);
-        }
-      }
-    });
-
-    formattedLead.trips = mergedTrips;
-  } catch (err) {
-    console.error('Failed to fetch and stitch bookings in getLeadById:', err);
-    formattedLead.trips = [];
-  }
+  // Dynamically fetch and stitch bookings using shared helper
+  await stitchBookingsForLeads([formattedLead]);
 
   return formattedLead;
 }
