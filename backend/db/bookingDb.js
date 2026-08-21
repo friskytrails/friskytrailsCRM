@@ -25,7 +25,7 @@ async function connectBookingDB() {
     connectPromise = (async () => {
       const connOpts = {
         dbName: 'ft_booking_system',
-        maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE || '3', 10),
+        maxPoolSize: config.MONGODB_MAX_POOL_SIZE,
         minPoolSize: 0,
         maxIdleTimeMS: 10000,       // close idle connections after 10s
         serverSelectionTimeoutMS: 5000,
@@ -43,7 +43,10 @@ async function connectBookingDB() {
       } catch (customErr) {
         console.warn("BOOKING_MONGODB_URI failed (auth/network). Attempting fallback to primary MongoDB cluster for ft_booking_system database...");
         // Fall back to sharing the main connection pool
-        await connectDB();
+        const conn = await connectDB();
+        if (!conn || mongoose.connection.readyState !== 1) {
+          throw new Error("Cannot share connection pool: primary MongoDB connection is not established. Verify MONGODB_URI is configured correctly.");
+        }
         bookingDbConnection = mongoose.connection.useDb('ft_booking_system', { useCache: true });
         isConnecting = false;
         return bookingDbConnection;
@@ -53,7 +56,10 @@ async function connectBookingDB() {
     return connectPromise;
   } else {
     // Share connection pool to cut connections in half
-    await connectDB();
+    const conn = await connectDB();
+    if (!conn || mongoose.connection.readyState !== 1) {
+      throw new Error("Cannot share connection pool: primary MongoDB connection is not established. Verify MONGODB_URI is configured correctly.");
+    }
     bookingDbConnection = mongoose.connection.useDb('ft_booking_system', { useCache: true });
     return bookingDbConnection;
   }
