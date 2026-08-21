@@ -1,68 +1,68 @@
 const mongoose = require('mongoose');
 const config = require('../config');
+const { connectDB } = require('./index');
 
 let bookingDbConnection = null;
 let isConnecting = false;
 let connectPromise = null;
 
 async function connectBookingDB() {
-  if (bookingDbConnection && bookingDbConnection.readyState === 1) {
-    return bookingDbConnection;
-  }
+  const primaryUri = config.MONGODB_URI;
+  const customUri = config.BOOKING_MONGODB_URI;
 
-  if (isConnecting && connectPromise) {
-    return connectPromise;
-  }
+  // If different clusters, attempt to create a separate connection pool
+  if (customUri && customUri !== primaryUri) {
+    if (bookingDbConnection && bookingDbConnection.readyState === 1) {
+      return bookingDbConnection;
+    }
 
-  isConnecting = true;
+    if (isConnecting && connectPromise) {
+      return connectPromise;
+    }
 
-  connectPromise = (async () => {
-    const primaryUri = config.MONGODB_URI;
-    const customUri = config.BOOKING_MONGODB_URI;
+    isConnecting = true;
 
-    const connOpts = {
-      dbName: 'ft_booking_system',
-      maxPoolSize: 3,
-      minPoolSize: 0,
-      maxIdleTimeMS: 10000,       // close idle connections after 10s
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-      socketTimeoutMS: 45000
-    };
+    connectPromise = (async () => {
+      const connOpts = {
+        dbName: 'ft_booking_system',
+        maxPoolSize: config.MONGODB_MAX_POOL_SIZE,
+        minPoolSize: 0,
+        maxIdleTimeMS: 10000,       // close idle connections after 10s
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 45000
+      };
 
-    try {
-      if (customUri) {
-        try {
-          console.log('Connecting to Secondary MongoDB [BOOKING_MONGODB_URI]...');
-          const conn = mongoose.createConnection(customUri, connOpts);
-          bookingDbConnection = await conn.asPromise();
-          console.log('Successfully connected to Secondary MongoDB [BOOKING_MONGODB_URI]!');
-          isConnecting = false;
-          return bookingDbConnection;
-        } catch (customErr) {
-          console.warn("BOOKING_MONGODB_URI failed (auth/network). Attempting fallback to primary MongoDB cluster for ft_booking_system database...");
-        }
-      }
-
-      if (primaryUri) {
-        console.log('Connecting to Secondary MongoDB [Primary cluster (ft_booking_system)]...');
-        const conn = mongoose.createConnection(primaryUri, connOpts);
+      try {
+        console.log('Connecting to Secondary MongoDB [BOOKING_MONGODB_URI]...');
+        const conn = mongoose.createConnection(customUri, connOpts);
         bookingDbConnection = await conn.asPromise();
-        console.log('Successfully connected to Secondary MongoDB [Primary cluster (ft_booking_system)]!');
+        console.log('Successfully connected to Secondary MongoDB [BOOKING_MONGODB_URI]!');
+        isConnecting = false;
+        return bookingDbConnection;
+      } catch (customErr) {
+        console.warn("BOOKING_MONGODB_URI failed (auth/network). Attempting fallback to primary MongoDB cluster for ft_booking_system database...");
+        // Fall back to sharing the main connection pool
+        const conn = await connectDB();
+        if (!conn || mongoose.connection.readyState !== 1) {
+          throw new Error("Cannot share connection pool: primary MongoDB connection is not established. Verify MONGODB_URI is configured correctly.");
+        }
+        bookingDbConnection = mongoose.connection.useDb('ft_booking_system', { useCache: true });
         isConnecting = false;
         return bookingDbConnection;
       }
+    })();
 
-      throw new Error("No MongoDB URI available for booking connection.");
-    } catch (error) {
-      isConnecting = false;
-      connectPromise = null;
-      console.error("Critical failure connecting to Secondary MongoDB:", error.message);
-      throw error;
+    return connectPromise;
+  } else {
+    // Share connection pool to cut connections in half
+    const conn = await connectDB();
+    if (!conn || mongoose.connection.readyState !== 1) {
+      throw new Error("Cannot share connection pool: primary MongoDB connection is not established. Verify MONGODB_URI is configured correctly.");
     }
-  })();
-
-  return connectPromise;
+    bookingDbConnection = mongoose.connection.useDb('ft_booking_system', { useCache: true });
+    return bookingDbConnection;
+  }
 }
 
 function getBookingDB() {
