@@ -22,8 +22,11 @@ async function connectBookingDB() {
 
     const connOpts = {
       dbName: 'ft_booking_system',
+      maxPoolSize: 5,
+      minPoolSize: 0,
       serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 45000
     };
 
     try {

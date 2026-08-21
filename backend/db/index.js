@@ -28,7 +28,10 @@ async function connectDB() {
     try {
       const conn = await mongoose.connect(uri, { 
         dbName: 'crm_website',
-        serverSelectionTimeoutMS: 5000 // fail fast rather than hanging
+        maxPoolSize: 5,
+        minPoolSize: 0,
+        serverSelectionTimeoutMS: 5000, // fail fast rather than hanging
+        socketTimeoutMS: 45000
       });
       cachedConnection = conn;
       isConnecting = false;
