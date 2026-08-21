@@ -621,9 +621,10 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       )}
 
       {/* Search and Filters Section */}
-      <div className="mt-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4 border border-gray-100 dark:border-slate-700/50 transition-all duration-300 hover:shadow-md">
-        <div className="relative flex-1">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+      <div className="mt-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700/50 transition-all duration-300 hover:shadow-md space-y-4">
+        {/* Full Width Search Bar */}
+        <div className="relative w-full">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 dark:text-slate-500">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -633,88 +634,117 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
             placeholder="Search by name, phone, origin, destination, or agent..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm bg-gray-50/50"
+            className="block w-full pl-11 pr-10 py-2.5 border border-gray-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm bg-gray-50/70 dark:bg-slate-900/70 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 transition-all shadow-sm"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
+              title="Clear search"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Agent:</span>
-            <select
-              value={filterAgent}
-              onChange={(e) => setFilterAgent(e.target.value)}
-              className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
-            >
-              <option value="unassigned">Unassigned Only (Default) ({unassignedCount} {unassignedCount === 1 ? 'lead' : 'leads'})</option>
-              <option value="assigned">Assigned Only ({assignedCount} {assignedCount === 1 ? 'lead' : 'leads'})</option>
-              <option value="all">Unassigned & Assigned (All) ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
-              {agents
-                .filter(agent => {
-                  const st = agent.status || 'Active';
-                  const isItinerary = agent.isItinerary || agent.role === 'itinerary';
-                  return st !== 'Inactive' && st !== 'Former Employee' && !isItinerary;
-                })
-                .map((agent) => {
-                  const agentId = getAgentId(agent);
-                  const count = getAgentLeadCount(agentId);
+        {/* Filter Controls Row */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-slate-700/50">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Agent:</span>
+              <select
+                value={filterAgent}
+                onChange={(e) => setFilterAgent(e.target.value)}
+                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+              >
+                <option value="unassigned">Unassigned Only (Default) ({unassignedCount} {unassignedCount === 1 ? 'lead' : 'leads'})</option>
+                <option value="assigned">Assigned Only ({assignedCount} {assignedCount === 1 ? 'lead' : 'leads'})</option>
+                <option value="all">Unassigned & Assigned (All) ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
+                {agents
+                  .filter(agent => {
+                    const st = agent.status || 'Active';
+                    const isItinerary = agent.isItinerary || agent.role === 'itinerary';
+                    return st !== 'Inactive' && st !== 'Former Employee' && !isItinerary;
+                  })
+                  .map((agent) => {
+                    const agentId = getAgentId(agent);
+                    const count = getAgentLeadCount(agentId);
+                    return (
+                      <option key={agentId} value={agentId}>
+                        {agent.name} ({count} {count === 1 ? 'lead' : 'leads'})
+                      </option>
+                    );
+                  })}
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Package:</span>
+              <select
+                value={filterProduct}
+                onChange={(e) => setFilterProduct(e.target.value)}
+                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+              >
+                <option value="all">All Packages ({activeLeads.length} {activeLeads.length === 1 ? 'lead' : 'leads'})</option>
+                {productOptions.map(prod => {
+                  const count = productCounts[prod] || 0;
                   return (
-                    <option key={agentId} value={agentId}>
-                      {agent.name} ({count} {count === 1 ? 'lead' : 'leads'})
+                    <option key={prod} value={prod}>
+                      {prod} ({count} {count === 1 ? 'lead' : 'leads'})
                     </option>
                   );
                 })}
-            </select>
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Status:</span>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+              >
+                <option value="all">Active Statuses ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
+                {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => {
+                  const count = statusCounts[st] || 0;
+                  return (
+                    <option key={st} value={st}>{st} ({count} {count === 1 ? 'lead' : 'leads'})</option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
+          {(searchQuery || filterAgent !== 'unassigned' || filterProduct !== 'all' || filterStatus !== 'all' || sortBy !== 'newest') && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setFilterAgent('unassigned');
+                setFilterProduct('all');
+                setFilterStatus('all');
+                setSortBy('newest');
+              }}
+              className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors cursor-pointer py-1 px-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/50"
             >
-              <option value="newest">Newest First</option>
-              <option value="oldest">Oldest First</option>
-              <option value="name-asc">Name (A-Z)</option>
-              <option value="name-desc">Name (Z-A)</option>
-            </select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Package:</span>
-            <select
-              value={filterProduct}
-              onChange={(e) => setFilterProduct(e.target.value)}
-              className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
-            >
-              <option value="all">All Packages ({activeLeads.length} {activeLeads.length === 1 ? 'lead' : 'leads'})</option>
-              {productOptions.map(prod => {
-                const count = productCounts[prod] || 0;
-                return (
-                  <option key={prod} value={prod}>
-                    {prod} ({count} {count === 1 ? 'lead' : 'leads'})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Status:</span>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="pl-3 pr-8 py-2 text-xs border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white cursor-pointer text-gray-700 font-medium"
-            >
-              <option value="all">Active Statuses ({allActiveCount} {allActiveCount === 1 ? 'lead' : 'leads'})</option>
-              {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => {
-                const count = statusCounts[st] || 0;
-                return (
-                  <option key={st} value={st}>{st} ({count} {count === 1 ? 'lead' : 'leads'})</option>
-                );
-              })}
-            </select>
-          </div>
+              Reset Filters
+            </button>
+          )}
         </div>
       </div>
 
