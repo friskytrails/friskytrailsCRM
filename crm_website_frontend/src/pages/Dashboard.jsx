@@ -110,6 +110,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     let isMounted = true;
 
     const fetchLiveStatus = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
@@ -125,6 +126,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
     };
 
     const fetchLiveActivity = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
@@ -139,9 +141,20 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
       }
     };
 
-    // Fetch both immediately on mount
-    fetchLiveStatus();
-    fetchLiveActivity();
+    // Fetch both immediately on mount if visible
+    if (document.visibilityState === 'visible') {
+      fetchLiveStatus();
+      fetchLiveActivity();
+    }
+
+    // Refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLiveStatus();
+        fetchLiveActivity();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Live Status polling: Every 1 minute
     const statusInterval = setInterval(fetchLiveStatus, 60000);
@@ -150,6 +163,7 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
     return () => {
       isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(statusInterval);
       clearInterval(activityInterval);
     };

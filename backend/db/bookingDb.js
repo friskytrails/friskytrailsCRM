@@ -22,8 +22,9 @@ async function connectBookingDB() {
 
     const connOpts = {
       dbName: 'ft_booking_system',
-      maxPoolSize: 5,
+      maxPoolSize: 3,
       minPoolSize: 0,
+      maxIdleTimeMS: 10000,       // close idle connections after 10s
       serverSelectionTimeoutMS: 5000,
       connectTimeoutMS: 5000,
       socketTimeoutMS: 45000

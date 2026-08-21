@@ -28,8 +28,9 @@ async function connectDB() {
     try {
       const conn = await mongoose.connect(uri, { 
         dbName: 'crm_website',
-        maxPoolSize: 5,
+        maxPoolSize: 3,
         minPoolSize: 0,
+        maxIdleTimeMS: 10000,       // close idle connections after 10s
         serverSelectionTimeoutMS: 5000, // fail fast rather than hanging
         socketTimeoutMS: 45000
       });
