@@ -145,11 +145,14 @@ const LeadSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Performance indexes for query acceleration
+// Performance indexes for query acceleration and instant sorting
 LeadSchema.index({ agentIds: 1 });
 LeadSchema.index({ status: 1 });
-LeadSchema.index({ agentIds: 1, status: 1 });
 LeadSchema.index({ createdAt: -1 });
+LeadSchema.index({ agentIds: 1, status: 1 });
+LeadSchema.index({ agentIds: 1, createdAt: -1 });
+LeadSchema.index({ status: 1, createdAt: -1 });
+LeadSchema.index({ agentIds: 1, status: 1, createdAt: -1 });
 
 const Lead = mongoose.model('Lead', LeadSchema);
 
