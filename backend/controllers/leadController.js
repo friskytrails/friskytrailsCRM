@@ -48,7 +48,7 @@ async function getLeads(req, res) {
       product: product || '',
       sortBy: sortBy || 'newest',
       filterAgent: req.user.isAdmin ? (filterAgent || '') : '',
-      pagination: pagination === 'false' ? false : true
+      pagination: pagination === 'true' ? true : false
     });
 
     // If pagination was disabled, result is an array

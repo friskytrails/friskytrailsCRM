@@ -111,7 +111,8 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         status: filterStatus,
         product: filterProduct,
         sortBy: sortBy,
-        filterAgent: filterAgent
+        filterAgent: filterAgent,
+        pagination: 'true'
       });
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/leads?${params.toString()}`, {
