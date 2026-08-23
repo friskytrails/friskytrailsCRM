@@ -85,9 +85,23 @@ async function stitchBookingsForLeads(formattedLeads) {
   }
 }
 
-async function getLeads(agentIdCondition = undefined) {
-  // Push agent filter to MongoDB query instead of loading all leads into memory
+const INACTIVE_STATUSES = ['Booked', 'Rejected Leads', 'Rejected', 'Future Leads', 'Future', 'Non Responding Leads', 'Non Responding'];
+
+async function getLeads(agentIdCondition = undefined, options = {}) {
+  const {
+    page = 1,
+    limit = 50,
+    search = '',
+    status = '',
+    product = '',
+    sortBy = 'newest',
+    filterAgent = '',
+    pagination = true
+  } = options;
+
   let query = {};
+
+  // 1. Agent scope condition (enforces security for non-admins)
   if (agentIdCondition !== undefined) {
     if (Array.isArray(agentIdCondition)) {
       query.agentIds = { $in: agentIdCondition };
@@ -96,13 +110,152 @@ async function getLeads(agentIdCondition = undefined) {
     }
   }
 
-  const leads = await Lead.Model.find(query)
-    .select('-notes -callLogs -trips -booking -bookingDetails')
-    .sort({ createdAt: -1 })
-    .lean();
+  // 2. Specific filterAgent from dashboard (for admins)
+  if (filterAgent && filterAgent !== 'all') {
+    if (filterAgent === 'unassigned') {
+      query.$or = [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }];
+    } else if (filterAgent === 'assigned') {
+      query.agentIds = { $exists: true, $not: { $size: 0 } };
+    } else {
+      query.agentIds = filterAgent;
+    }
+  }
+
+  // 3. Search query
+  const trimmedSearch = typeof search === 'string' ? search.trim() : '';
+  const hasSearch = trimmedSearch.length > 0;
+  if (hasSearch) {
+    const escaped = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    query.$or = [
+      { name: regex },
+      { phone: regex },
+      { origin: regex },
+      { destination: regex },
+      { mailId: regex },
+      { product: regex }
+    ];
+  }
+
+  // 4. Status filter
+  if (status && status !== 'all') {
+    query.status = status;
+  } else if (!status && !hasSearch && filterAgent === 'unassigned') {
+    // Default dashboard view: hide inactive leads unless searching or explicitly viewing 'all'
+    query.status = { $nin: INACTIVE_STATUSES };
+  } else if (!status && !hasSearch && (!filterAgent || filterAgent === 'all')) {
+    query.status = { $nin: INACTIVE_STATUSES };
+  }
+
+  // 5. Product filter
+  if (product && product !== 'all') {
+    query.product = product;
+  }
+
+  // 6. Sort mapping
+  const sortMap = {
+    newest: { createdAt: -1 },
+    oldest: { createdAt: 1 },
+    'name-asc': { name: 1 },
+    'name-desc': { name: -1 }
+  };
+  const sortOrder = sortMap[sortBy] || { createdAt: -1 };
+
+  const parsedPage = Math.max(1, parseInt(page) || 1);
+  const parsedLimit = Math.max(1, Math.min(100, parseInt(limit) || 50));
+  const skip = (parsedPage - 1) * parsedLimit;
+
+  // If pagination is explicitly disabled, return array
+  if (pagination === false) {
+    const rawLeads = await Lead.Model.find(query)
+      .select('-notes -callLogs -trips -booking -bookingDetails')
+      .sort(sortOrder)
+      .lean();
+    return rawLeads.map(formatDoc);
+  }
+
+  const [leads, totalCount] = await Promise.all([
+    Lead.Model.find(query)
+      .select('-notes -callLogs -trips -booking -bookingDetails')
+      .sort(sortOrder)
+      .skip(skip)
+      .limit(parsedLimit)
+      .lean(),
+    Lead.Model.countDocuments(query)
+  ]);
+
   const formattedLeads = leads.map(formatDoc);
 
-  return formattedLeads;
+  return {
+    leads: formattedLeads,
+    totalCount,
+    page: parsedPage,
+    totalPages: Math.ceil(totalCount / parsedLimit) || 1,
+    limit: parsedLimit
+  };
+}
+
+async function getLeadCounts(agentIdCondition = undefined) {
+  const baseQuery = {};
+  if (agentIdCondition !== undefined) {
+    if (Array.isArray(agentIdCondition)) {
+      baseQuery.agentIds = { $in: agentIdCondition };
+    } else {
+      baseQuery.agentIds = agentIdCondition;
+    }
+  }
+
+  const inactiveStatuses = INACTIVE_STATUSES;
+
+  const [statusAgg, productAgg, agentAgg, totalCount, activeCount, unassignedCount] = await Promise.all([
+    Lead.Model.aggregate([
+      { $match: baseQuery },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]),
+    Lead.Model.aggregate([
+      { $match: { ...baseQuery, status: { $nin: inactiveStatuses } } },
+      { $group: { _id: '$product', count: { $sum: 1 } } }
+    ]),
+    Lead.Model.aggregate([
+      { $match: { ...baseQuery, status: { $nin: inactiveStatuses }, agentIds: { $exists: true, $ne: [] } } },
+      { $unwind: '$agentIds' },
+      { $group: { _id: '$agentIds', count: { $sum: 1 } } }
+    ]),
+    Lead.Model.countDocuments(baseQuery),
+    Lead.Model.countDocuments({ ...baseQuery, status: { $nin: inactiveStatuses } }),
+    Lead.Model.countDocuments({
+      ...baseQuery,
+      status: { $nin: inactiveStatuses },
+      $or: [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }]
+    })
+  ]);
+
+  const statusCounts = {};
+  statusAgg.forEach(({ _id, count }) => {
+    statusCounts[_id || 'Fresh Leads'] = count;
+  });
+
+  const productCounts = {};
+  productAgg.forEach(({ _id, count }) => {
+    if (_id) productCounts[_id] = count;
+  });
+
+  const agentCounts = {};
+  agentAgg.forEach(({ _id, count }) => {
+    if (_id !== null && _id !== undefined) {
+      agentCounts[String(_id)] = count;
+    }
+  });
+
+  return {
+    totalLeads: totalCount,
+    allActiveCount: activeCount,
+    unassignedCount,
+    assignedCount: Math.max(0, activeCount - unassignedCount),
+    statusCounts,
+    productCounts,
+    agentCounts
+  };
 }
 
 async function createLead(name, phone, age, origin, destination, leadSource, mailId, product, createdByUser) {
@@ -751,6 +904,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
 
 module.exports = {
   getLeads,
+  getLeadCounts,
   createLead,
   updateLead,
   assignLead,

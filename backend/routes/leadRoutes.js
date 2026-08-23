@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const router = express.Router();
 
 router.get('/', auth, leadController.getLeads);
+router.get('/counts', auth, leadController.getLeadCounts);
 router.post('/', auth, leadController.createLead);
 router.get('/:id', auth, leadController.getLead);
 router.put('/:id', auth, leadController.updateLead);

@@ -61,29 +61,26 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     );
   });
 
-  const isInactiveStatus = (status) => {
-    const st = status || 'Fresh Leads';
-    return (
-      st === 'Booked' ||
-      st === 'Rejected Leads' ||
-      st === 'Rejected' ||
-      st === 'Future Leads' ||
-      st === 'Future' ||
-      st === 'Non Responding Leads' ||
-      st === 'Non Responding'
-    );
-  };
+  const [agentLeadCounts, setAgentLeadCounts] = useState({});
 
-  const agentLeadCounts = leads.reduce((acc, lead) => {
-    const st = lead.status || 'Fresh Leads';
-    if (!isInactiveStatus(st)) {
-      (lead.agentIds || []).forEach(agentId => {
-        const key = String(agentId);
-        acc[key] = (acc[key] || 0) + 1;
-      });
-    }
-    return acc;
-  }, {});
+  useEffect(() => {
+    const fetchLeadCounts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAgentLeadCounts(data.agentCounts || {});
+        }
+      } catch (err) {
+        console.error('Error fetching lead counts for team list:', err);
+      }
+    };
+    fetchLeadCounts();
+  }, []);
 
   const handleAction = async (agentId, action, value) => {
     if (action === 'status' && (value === 'Inactive' || value === 'Former Employee')) {

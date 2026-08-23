@@ -70,17 +70,24 @@ export default function ManagerDashboard({ user, token, leads = [] }) {
     }
   };
 
-  const agentLeadCounts = leads.reduce((acc, lead) => {
-    const st = lead.status || 'Fresh Leads';
-    const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
-    if (!isBookedOrRejected) {
-      (lead.agentIds || []).forEach(agentId => {
-        const key = String(agentId);
-        acc[key] = (acc[key] || 0) + 1;
-      });
-    }
-    return acc;
-  }, {});
+  const [agentLeadCounts, setAgentLeadCounts] = useState({});
+
+  useEffect(() => {
+    const fetchLeadCounts = async () => {
+      try {
+        const res = await fetch(`${API_URL}/leads/counts`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAgentLeadCounts(data.agentCounts || {});
+        }
+      } catch (err) {
+        console.error('Error fetching manager team lead counts:', err);
+      }
+    };
+    if (token) fetchLeadCounts();
+  }, [token]);
 
   const statusColors = {
     Active: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50',

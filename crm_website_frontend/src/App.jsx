@@ -55,7 +55,7 @@ function App() {
     setUser(null);
   };
 
-  // Fetch all leads and agents on component mount or token update
+  // Fetch agents, config, profile on component mount or token update
   useEffect(() => {
     if (!token) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -65,10 +65,7 @@ function App() {
     async function fetchData() {
       setLoadingData(true);
       try {
-        const [leadsRes, agentsRes, configRes, profileRes] = await Promise.all([
-          fetch(`${API_URL}/leads`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          }),
+        const [agentsRes, configRes, profileRes] = await Promise.all([
           fetch(`${API_URL}/agents`, {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
@@ -79,11 +76,9 @@ function App() {
             headers: { 'Authorization': `Bearer ${token}` }
           })
         ]);
-        if (leadsRes.ok && agentsRes.ok && configRes.ok) {
-          const leadsData = await leadsRes.json();
+        if (agentsRes.ok && configRes.ok) {
           const agentsData = await agentsRes.json();
           const configData = await configRes.json();
-          setLeads(leadsData);
           setAgents(agentsData);
           setProducts(configData.products || []);
           setStatuses(configData.statuses || []);
@@ -98,7 +93,7 @@ function App() {
           }
         } else {
           // If token expired or invalid
-          if (leadsRes.status === 401 || agentsRes.status === 401) {
+          if (agentsRes.status === 401 || (profileRes && profileRes.status === 401)) {
             handleLogout();
             toast.error("Session expired. Please log in again.");
           } else {
@@ -131,11 +126,29 @@ function App() {
       });
       if (response.ok) {
         const savedLead = await response.json();
-        // Only admins should see unassigned leads added to their dashboard
+        const leadId = savedLead.id || savedLead._id;
+
         if (user?.isAdmin) {
-          setLeads((prev) => [savedLead, ...prev]);
+          toast.success((t) => (
+            <div className="flex items-center justify-between gap-3 min-w-[260px]">
+              <span className="font-semibold text-xs text-gray-800 dark:text-gray-200">Lead created successfully!</span>
+              <a
+                href={`/leads/${leadId}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  toast.dismiss(t.id);
+                  window.location.href = `/leads/${leadId}`;
+                }}
+                className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-2.5 py-1 rounded-lg font-bold transition-colors shrink-0 shadow-sm"
+              >
+                View Lead →
+              </a>
+            </div>
+          ), { duration: 6000 });
+        } else {
+          toast.success("Lead created successfully.");
         }
-        toast.success("Lead added successfully.");
+
         return true;
       } else {
         const errData = await response.json().catch(() => ({}));

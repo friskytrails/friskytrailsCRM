@@ -1,11 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const config = require('./config');
 const { connectDB } = require('./db');
-const { connectBookingDB } = require('./db/bookingDb');
 const apiRoutes = require('./routes');
 
 const app = express();
+
+// Enable gzip/brotli compression for all responses
+app.use(compression());
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -35,11 +38,10 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// Ensure database is connected before handling API routes (0ms fast-path if already connected)
+// Ensure primary database is connected before handling API routes (0ms fast-path if already connected)
 app.use('/api', async (req, res, next) => {
   try {
-    // Check/establish both connections concurrently
-    await Promise.all([connectDB(), connectBookingDB()]);
+    await connectDB();
     next();
   } catch (error) {
     console.error("Critical database connection failure:", error);
@@ -49,15 +51,15 @@ app.use('/api', async (req, res, next) => {
 
 // Start server if run directly (e.g. node index.js)
 if (require.main === module) {
-  // Connect databases once on startup for local dev (avoids per-request overhead)
-  Promise.all([connectDB(), connectBookingDB()])
+  // Connect database once on startup for local dev (avoids per-request overhead)
+  connectDB()
     .then(() => {
       app.listen(config.PORT, () => {
         console.log(`Backend server is running on http://localhost:${config.PORT}`);
       });
     })
     .catch((err) => {
-      console.error("Failed to connect databases on startup:", err);
+      console.error("Failed to connect database on startup:", err);
       // Start server anyway — the per-request middleware will retry
       app.listen(config.PORT, () => {
         console.log(`Backend server is running on http://localhost:${config.PORT} (DB connection will retry per-request)`);
