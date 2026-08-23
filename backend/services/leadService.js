@@ -207,45 +207,62 @@ async function getLeadCounts(agentIdCondition = undefined) {
 
   const inactiveStatuses = INACTIVE_STATUSES;
 
-  const [statusAgg, productAgg, agentAgg, totalCount, activeCount, unassignedCount] = await Promise.all([
-    Lead.Model.aggregate([
-      { $match: baseQuery },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]),
-    Lead.Model.aggregate([
-      { $match: { ...baseQuery, status: { $nin: inactiveStatuses } } },
-      { $group: { _id: '$product', count: { $sum: 1 } } }
-    ]),
-    Lead.Model.aggregate([
-      { $match: { ...baseQuery, status: { $nin: inactiveStatuses }, agentIds: { $exists: true, $ne: [] } } },
-      { $unwind: '$agentIds' },
-      { $group: { _id: '$agentIds', count: { $sum: 1 } } }
-    ]),
-    Lead.Model.countDocuments(baseQuery),
-    Lead.Model.countDocuments({ ...baseQuery, status: { $nin: inactiveStatuses } }),
-    Lead.Model.countDocuments({
-      ...baseQuery,
-      status: { $nin: inactiveStatuses },
-      $or: [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }]
-    })
+  const [facetResult] = await Lead.Model.aggregate([
+    { $match: baseQuery },
+    {
+      $facet: {
+        statusCounts: [
+          { $group: { _id: '$status', count: { $sum: 1 } } }
+        ],
+        productCounts: [
+          { $match: { status: { $nin: inactiveStatuses } } },
+          { $group: { _id: '$product', count: { $sum: 1 } } }
+        ],
+        agentCounts: [
+          { $match: { status: { $nin: inactiveStatuses }, agentIds: { $exists: true, $ne: [] } } },
+          { $unwind: '$agentIds' },
+          { $group: { _id: '$agentIds', count: { $sum: 1 } } }
+        ],
+        totalCount: [
+          { $count: 'count' }
+        ],
+        activeCount: [
+          { $match: { status: { $nin: inactiveStatuses } } },
+          { $count: 'count' }
+        ],
+        unassignedCount: [
+          {
+            $match: {
+              status: { $nin: inactiveStatuses },
+              $or: [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }]
+            }
+          },
+          { $count: 'count' }
+        ]
+      }
+    }
   ]);
 
   const statusCounts = {};
-  statusAgg.forEach(({ _id, count }) => {
+  (facetResult?.statusCounts || []).forEach(({ _id, count }) => {
     statusCounts[_id || 'Fresh Leads'] = count;
   });
 
   const productCounts = {};
-  productAgg.forEach(({ _id, count }) => {
+  (facetResult?.productCounts || []).forEach(({ _id, count }) => {
     if (_id) productCounts[_id] = count;
   });
 
   const agentCounts = {};
-  agentAgg.forEach(({ _id, count }) => {
+  (facetResult?.agentCounts || []).forEach(({ _id, count }) => {
     if (_id !== null && _id !== undefined) {
       agentCounts[String(_id)] = count;
     }
   });
+
+  const totalCount = facetResult?.totalCount?.[0]?.count || 0;
+  const activeCount = facetResult?.activeCount?.[0]?.count || 0;
+  const unassignedCount = facetResult?.unassignedCount?.[0]?.count || 0;
 
   return {
     totalLeads: totalCount,

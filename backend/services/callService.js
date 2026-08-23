@@ -119,24 +119,23 @@ async function getLiveStatus(agentIdCondition) {
       : agentIdCondition;
   }
 
+  const User = require('../models/User');
+  const UserModel = User.Model || mongoose.model('User');
+  const activeUsers = await UserModel.find({ status: { $nin: ["Inactive", "Former Employee"] } })
+    .select('_id name')
+    .lean();
+
+  const activeUserMap = new Map(activeUsers.map(u => [String(u._id), u.name]));
+  const activeUserIds = activeUsers.map(u => u._id);
+
   const recentCalls = await CallLog.aggregate([
-    { $match: matchQuery },
+    { $match: { ...matchQuery, agentId: { $in: activeUserIds } } },
     {
       $group: {
         _id: "$agentId",
         lastCallTimestamp: { $max: "$timestamp" }
       }
-    },
-    {
-      $lookup: {
-        from: "users",
-        localField: "_id",
-        foreignField: "_id",
-        as: "agent"
-      }
-    },
-    { $unwind: "$agent" },
-    { $match: { "agent.status": { $nin: ["Inactive", "Former Employee"] } } }
+    }
   ]);
 
   const now = new Date();
@@ -144,7 +143,7 @@ async function getLiveStatus(agentIdCondition) {
     const idleMs = now - new Date(c.lastCallTimestamp);
     return {
       agentId: c._id,
-      name: c.agent.name,
+      name: activeUserMap.get(String(c._id)) || 'Agent',
       lastCallAt: c.lastCallTimestamp,
       idleMs: idleMs
     };
@@ -165,8 +164,17 @@ async function getLiveActivity(agentIdCondition) {
       : agentIdCondition;
   }
 
+  const User = require('../models/User');
+  const UserModel = User.Model || mongoose.model('User');
+  const activeUsers = await UserModel.find({ status: { $nin: ["Inactive", "Former Employee"] } })
+    .select('_id name')
+    .lean();
+
+  const activeUserMap = new Map(activeUsers.map(u => [String(u._id), u.name]));
+  const activeUserIds = activeUsers.map(u => u._id);
+
   const activity = await CallLog.aggregate([
-    { $match: matchQuery },
+    { $match: { ...matchQuery, agentId: { $in: activeUserIds } } },
     {
       $group: {
         _id: "$agentId",
@@ -174,22 +182,12 @@ async function getLiveActivity(agentIdCondition) {
         lastCall: { $max: "$timestamp" },
         talkTime: { $sum: "$duration" }
       }
-    },
-    {
-      $lookup: {
-        from: "users",
-        localField: "_id",
-        foreignField: "_id",
-        as: "agent"
-      }
-    },
-    { $unwind: "$agent" },
-    { $match: { "agent.status": { $nin: ["Inactive", "Former Employee"] } } }
+    }
   ]);
 
   const formattedActivity = activity.map(a => ({
     agentId: a._id,
-    name: a.agent.name,
+    name: activeUserMap.get(String(a._id)) || 'Agent',
     firstCall: a.firstCall,
     lastCall: a.lastCall,
     talkTime: a.talkTime || 0
