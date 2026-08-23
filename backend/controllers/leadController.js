@@ -38,11 +38,45 @@ function sanitizeLeadForItinerary(leadDoc) {
 async function getLeads(req, res) {
   try {
     const agentIdCondition = await getAgentIdCondition(req.user);
-    const leads = await leadService.getLeads(agentIdCondition);
-    if (req.user.isItinerary) {
-      return res.json(leads.map(sanitizeLeadForItinerary));
+    const { page, limit, search, status, product, sortBy, filterAgent, pagination } = req.query;
+
+    const result = await leadService.getLeads(agentIdCondition, {
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 50,
+      search: search || '',
+      status: status || '',
+      product: product || '',
+      sortBy: sortBy || 'newest',
+      filterAgent: req.user.isAdmin ? (filterAgent || '') : '',
+      pagination: pagination === 'false' ? false : true
+    });
+
+    // If pagination was disabled, result is an array
+    if (Array.isArray(result)) {
+      if (req.user.isItinerary) {
+        return res.json(result.map(sanitizeLeadForItinerary));
+      }
+      return res.json(result);
     }
-    res.json(leads);
+
+    if (req.user.isItinerary) {
+      return res.json({
+        ...result,
+        leads: result.leads.map(sanitizeLeadForItinerary)
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function getLeadCounts(req, res) {
+  try {
+    const agentIdCondition = await getAgentIdCondition(req.user);
+    const counts = await leadService.getLeadCounts(agentIdCondition);
+    res.json(counts);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -248,6 +282,7 @@ async function updateBooking(req, res) {
 
 module.exports = {
   getLeads,
+  getLeadCounts,
   createLead,
   updateLead,
   assignLead,

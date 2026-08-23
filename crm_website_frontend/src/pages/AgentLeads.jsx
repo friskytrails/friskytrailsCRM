@@ -48,11 +48,31 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     return sessionStorage.getItem('agentLeads_filterAge') || 'all';
   });
   
+  const [agentLeadsData, setAgentLeadsData] = useState([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+
   useEffect(() => {
-    sessionStorage.setItem('agentLeads_filterStatus', filterStatus);
-    sessionStorage.setItem('agentLeads_filterProduct', filterProduct);
-    sessionStorage.setItem('agentLeads_filterAge', filterAge);
-  }, [filterStatus, filterProduct, filterAge]);
+    const fetchAgentLeads = async () => {
+      const targetAgentId = agent ? (agent.id || agent._id) : id;
+      if (!targetAgentId) return;
+      setLoadingLeads(true);
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/leads?filterAgent=${targetAgentId}&pagination=false`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAgentLeadsData(Array.isArray(data) ? data : (data.leads || []));
+        }
+      } catch (err) {
+        console.error('Error fetching agent leads:', err);
+      } finally {
+        setLoadingLeads(false);
+      }
+    };
+    fetchAgentLeads();
+  }, [id, agent?.id, agent?._id]);
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -69,7 +89,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     );
   };
 
-  const agentLeads = agent ? leads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : [];
+  const effectiveLeads = agentLeadsData.length > 0 ? agentLeadsData : (leads || []);
+  const agentLeads = agent ? effectiveLeads.filter(lead => (lead.agentIds || []).some(aid => matchIds(aid, agent.id || agent._id))) : effectiveLeads;
   const activeAgentLeads = agentLeads.filter(l => !isInactiveStatus(l.status));
   const hasSearchQuery = searchQuery.trim().length > 0;
   const getAgeInDays = (createdAt) => {
