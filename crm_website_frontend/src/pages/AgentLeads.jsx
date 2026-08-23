@@ -24,9 +24,9 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   })();
   const normalizedParam = normalizeAgentSlug(decodedParam);
 
-  const agent = (agents || []).find(a => 
-    matchIds(a.id || a._id, id) || 
-    a.name === decodedParam || 
+  const agent = (agents || []).find(a =>
+    matchIds(a.id || a._id, id) ||
+    a.name === decodedParam ||
     a.name?.toLowerCase() === decodedParam.toLowerCase() ||
     getAgentSlug(a) === normalizedParam ||
     encodeURIComponent(a.name) === id
@@ -47,7 +47,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const [filterAge, setFilterAge] = useState(() => {
     return sessionStorage.getItem('agentLeads_filterAge') || 'all';
   });
-  
+
   const [agentLeadsData, setAgentLeadsData] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
 
@@ -75,7 +75,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   }, [id, agent?.id, agent?._id]);
 
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const isInactiveStatus = (status) => {
     const st = status || 'Fresh Leads';
     return (
@@ -147,7 +147,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     }
   }, [filteredAgentLeads, agent]);
 
-  if (loading || (!agent && (!agents || agents.length === 0))) {
+  if (loading || loadingLeads || (!agent && (!agents || agents.length === 0))) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center justify-center min-h-[400px]">
         <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
@@ -173,7 +173,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       </div>
     );
   }
-  
+
   const activeNavAgents = (agents || []).filter(a => {
     const status = a.status || 'Active';
     return status === 'Active' && !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected';
@@ -253,27 +253,27 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           <AgentMetricsTable agent={agent} agentId={agent.id} agentName={agent.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
         </div>
       </div>
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Assigned Leads</h2>
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto flex-wrap sm:justify-end">
-          <div className="relative w-full sm:w-72 md:w-80">
+      <div className="mb-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white shrink-0">Assigned Leads</h2>
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 w-full xl:w-auto xl:justify-end">
+          <div className="relative flex-1 sm:w-48 md:w-56 min-w-[150px]">
             <input
               type="text"
               placeholder="Search leads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg pl-9 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 shadow-sm transition-shadow"
+              className="w-full text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg pl-8 pr-7 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 shadow-sm transition-shadow"
             />
-            <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
                 title="Clear search"
               >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -282,45 +282,45 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
           >
-            <option value="all">Active Statuses ({activeAgentLeads.length} {activeAgentLeads.length === 1 ? 'lead' : 'leads'})</option>
+            <option value="all">Active Statuses ({activeAgentLeads.length})</option>
             {availableStatuses.map(st => {
               const count = agentLeads.filter(l => (l.status || 'Fresh Leads') === st).length;
               return (
-                <option key={st} value={st}>{st} ({count} {count === 1 ? 'lead' : 'leads'})</option>
+                <option key={st} value={st}>{st} ({count})</option>
               );
             })}
           </select>
           <select
             value={filterProduct}
             onChange={(e) => setFilterProduct(e.target.value)}
-            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
           >
-            <option value="all">All Packages ({availableProducts.length} {availableProducts.length === 1 ? 'Package' : 'Packages'}, {statusScopedLeads.length} {statusScopedLeads.length === 1 ? 'Lead' : 'Leads'})</option>
+            <option value="all">All Packages ({statusScopedLeads.length})</option>
             {availableProducts.map(prod => {
               const count = statusScopedLeads.filter(l => (l.product || 'Other') === prod).length;
               return (
-                <option key={prod} value={prod}>{prod} ({count} {count === 1 ? 'lead' : 'leads'})</option>
+                <option key={prod} value={prod}>{prod} ({count})</option>
               );
             })}
           </select>
           <select
             value={filterAge}
             onChange={(e) => setFilterAge(e.target.value)}
-            className="w-full sm:w-auto text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer"
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
           >
-            <option value="all">All Ages ({statusScopedLeads.length} {statusScopedLeads.length === 1 ? 'lead' : 'leads'})</option>
+            <option value="all">All Ages ({statusScopedLeads.length})</option>
             {ageOptions.map(opt => {
               const count = statusScopedLeads.filter(l => checkAgeFilter(getAgeInDays(l.createdAt), opt.value)).length;
               return (
-                <option key={opt.value} value={opt.value}>{opt.label} ({count} {count === 1 ? 'lead' : 'leads'})</option>
+                <option key={opt.value} value={opt.value}>{opt.label} ({count})</option>
               );
             })}
           </select>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAgentLeads.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
@@ -337,13 +337,13 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
                   {lead.status || 'Fresh Leads'}
                 </span>
               </div>
-              
+
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
                 <p className="flex items-center gap-2">
                   <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                   {lead.phone || 'N/A'}
                 </p>
-                
+
                 <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-slate-700 mt-2">
                   <div className="flex-1">
                     <span className="block text-[10px] uppercase text-gray-400">Origin</span>
