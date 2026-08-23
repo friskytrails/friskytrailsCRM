@@ -96,11 +96,11 @@ async function getLeads(agentIdCondition = undefined) {
     }
   }
 
-  const leads = await Lead.Model.find(query).lean();
+  const leads = await Lead.Model.find(query)
+    .select('-notes -callLogs -trips -booking -bookingDetails')
+    .sort({ createdAt: -1 })
+    .lean();
   const formattedLeads = leads.map(formatDoc);
-
-  // Dynamically fetch and stitch bookings
-  await stitchBookingsForLeads(formattedLeads);
 
   return formattedLeads;
 }

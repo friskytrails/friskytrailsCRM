@@ -1,9 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import NoteItem from '../components/NoteItem';
 import AgentMultiSelect from '../components/AgentMultiSelect';
-import { uploadFileToCloudinary } from '../utils/uploadHelper';
 
 const STATUS_OPTIONS = [
   { value: 'Fresh Leads', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
@@ -14,14 +12,9 @@ const STATUS_OPTIONS = [
   { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
 ];
 
-export default function Dashboard({ leads, agents, products = [], statuses = [], assignAgent, addNote, deleteNote, updateLead, user, loading }) {
+export default function Dashboard({ leads, agents, products = [], statuses = [], assignAgent, updateLead, user, loading }) {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
-  const [noteInputs, setNoteInputs] = useState({}); // { [leadId]: 'comment text' }
-  const [selectedImages, setSelectedImages] = useState({}); // { [leadId]: 'base64...' }
-  const [imageFiles, setImageFiles] = useState({}); // { [leadId]: File }
-  const [isUploading, setIsUploading] = useState({}); // { [leadId]: boolean }
-  const [expandedNotes, setExpandedNotes] = useState({}); // { [leadId]: true/false }
   const userId = user?.id || user?._id || 'guest';
 
   const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
@@ -254,68 +247,6 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
   const handleInlineAssign = async (leadId, newIds) => {
     await assignAgent(leadId, newIds);
-  };
-
-  const toggleNotes = (leadId) => {
-    setExpandedNotes(prev => ({
-      ...prev,
-      [leadId]: !prev[leadId]
-    }));
-  };
-
-  const handleImageChange = (leadId, e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (file.size > 15 * 1024 * 1024) {
-      toast.error("File size must be 15MB or smaller");
-      return;
-    }
-
-    setImageFiles(prev => ({ ...prev, [leadId]: file }));
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImages(prev => ({ ...prev, [leadId]: reader.result }));
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setSelectedImages(prev => ({ ...prev, [leadId]: `DOCUMENT:${file.name}` }));
-    }
-  };
-
-  const handleSendNote = async (leadId) => {
-    const text = noteInputs[leadId] || '';
-    const file = imageFiles[leadId];
-    if (!text.trim() && !file) return;
-
-    setIsUploading(prev => ({ ...prev, [leadId]: true }));
-    try {
-      let finalImageUrl = null;
-      if (file) {
-        try {
-          const token = localStorage.getItem('token');
-          const apiUrl = import.meta.env.VITE_API_URL;
-          finalImageUrl = await uploadFileToCloudinary(file, token, apiUrl);
-        } catch (uploadErr) {
-          console.error('Direct upload error:', uploadErr);
-          toast.error(`Failed to upload file: ${uploadErr.message}`);
-          setIsUploading(prev => ({ ...prev, [leadId]: false }));
-          return;
-        }
-      }
-
-      const success = await addNote(leadId, text.trim(), finalImageUrl);
-      if (success) {
-        setNoteInputs(prev => ({ ...prev, [leadId]: '' }));
-        setSelectedImages(prev => ({ ...prev, [leadId]: '' }));
-        setImageFiles(prev => ({ ...prev, [leadId]: null }));
-      }
-    } catch {
-      toast.error('Failed to send note');
-    } finally {
-      setIsUploading(prev => ({ ...prev, [leadId]: false }));
-    }
   };
 
   // Filter logic (Memoized)
@@ -792,7 +723,6 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
             const assignedAgents = currentAgentIds.map(id => agents.find(a => a.id === id)).filter(Boolean);
             const agentDisplayNames = assignedAgents.length > 0 ? assignedAgents.map(a => a.name).join(', ') : 'Unassigned';
-            const isNotesExpanded = !!expandedNotes[lead.id];
 
             return (
               <div
@@ -888,85 +818,6 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                       </div>
                     )}
                   </div>
-
-                  {/* Notes / Chat logs section */}
-                  <div className="border-t border-gray-100 pt-3">
-                    <button
-                      onClick={() => toggleNotes(lead.id)}
-                      className="text-xs text-orange-600 hover:text-orange-700 font-semibold flex items-center space-x-1 cursor-pointer"
-                    >
-                      <span>{isNotesExpanded ? 'Hide Chat Log' : `Chat Log (${lead.notes ? lead.notes.length : 0})`}</span>
-                    </button>
-
-                    {isNotesExpanded && (
-                      <div className="mt-3 space-y-3">
-                        <div className="max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                          {(!lead.notes || lead.notes.length === 0) ? (
-                            <p className="text-[11px] text-gray-400 dark:text-gray-500 italic">No notes posted yet.</p>
-                          ) : (
-                            lead.notes.map((note) => (
-                              <NoteItem
-                                key={note.id || note._id}
-                                note={note}
-                                leadId={lead.id}
-                                deleteNote={deleteNote}
-                                currentUser={user}
-                              />
-                            ))
-                          )}
-                        </div>
-                        {selectedImages[lead.id] && (
-                          <div className="relative inline-block mb-1.5 rounded overflow-hidden border border-gray-200 dark:border-slate-700">
-                            {selectedImages[lead.id].startsWith('DOCUMENT:') ? (
-                              <div className="p-3 bg-gray-100 dark:bg-slate-800 text-xs font-semibold flex items-center h-12 w-auto min-w-[150px]">
-                                📄 {selectedImages[lead.id].replace('DOCUMENT:', '')}
-                              </div>
-                            ) : (
-                              <img src={selectedImages[lead.id]} alt="Upload preview" className="h-12 w-auto object-cover" />
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedImages(prev => ({ ...prev, [lead.id]: '' }));
-                                setImageFiles(prev => ({ ...prev, [lead.id]: null }));
-                              }}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold hover:bg-red-600 transition-colors shadow-sm cursor-pointer"
-                            >
-                              &times;
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex items-center space-x-2 mt-2">
-                          <input
-                            type="text"
-                            placeholder="Add update..."
-                            value={noteInputs[lead.id] || ''}
-                            onChange={(e) => setNoteInputs({ ...noteInputs, [lead.id]: e.target.value })}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSendNote(lead.id)}
-                            className="flex-1 text-xs py-1.5 px-3 border border-gray-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500"
-                          />
-                          <label className="flex items-center justify-center p-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-lg cursor-pointer transition-colors border border-gray-200/50 dark:border-slate-700/50">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                            </svg>
-                            <input
-                              type="file"
-                              accept="image/*,.pdf,.doc,.docx"
-                              onChange={(e) => handleImageChange(lead.id, e)}
-                              className="hidden"
-                            />
-                          </label>
-                          <button
-                            onClick={() => handleSendNote(lead.id)}
-                            className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1.5 rounded-lg font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            disabled={(!(noteInputs[lead.id] || '').trim() && !imageFiles[lead.id]) || isUploading[lead.id]}
-                          >
-                            {isUploading[lead.id] ? '...' : 'Send'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             );
@@ -981,7 +832,6 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
 
             const assignedAgents = currentAgentIds.map(id => agents.find(a => a.id === id)).filter(Boolean);
             const agentDisplayNames = assignedAgents.length > 0 ? assignedAgents.map(a => a.name).join(', ') : 'Unassigned';
-            const isNotesExpanded = !!expandedNotes[lead.id];
 
             return (
               <div
@@ -1070,88 +920,8 @@ export default function Dashboard({ leads, agents, products = [], statuses = [],
                         {agentDisplayNames}
                       </div>
                     )}
-
-                    <button
-                      onClick={() => toggleNotes(lead.id)}
-                      className="text-xs text-orange-600 hover:text-orange-700 font-semibold px-2 py-1 bg-orange-50 rounded-lg cursor-pointer"
-                    >
-                      {isNotesExpanded ? 'Hide Chat' : `Chat (${lead.notes ? lead.notes.length : 0})`}
-                    </button>
                   </div>
                 </div>
-
-                {isNotesExpanded && (
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="max-h-36 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                        {(!lead.notes || lead.notes.length === 0) ? (
-                          <p className="text-[11px] text-gray-400 dark:text-gray-500 italic">No notes posted yet.</p>
-                        ) : (
-                          lead.notes.map((note) => (
-                            <NoteItem
-                              key={note.id || note._id}
-                              note={note}
-                              leadId={lead.id}
-                              deleteNote={deleteNote}
-                              currentUser={user}
-                            />
-                          ))
-                        )}
-                      </div>
-                      <div className="flex-1 flex flex-col">
-                        {selectedImages[lead.id] && (
-                          <div className="relative inline-block mb-1.5 rounded overflow-hidden border border-gray-200 dark:border-slate-700">
-                            {selectedImages[lead.id].startsWith('DOCUMENT:') ? (
-                              <div className="p-3 bg-gray-100 dark:bg-slate-800 text-xs font-semibold flex items-center h-12 w-auto min-w-[150px]">
-                                📄 {selectedImages[lead.id].replace('DOCUMENT:', '')}
-                              </div>
-                            ) : (
-                              <img src={selectedImages[lead.id]} alt="Upload preview" className="h-12 w-auto object-cover" />
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedImages(prev => ({ ...prev, [lead.id]: '' }));
-                                setImageFiles(prev => ({ ...prev, [lead.id]: null }));
-                              }}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold hover:bg-red-600 transition-colors shadow-sm cursor-pointer"
-                            >
-                              &times;
-                            </button>
-                          </div>
-                        )}
-                        <div className="flex items-start space-x-2">
-                          <textarea
-                            placeholder="Type important information..."
-                            value={noteInputs[lead.id] || ''}
-                            onChange={(e) => setNoteInputs({ ...noteInputs, [lead.id]: e.target.value })}
-                            className="w-full text-xs p-2 border border-gray-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-500 resize-none h-16 bg-white"
-                          />
-                          <div className="flex flex-col space-y-1.5">
-                            <label className="flex items-center justify-center p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-600 dark:text-slate-300 rounded-lg cursor-pointer transition-colors border border-gray-200/50 dark:border-slate-700/50 h-8">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                              </svg>
-                              <input
-                                type="file"
-                                accept="image/*,.pdf,.doc,.docx"
-                                onChange={(e) => handleImageChange(lead.id, e)}
-                                className="hidden"
-                              />
-                            </label>
-                            <button
-                              onClick={() => handleSendNote(lead.id)}
-                              disabled={(!(noteInputs[lead.id] || '').trim() && !imageFiles[lead.id]) || isUploading[lead.id]}
-                              className="bg-orange-600 hover:bg-orange-700 text-white text-xs px-3 py-1.5 rounded-lg font-semibold h-8 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                            >
-                              {isUploading[lead.id] ? '...' : 'Send'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
