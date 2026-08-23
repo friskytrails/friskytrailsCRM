@@ -255,14 +255,14 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       </div>
       <div className="mb-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white shrink-0">Assigned Leads</h2>
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 w-full xl:w-auto xl:justify-end">
-          <div className="relative flex-1 sm:w-48 md:w-56 min-w-[150px]">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full xl:w-auto xl:justify-end">
+          <div className="relative flex-1 sm:w-52 md:w-60 min-w-[160px]">
             <input
               type="text"
               placeholder="Search leads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg pl-8 pr-7 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 shadow-sm transition-shadow"
+              className="w-full text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg pl-8 pr-7 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 placeholder-gray-400 dark:placeholder-slate-500 shadow-sm transition-shadow font-medium"
             />
             <svg className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -270,7 +270,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
                 title="Clear search"
               >
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -282,7 +282,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
+            className="text-xs font-medium bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
           >
             <option value="all">Active Statuses ({activeAgentLeads.length})</option>
             {availableStatuses.map(st => {
@@ -295,7 +295,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           <select
             value={filterProduct}
             onChange={(e) => setFilterProduct(e.target.value)}
-            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
+            className="text-xs font-medium bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
           >
             <option value="all">All Packages ({statusScopedLeads.length})</option>
             {availableProducts.map(prod => {
@@ -308,7 +308,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           <select
             value={filterAge}
             onChange={(e) => setFilterAge(e.target.value)}
-            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
+            className="text-xs font-medium bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
           >
             <option value="all">All Ages ({statusScopedLeads.length})</option>
             {ageOptions.map(opt => {
