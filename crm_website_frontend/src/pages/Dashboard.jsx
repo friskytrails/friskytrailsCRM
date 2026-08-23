@@ -236,10 +236,13 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
       }
     };
 
-    if (document.visibilityState === 'visible') {
-      fetchLiveStatus();
-      fetchLiveActivity();
-    }
+    // Stagger initial background calls slightly so primary leads & counts load with 100% priority
+    const initialTimer = setTimeout(() => {
+      if (document.visibilityState === 'visible') {
+        fetchLiveStatus();
+        fetchLiveActivity();
+      }
+    }, 150);
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
