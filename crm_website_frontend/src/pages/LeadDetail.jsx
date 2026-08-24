@@ -65,6 +65,22 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [dateForm, setDateForm] = useState({ startDate: '', dueDate: '' });
   const [isSavingDates, setIsSavingDates] = useState(false);
 
+  // Active lead IDs for next/previous navigation
+  const [navLeadIds, setNavLeadIds] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('activeLeadIds');
+      if (stored) {
+        const activeIds = JSON.parse(stored);
+        if (Array.isArray(activeIds) && activeIds.length > 0) {
+          return activeIds.map(item => (typeof item === 'object' && item !== null) ? String(item.id || item._id) : String(item)).filter(Boolean);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse activeLeadIds:", e);
+    }
+    return [];
+  });
+
   const handleStartEditingDates = () => {
     const rawStartDate = lead?.dates?.startDate || null;
     const rawDueDate = lead?.dates?.dueDate || lead?.dates?.endDate || null;
@@ -345,6 +361,37 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     fetchLead();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Ensure navigation sequence is populated even when opening direct link or refreshing
+  useEffect(() => {
+    const currentId = String(lead?.id || lead?._id || id || '');
+    if (!token || !API_URL || !currentId) return;
+
+    if (navLeadIds.length > 0 && navLeadIds.some(nId => String(nId) === currentId)) {
+      return;
+    }
+
+    const fetchSequence = async () => {
+      try {
+        const res = await fetch(`${API_URL}/leads?pagination=false`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.leads || []);
+          const ids = list.map(l => String(l.id || l._id)).filter(Boolean);
+          if (ids.length > 0) {
+            setNavLeadIds(ids);
+            sessionStorage.setItem('activeLeadIds', JSON.stringify(ids));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch lead navigation sequence:", err);
+      }
+    };
+
+    fetchSequence();
+  }, [id, lead?.id, lead?._id, token, API_URL, navLeadIds]);
 
 
   const handleSendNote = async () => {
@@ -696,30 +743,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     );
   }
 
-  // Retrieve active filtered lead sequence from sessionStorage (synced from Dashboard / AgentLeads)
-  const getNavLeads = () => {
-    try {
-      const stored = sessionStorage.getItem('activeLeadIds');
-      if (stored) {
-        const activeIds = JSON.parse(stored);
-        if (Array.isArray(activeIds) && activeIds.length > 0) {
-          const leadMap = new Map((leads || []).map(l => [String(l.id || l._id), l]));
-          const filteredNav = activeIds.map(idStr => leadMap.get(String(idStr))).filter(Boolean);
-          if (filteredNav.length > 0 && filteredNav.some(l => String(l.id || l._id) === String(lead?.id || lead?._id || id))) {
-            return filteredNav;
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Failed to parse activeLeadIds:", e);
-    }
-    return leads || [];
-  };
-
-  const navLeads = getNavLeads();
-  const currentLeadIndex = navLeads.findIndex(l => String(l.id || l._id) === String(lead?.id || lead?._id || id));
-  const prevLead = currentLeadIndex > 0 ? navLeads[currentLeadIndex - 1] : null;
-  const nextLead = currentLeadIndex >= 0 && currentLeadIndex < navLeads.length - 1 ? navLeads[currentLeadIndex + 1] : null;
+  const currentLeadId = String(lead?.id || lead?._id || id || '');
+  const currentLeadIndex = navLeadIds.findIndex(leadId => String(leadId) === currentLeadId);
+  const prevLeadId = currentLeadIndex > 0 ? navLeadIds[currentLeadIndex - 1] : null;
+  const nextLeadId = (currentLeadIndex >= 0 && currentLeadIndex < navLeadIds.length - 1) ? navLeadIds[currentLeadIndex + 1] : null;
   const assignedAgents = (lead.agentIds || []).map(id => agents?.find(a => a.id === id)).filter(Boolean);
 
   if (user?.isItinerary) {
@@ -739,10 +766,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => prevLead && navigate(`/leads/${prevLead.id || prevLead._id}`)}
-              disabled={!prevLead}
+              onClick={() => prevLeadId && navigate(`/leads/${prevLeadId}`)}
+              disabled={!prevLeadId}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
-              title={prevLead ? `Previous Lead: ${prevLead.name || ''}` : 'First lead'}
+              title={prevLeadId ? 'Previous Lead' : 'First lead'}
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -750,10 +777,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               Previous Lead
             </button>
             <button
-              onClick={() => nextLead && navigate(`/leads/${nextLead.id || nextLead._id}`)}
-              disabled={!nextLead}
+              onClick={() => nextLeadId && navigate(`/leads/${nextLeadId}`)}
+              disabled={!nextLeadId}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
-              title={nextLead ? `Next Lead: ${nextLead.name || ''}` : 'Last lead'}
+              title={nextLeadId ? 'Next Lead' : 'Last lead'}
             >
               Next Lead
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -921,10 +948,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => prevLead && navigate(`/leads/${prevLead.id || prevLead._id}`)}
-            disabled={!prevLead}
+            onClick={() => prevLeadId && navigate(`/leads/${prevLeadId}`)}
+            disabled={!prevLeadId}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
-            title={prevLead ? `Previous Lead: ${prevLead.name || ''}` : 'First lead'}
+            title={prevLeadId ? 'Previous Lead' : 'First lead'}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -932,10 +959,10 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             Previous Lead
           </button>
           <button
-            onClick={() => nextLead && navigate(`/leads/${nextLead.id || nextLead._id}`)}
-            disabled={!nextLead}
+            onClick={() => nextLeadId && navigate(`/leads/${nextLeadId}`)}
+            disabled={!nextLeadId}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
-            title={nextLead ? `Next Lead: ${nextLead.name || ''}` : 'Last lead'}
+            title={nextLeadId ? 'Next Lead' : 'Last lead'}
           >
             Next Lead
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
