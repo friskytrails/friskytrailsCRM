@@ -160,13 +160,14 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   const parsedLimit = Math.max(1, Math.min(100, parseInt(limit) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
 
-  // If pagination is explicitly disabled, return array
+  // If pagination is disabled (used by mobile app), return full lead documents with callLogs, notes, booking & trips
   if (pagination === false) {
     const rawLeads = await Lead.Model.find(query)
-      .select('-notes -callLogs -trips -booking -bookingDetails')
       .sort(sortOrder)
       .lean();
-    return rawLeads.map(formatDoc);
+    const formattedLeads = rawLeads.map(formatDoc);
+    await stitchBookingsForLeads(formattedLeads);
+    return formattedLeads;
   }
 
   const [leads, totalCount] = await Promise.all([
