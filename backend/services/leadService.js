@@ -140,11 +140,6 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   // 4. Status filter
   if (status && status !== 'all') {
     query.status = status;
-  } else if (!status && !hasSearch && filterAgent === 'unassigned') {
-    // Default dashboard view: hide inactive leads unless searching or explicitly viewing 'all'
-    query.status = { $nin: INACTIVE_STATUSES };
-  } else if (!status && !hasSearch && (!filterAgent || filterAgent === 'all')) {
-    query.status = { $nin: INACTIVE_STATUSES };
   }
 
   // 5. Product filter
