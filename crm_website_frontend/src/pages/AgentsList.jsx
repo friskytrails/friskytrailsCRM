@@ -11,12 +11,31 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [viewTeamManager, setViewTeamManager] = useState(null);
   const [selectedAgentIds, setSelectedAgentIds] = useState([]);
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
-  const [assignLoading, setAssignLoading] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [agentLeadCounts, setAgentLeadCounts] = useState({});
 
   useEffect(() => {
     sessionStorage.setItem('leadDetail_backUrl', '/agents');
     sessionStorage.setItem('leadDetail_backLabel', 'Active Team');
+  }, []);
+
+  useEffect(() => {
+    const fetchLeadCounts = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAgentLeadCounts(data.agentCounts || {});
+        }
+      } catch (err) {
+        console.error('Error fetching lead counts for team list:', err);
+      }
+    };
+    fetchLeadCounts();
   }, []);
 
   if (loading) {
@@ -60,27 +79,6 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
       (status).toLowerCase().includes(trimmedQuery)
     );
   });
-
-  const [agentLeadCounts, setAgentLeadCounts] = useState({});
-
-  useEffect(() => {
-    const fetchLeadCounts = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setAgentLeadCounts(data.agentCounts || {});
-        }
-      } catch (err) {
-        console.error('Error fetching lead counts for team list:', err);
-      }
-    };
-    fetchLeadCounts();
-  }, []);
 
   const handleAction = async (agentId, action, value) => {
     if (action === 'status' && (value === 'Inactive' || value === 'Former Employee')) {
