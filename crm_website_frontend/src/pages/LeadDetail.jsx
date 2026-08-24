@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
@@ -292,13 +292,31 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
   };
 
-  const getAgentLeadCount = (agentId) => {
-    return leads?.filter((l) => {
-      const st = l.status || 'Fresh Leads';
-      const isBookedOrRejected = st === 'Booked' || st === 'Rejected Leads' || st === 'Rejected';
-      return !isBookedOrRejected && (l.agentIds || []).includes(agentId);
-    }).length || 0;
-  };
+  const [agentLeadCounts, setAgentLeadCounts] = useState({});
+
+  const fetchLeadCounts = useCallback(async () => {
+    if (!token || !API_URL) return;
+    try {
+      const res = await fetch(`${API_URL}/leads/counts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAgentLeadCounts(data.agentCounts || {});
+      }
+    } catch (err) {
+      console.error('Error fetching lead counts:', err);
+    }
+  }, [token, API_URL]);
+
+  useEffect(() => {
+    fetchLeadCounts();
+  }, [fetchLeadCounts]);
+
+  const getAgentLeadCount = useCallback((agentId) => {
+    const key = String(agentId || '');
+    return agentLeadCounts[key] || 0;
+  }, [agentLeadCounts]);
 
   const handleBackClick = () => {
     const savedBackUrl = sessionStorage.getItem('leadDetail_backUrl');
@@ -539,6 +557,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     if (updated) {
       setLead(updated);
       syncLeadToParent(updated);
+      fetchLeadCounts();
     } else {
       setLead(previousLead);
     }
@@ -697,6 +716,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       setLead(updatedLead);
       syncLeadToParent(updatedLead);
+      fetchLeadCounts();
     }
   };
 
@@ -710,6 +730,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     if (updated) {
       setLead(updated);
       syncLeadToParent(updated);
+      fetchLeadCounts();
     } else {
       setLead(previousLead);
       syncLeadToParent(previousLead);

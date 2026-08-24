@@ -61,7 +61,7 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
     }
   };
 
-  const selectedAgent = agents.find(a => selectedAgentIds.includes(a.id));
+  const selectedAgent = agents.find(a => selectedAgentIds.includes(a.id || a._id));
   const buttonText = selectedAgent 
     ? selectedAgent.name 
     : 'Select Agent';
@@ -94,25 +94,27 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
           <div className="p-1">
             {agents
               .filter(agent => {
-                const isSelected = selectedAgentIds.includes(agent.id);
+                const agId = agent.id || agent._id;
+                const isSelected = selectedAgentIds.includes(agId);
                 const isActive = (agent.status || 'Active') === 'Active' && agent.isVerified !== false;
                 const isItinerary = agent.isItinerary || agent.role === 'itinerary';
                 const isPresent = agent.attendance !== 'A';
                 return isSelected || (isActive && !isItinerary && isPresent);
               })
               .map(agent => {
-                const isSelected = selectedAgentIds.includes(agent.id);
-                const count = getAgentLeadCount ? getAgentLeadCount(agent.id) : 0;
+                const agId = agent.id || agent._id;
+                const isSelected = selectedAgentIds.includes(agId);
+                const count = getAgentLeadCount ? (getAgentLeadCount(agId) ?? (agent.id ? getAgentLeadCount(agent.id) : 0)) : 0;
 
                 return (
                   <label 
-                    key={agent.id} 
+                    key={agId} 
                     className="flex items-center space-x-2 px-2 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer"
                   >
                     <input
                       type="radio"
                       checked={isSelected}
-                      onClick={() => handleToggle(agent.id)}
+                      onClick={() => handleToggle(agId)}
                       readOnly
                       className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded-full focus:ring-orange-500 dark:bg-slate-700 dark:border-slate-600 cursor-pointer"
                     />
@@ -126,7 +128,8 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
                 );
               })}
             {agents.filter(agent => {
-              const isSelected = selectedAgentIds.includes(agent.id);
+              const agId = agent.id || agent._id;
+              const isSelected = selectedAgentIds.includes(agId);
               const isActive = (agent.status || 'Active') === 'Active' && agent.isVerified !== false;
               const isItinerary = agent.isItinerary || agent.role === 'itinerary';
               const isPresent = agent.attendance !== 'A';
