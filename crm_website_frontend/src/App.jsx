@@ -19,6 +19,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const GlobalSettings = lazy(() => import('./pages/GlobalSettings'));
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
 const BugReports = lazy(() => import('./pages/BugReports'));
+const LiveActivity = lazy(() => import('./pages/LiveActivity'));
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
 
@@ -684,6 +685,10 @@ function App() {
               <Route
                 path="/reports"
                 element={user?.isAdmin ? <Reports leads={leads} agents={agents} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/live-activity"
+                element={user?.isAdmin ? <LiveActivity agents={agents} /> : <Navigate to="/" replace />}
               />
 
               <Route

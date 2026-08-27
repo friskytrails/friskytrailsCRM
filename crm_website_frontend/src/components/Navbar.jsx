@@ -61,6 +61,9 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                     <Link to="/reports" className={getLinkClass('/reports')}>
                       Reports
                     </Link>
+                    <Link to="/live-activity" className={getLinkClass('/live-activity')}>
+                      Live Activity
+                    </Link>
                     <Link to="/settings" className={getLinkClass('/settings')}>
                       Settings
                     </Link>
@@ -173,6 +176,9 @@ export default function Navbar({ darkMode, setDarkMode, user, handleLogout, agen
                 </Link>
                 <Link to="/reports" onClick={() => setIsOpen(false)} className={getLinkClass('/reports', true)}>
                   Reports
+                </Link>
+                <Link to="/live-activity" onClick={() => setIsOpen(false)} className={getLinkClass('/live-activity', true)}>
+                  Live Activity
                 </Link>
                 <Link to="/settings" onClick={() => setIsOpen(false)} className={getLinkClass('/settings', true)}>
                   Settings

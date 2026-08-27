@@ -32,6 +32,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     encodeURIComponent(a.name) === id
   );
 
+  const agentKey = agent ? (getAgentSlug(agent) || agent.id || agent._id) : (normalizedParam || id);
+
   useEffect(() => {
     if (refreshAgents && agent) {
       refreshAgents(agent.id || agent._id);
@@ -39,22 +41,47 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   }, [id, agent?.id]);
 
   const [filterStatus, setFilterStatus] = useState(() => {
-    return sessionStorage.getItem('agentLeads_filterStatus') || 'all';
+    return sessionStorage.getItem(`agentLeads_${agentKey}_filterStatus`) || 'all';
   });
   const [filterProduct, setFilterProduct] = useState(() => {
-    return sessionStorage.getItem('agentLeads_filterProduct') || 'all';
+    return sessionStorage.getItem(`agentLeads_${agentKey}_filterProduct`) || 'all';
   });
   const [filterAge, setFilterAge] = useState(() => {
-    return sessionStorage.getItem('agentLeads_filterAge') || 'all';
+    return sessionStorage.getItem(`agentLeads_${agentKey}_filterAge`) || 'all';
   });
+
+  // When switching agents (agentKey changes), load that agent's saved filters or default to 'all'
+  useEffect(() => {
+    if (!agentKey) return;
+    setFilterStatus(sessionStorage.getItem(`agentLeads_${agentKey}_filterStatus`) || 'all');
+    setFilterProduct(sessionStorage.getItem(`agentLeads_${agentKey}_filterProduct`) || 'all');
+    setFilterAge(sessionStorage.getItem(`agentLeads_${agentKey}_filterAge`) || 'all');
+    setSearchQuery('');
+  }, [agentKey]);
+
+  // Persist filter changes for the current agent
+  useEffect(() => {
+    if (!agentKey) return;
+    sessionStorage.setItem(`agentLeads_${agentKey}_filterStatus`, filterStatus);
+    sessionStorage.setItem(`agentLeads_${agentKey}_filterProduct`, filterProduct);
+    sessionStorage.setItem(`agentLeads_${agentKey}_filterAge`, filterAge);
+  }, [filterStatus, filterProduct, filterAge, agentKey]);
 
   const [agentLeadsData, setAgentLeadsData] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
 
   useEffect(() => {
     const fetchAgentLeads = async () => {
-      const targetAgentId = agent ? (agent.id || agent._id) : id;
+      // If agents list is still loading, wait for it unless id is already a 24-char ObjectId
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+      if (!agent && !isObjectId) {
+        // Still resolving slug from agents list; do not fire with raw non-ObjectId string
+        return;
+      }
+
+      const targetAgentId = agent ? (agent.id || agent._id) : (isObjectId ? id : null);
       if (!targetAgentId) return;
+
       setLoadingLeads(true);
       try {
         const token = localStorage.getItem('token');
@@ -72,7 +99,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       }
     };
     fetchAgentLeads();
-  }, [id, agent?.id, agent?._id]);
+  }, [id, agent?.id, agent?._id, agent]);
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -212,7 +239,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => prevAgent && navigate(`/agents/${prevAgent.id || prevAgent._id}`)}
+            onClick={() => prevAgent && navigate(`/agents/${getAgentSlug(prevAgent) || prevAgent.id || prevAgent._id}`)}
             disabled={!prevAgent}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
             title={prevAgent ? `Previous Agent: ${prevAgent.name}` : 'First agent'}
@@ -223,7 +250,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
             Previous Agent
           </button>
           <button
-            onClick={() => nextAgent && navigate(`/agents/${nextAgent.id || nextAgent._id}`)}
+            onClick={() => nextAgent && navigate(`/agents/${getAgentSlug(nextAgent) || nextAgent.id || nextAgent._id}`)}
             disabled={!nextAgent}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
             title={nextAgent ? `Next Agent: ${nextAgent.name}` : 'Last agent'}

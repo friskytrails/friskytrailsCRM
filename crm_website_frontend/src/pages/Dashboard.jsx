@@ -43,6 +43,27 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     agentCounts: {}
   });
 
+  const defaultProducts = [
+    "Meghalaya Package",
+    "Hampta Pass Trek",
+    "Rishikesh Activities",
+    "Spiti Package",
+    "Ladakh Package",
+    "Kerala Trip",
+    "Adventure Activities",
+    "Others",
+    "Arunachal Pradesh Package",
+    "Goa Package",
+    "Darjeeling Gangtok Package"
+  ];
+
+  const allAvailableProducts = useMemo(() => {
+    const set = new Set((products && products.length > 0) ? products : defaultProducts);
+    Object.keys(summaryCounts.productCounts || {}).forEach(p => p && set.add(p));
+    Object.keys(summaryCounts.scopedProductCounts || {}).forEach(p => p && set.add(p));
+    return Array.from(set);
+  }, [products, summaryCounts.productCounts, summaryCounts.scopedProductCounts]);
+
   const getAgentLeadCount = useCallback((agentId) => {
     return summaryCounts.agentCounts?.[String(agentId || '')] || 0;
   }, [summaryCounts.agentCounts]);
@@ -76,12 +97,15 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     }
   }, [agents, filterAgent, isAdmin]);
 
-  // Fetch summary badge counts (once on mount, and whenever assignments update)
+  // Fetch summary badge counts (once on mount, and whenever assignments or filterAgent update)
   const fetchCounts = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts`, {
+      const params = new URLSearchParams({
+        scopedAgentFilter: filterAgent || ''
+      });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -91,7 +115,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     } catch (err) {
       console.error('Error fetching lead counts:', err);
     }
-  }, []);
+  }, [filterAgent]);
 
   useEffect(() => {
     fetchCounts();
@@ -190,80 +214,6 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     setPage(1);
   };
 
-  // Live Status & Activity state (Admin only)
-  const [liveStatus, setLiveStatus] = useState([]);
-  const [liveActivity, setLiveActivity] = useState([]);
-  const [currentTime, setCurrentTime] = useState(Date.now());
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    const interval = setInterval(() => setCurrentTime(Date.now()), 60000);
-    return () => clearInterval(interval);
-  }, [isAdmin]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    let isMounted = true;
-
-    const fetchLiveStatus = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const token = localStorage.getItem('token');
-        const headers = { 'Authorization': `Bearer ${token}` };
-        const statusRes = await fetch(`${import.meta.env.VITE_API_URL}/calls/live-status`, { headers });
-        if (!isMounted) return;
-        if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          setLiveStatus(statusData);
-        }
-      } catch (err) {
-        console.error("Error fetching live status:", err);
-      }
-    };
-
-    const fetchLiveActivity = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const token = localStorage.getItem('token');
-        const headers = { 'Authorization': `Bearer ${token}` };
-        const activityRes = await fetch(`${import.meta.env.VITE_API_URL}/calls/live-activity`, { headers });
-        if (!isMounted) return;
-        if (activityRes.ok) {
-          const activityData = await activityRes.json();
-          setLiveActivity(activityData);
-        }
-      } catch (err) {
-        console.error("Error fetching live activity:", err);
-      }
-    };
-
-    // Stagger initial background calls slightly so primary leads & counts load with 100% priority
-    const initialTimer = setTimeout(() => {
-      if (document.visibilityState === 'visible') {
-        fetchLiveStatus();
-        fetchLiveActivity();
-      }
-    }, 150);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchLiveStatus();
-        fetchLiveActivity();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    const statusInterval = setInterval(fetchLiveStatus, 60000);
-    const activityInterval = setInterval(fetchLiveActivity, 60000);
-
-    return () => {
-      isMounted = false;
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(statusInterval);
-      clearInterval(activityInterval);
-    };
-  }, [isAdmin]);
-
   // Modal Editing State
   const [editingLead, setEditingLead] = useState(null);
   const [modalData, setModalData] = useState({
@@ -329,32 +279,6 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
-
-  const filteredLiveStatus = useMemo(() => {
-    const agentMap = new Map((agents || []).map(a => [String(a.id || a._id || ''), a]));
-    const agentNameMap = new Map((agents || []).map(a => [a.name, a]));
-    return (liveStatus || []).filter(status => {
-      const ag = agentMap.get(String(status.agentId)) || agentNameMap.get(status.name);
-      if (ag) {
-        const st = ag.status || 'Active';
-        return st !== 'Inactive' && st !== 'Former Employee';
-      }
-      return true;
-    });
-  }, [liveStatus, agents]);
-
-  const filteredLiveActivity = useMemo(() => {
-    const agentMap = new Map((agents || []).map(a => [String(a.id || a._id || ''), a]));
-    const agentNameMap = new Map((agents || []).map(a => [a.name, a]));
-    return (liveActivity || []).filter(act => {
-      const ag = agentMap.get(String(act.agentId)) || agentNameMap.get(act.name);
-      if (ag) {
-        const st = ag.status || 'Active';
-        return st !== 'Inactive' && st !== 'Former Employee';
-      }
-      return true;
-    });
-  }, [liveActivity, agents]);
 
   const hasActiveFilters = searchQuery || (isAdmin ? filterAgent !== 'unassigned' : filterAgent !== 'all') || filterProduct !== 'all' || filterStatus !== 'all' || sortBy !== 'newest';
 
@@ -423,118 +347,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         </div>
       </div>
 
-      {/* Admin Live Panels */}
-      {isAdmin && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-          {/* Live Status Panel */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-              </span>
-              Live Status Panel
-            </h2>
-            <div className="overflow-x-auto max-h-80 overflow-y-auto relative border border-gray-100 dark:border-slate-700 rounded-lg">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300 sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="px-4 py-2 rounded-l-lg">Agent</th>
-                    <th className="px-4 py-2">Idle Time</th>
-                    <th className="px-4 py-2 rounded-r-lg">Last Call</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLiveStatus.map(status => {
-                    const idleMs = status.lastCallAt ? (currentTime - new Date(status.lastCallAt).getTime()) : status.idleMs;
-                    const idleHours = idleMs / (1000 * 60 * 60);
-                    const isIdle = idleHours > 2;
-                    const idleMins = Math.floor(idleMs / (1000 * 60));
-                    return (
-                      <tr key={status.agentId} className={`border-b dark:border-slate-700/50 ${isIdle ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{status.name}</td>
-                        <td className={`px-4 py-3 ${isIdle ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-600 dark:text-gray-400'}`}>
-                          {idleHours >= 1 ? `${Math.floor(idleHours)}h ${idleMins % 60}m` : `${idleMins}m`}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                          {new Date(status.lastCallAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredLiveStatus.length === 0 && (
-                    <tr>
-                      <td colSpan="3" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          {/* Daily Activity Audit */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <svg className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Daily Activity Audit
-              </h2>
-              <span className="text-xs text-green-500 dark:text-green-400 font-bold flex items-center gap-1">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                Live Updates
-              </span>
-            </div>
-            <div className="overflow-x-auto max-h-80 overflow-y-auto relative border border-gray-100 dark:border-slate-700 rounded-lg">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300 sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="px-4 py-2 rounded-l-lg">Agent</th>
-                    <th className="px-4 py-2">First Call</th>
-                    <th className="px-4 py-2">Last Call</th>
-                    <th className="px-4 py-2 rounded-r-lg">Talk Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...filteredLiveActivity]
-                    .sort((a, b) => new Date(a.lastCall) - new Date(b.lastCall))
-                    .map(act => {
-                      const sec = act.talkTime || 0;
-                      const h = Math.floor(sec / 3600);
-                      const m = Math.floor((sec % 3600) / 60);
-                      const s = Math.floor(sec % 60);
-                      const formattedTalkTime = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
-
-                      return (
-                        <tr key={act.agentId} className="border-b dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-800/50">
-                          <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{act.name}</td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                            {new Date(act.firstCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                            {new Date(act.lastCall).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </td>
-                          <td className="px-4 py-3 font-bold text-orange-600 dark:text-orange-400">
-                            {formattedTalkTime}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  {filteredLiveActivity.length === 0 && (
-                    <tr>
-                      <td colSpan="4" className="px-4 py-4 text-center text-gray-500">No activity today.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Search and Filters Section */}
       <div className="mt-8 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-700/50 transition-all duration-300 hover:shadow-md space-y-4">
@@ -620,14 +433,21 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                 className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
               >
                 <option value="all">All Packages</option>
-                {products.map(prod => {
-                  const count = summaryCounts.productCounts?.[prod] || 0;
-                  return (
-                    <option key={prod} value={prod}>
-                      {prod} {count > 0 ? `(${count})` : ''}
-                    </option>
-                  );
-                })}
+                {allAvailableProducts
+                  .sort((a, b) => {
+                    const countA = (summaryCounts.scopedProductCounts || summaryCounts.productCounts)?.[a] || 0;
+                    const countB = (summaryCounts.scopedProductCounts || summaryCounts.productCounts)?.[b] || 0;
+                    if (countA !== countB) return countB - countA;
+                    return a.localeCompare(b);
+                  })
+                  .map(prod => {
+                    const count = (summaryCounts.scopedProductCounts || summaryCounts.productCounts)?.[prod] || 0;
+                    return (
+                      <option key={prod} value={prod}>
+                        {prod} {count > 0 ? `(${count})` : ''}
+                      </option>
+                    );
+                  })}
               </select>
             </div>
 

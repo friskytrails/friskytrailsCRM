@@ -75,7 +75,10 @@ async function getLeads(req, res) {
 async function getLeadCounts(req, res) {
   try {
     const agentIdCondition = await getAgentIdCondition(req.user);
-    const counts = await leadService.getLeadCounts(agentIdCondition);
+    const { scopedAgentFilter, filterAgent } = req.query;
+    const counts = await leadService.getLeadCounts(agentIdCondition, {
+      scopedAgentFilter: scopedAgentFilter || filterAgent || ''
+    });
     res.json(counts);
   } catch (error) {
     res.status(500).json({ error: error.message });
