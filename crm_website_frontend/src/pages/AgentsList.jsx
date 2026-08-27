@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
-const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
+const getAgentSlug = (ag) => {
+  if (!ag) return '';
+  const raw = String(ag.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return raw ? encodeURIComponent(raw) : String(ag.id || ag._id || '');
+};
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager, loading }) {
   const [loadingAction, setLoadingAction] = useState({});
@@ -13,7 +16,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [agentLeadCounts, setAgentLeadCounts] = useState({});
-  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignLoadingManagerId, setAssignLoadingManagerId] = useState(null);
 
   useEffect(() => {
     sessionStorage.setItem('leadDetail_backUrl', '/agents');
@@ -33,11 +36,34 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           setAgentLeadCounts(data.agentCounts || {});
         }
       } catch (err) {
-        console.error('Error fetching lead counts for team list:', err);
+        console.error('Error fetching lead counts:', err);
       }
     };
     fetchLeadCounts();
   }, []);
+
+  const openAssignModal = (manager) => {
+    if (assignLoadingManagerId) return; // Prevent switching while request is in flight
+    // Pre-select agents currently assigned to this manager
+    const currentAgentIds = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).map(a => a.id);
+    setSelectedAgentIds(currentAgentIds);
+    setAssignModalManager(manager);
+    setAssignSearchQuery('');
+  };
+
+  const handleAssign = async () => {
+    if (!assignModalManager) return;
+    const targetManagerId = assignModalManager.id || assignModalManager._id;
+    setAssignLoadingManagerId(targetManagerId);
+    try {
+      const result = await assignAgentsToManager(targetManagerId, selectedAgentIds);
+      if (result) {
+        setAssignModalManager(prev => (prev && (prev.id === targetManagerId || prev._id === targetManagerId) ? null : prev));
+      }
+    } finally {
+      setAssignLoadingManagerId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -145,27 +171,6 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
       }
     } finally {
       setLoadingAction(prev => ({ ...prev, [`itin_${agent.id}`]: false }));
-    }
-  };
-
-  const openAssignModal = (manager) => {
-    // Pre-select agents currently assigned to this manager
-    const currentAgentIds = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).map(a => a.id);
-    setSelectedAgentIds(currentAgentIds);
-    setAssignModalManager(manager);
-    setAssignSearchQuery('');
-  };
-
-  const handleAssign = async () => {
-    if (!assignModalManager) return;
-    setAssignLoading(true);
-    try {
-      const result = await assignAgentsToManager(assignModalManager.id, selectedAgentIds);
-      if (result) {
-        setAssignModalManager(null);
-      }
-    } finally {
-      setAssignLoading(false);
     }
   };
 
@@ -597,16 +602,17 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-800 flex gap-3">
               <button
                 onClick={() => setAssignModalManager(null)}
-                className="flex-1 py-2.5 text-sm font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                disabled={!!assignLoadingManagerId}
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAssign}
-                disabled={assignLoading}
+                disabled={!!assignLoadingManagerId}
                 className="flex-1 py-2.5 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors disabled:opacity-50 shadow-sm"
               >
-                {assignLoading ? 'Saving...' : `Assign ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? 's' : ''}`}
+                {assignLoadingManagerId ? 'Saving...' : `Assign ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

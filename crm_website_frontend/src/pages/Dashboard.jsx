@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AgentMultiSelect from '../components/AgentMultiSelect';
@@ -97,8 +97,17 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     }
   }, [agents, filterAgent, isAdmin]);
 
+  const abortCountsRef = useRef(null);
+  const abortLeadsRef = useRef(null);
+
   // Fetch summary badge counts (once on mount, and whenever assignments or filterAgent update)
   const fetchCounts = useCallback(async () => {
+    if (abortCountsRef.current) {
+      abortCountsRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortCountsRef.current = controller;
+
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -106,14 +115,19 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         scopedAgentFilter: filterAgent || ''
       });
       const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: controller.signal
       });
       if (res.ok) {
         const data = await res.json();
-        setSummaryCounts(data);
+        if (abortCountsRef.current === controller) {
+          setSummaryCounts(data);
+        }
       }
     } catch (err) {
-      console.error('Error fetching lead counts:', err);
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching lead counts:', err);
+      }
     }
   }, [filterAgent]);
 
@@ -123,6 +137,12 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   // Fetch paginated leads from server
   const fetchLeads = useCallback(async (targetPage = page) => {
+    if (abortLeadsRef.current) {
+      abortLeadsRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortLeadsRef.current = controller;
+
     setIsLoadingLeads(true);
     try {
       const token = localStorage.getItem('token');
@@ -140,29 +160,40 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
       });
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/leads?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: controller.signal
       });
 
       if (res.ok) {
         const data = await res.json();
-        const leadsArray = data.leads || [];
-        setLeads(leadsArray);
-        setTotalCount(data.totalCount || 0);
-        setTotalPages(data.totalPages || 1);
+        if (abortLeadsRef.current === controller) {
+          const leadsArray = data.leads || [];
+          setLeads(leadsArray);
+          setTotalCount(data.totalCount || 0);
+          setTotalPages(data.totalPages || 1);
 
-        // Sync lead IDs to sessionStorage for lead detail prev/next buttons
-        const activeIds = leadsArray.map(l => l.id || l._id);
-        sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
-        sessionStorage.setItem('leadDetail_backUrl', '/');
-        sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
+          // Sync lead IDs to sessionStorage for lead detail prev/next buttons
+          const activeIds = leadsArray.map(l => l.id || l._id);
+          sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
+          sessionStorage.setItem('leadDetail_backUrl', '/');
+          sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
+        }
       } else {
-        toast.error('Failed to load leads from server');
+        if (abortLeadsRef.current === controller) {
+          toast.error('Failed to load leads from server');
+        }
       }
     } catch (err) {
-      console.error('Error fetching paginated leads:', err);
-      toast.error('Could not connect to server');
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching paginated leads:', err);
+        if (abortLeadsRef.current === controller) {
+          toast.error('Could not connect to server');
+        }
+      }
     } finally {
-      setIsLoadingLeads(false);
+      if (abortLeadsRef.current === controller) {
+        setIsLoadingLeads(false);
+      }
     }
   }, [page, searchQuery, filterStatus, filterProduct, sortBy, filterAgent]);
 

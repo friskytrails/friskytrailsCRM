@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,8 @@ export default function LiveActivity({ agents = [] }) {
   const [sortBy, setSortBy] = useState('lastCall'); // 'name', 'firstCall', 'lastCall', 'idleTime', 'talkTime'
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
 
+  const abortControllerRef = useRef(null);
+
   // Clock tick every 60s to keep idle times accurate
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 60000);
@@ -22,6 +24,12 @@ export default function LiveActivity({ agents = [] }) {
   }, []);
 
   const fetchData = useCallback(async (isManual = false) => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     if (isManual) setRefreshing(true);
     try {
       const token = localStorage.getItem('token');
@@ -29,8 +37,8 @@ export default function LiveActivity({ agents = [] }) {
       const headers = { 'Authorization': `Bearer ${token}` };
 
       const [statusRes, activityRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/calls/live-status`, { headers }),
-        fetch(`${import.meta.env.VITE_API_URL}/calls/live-activity`, { headers })
+        fetch(`${import.meta.env.VITE_API_URL}/calls/live-status`, { headers, signal: controller.signal }),
+        fetch(`${import.meta.env.VITE_API_URL}/calls/live-activity`, { headers, signal: controller.signal })
       ]);
 
       if (statusRes.ok && activityRes.ok) {
@@ -38,17 +46,27 @@ export default function LiveActivity({ agents = [] }) {
           statusRes.json(),
           activityRes.json()
         ]);
-        setLiveStatus(statusData || []);
-        setLiveActivity(activityData || []);
+        if (abortControllerRef.current === controller) {
+          setLiveStatus(statusData || []);
+          setLiveActivity(activityData || []);
+        }
       } else {
-        if (isManual) toast.error('Failed to refresh live data');
+        if (isManual && abortControllerRef.current === controller) {
+          toast.error('Failed to refresh live data');
+        }
       }
     } catch (err) {
-      console.error('Error fetching live activity data:', err);
-      if (isManual) toast.error('Connection error while fetching data');
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching live activity data:', err);
+        if (isManual && abortControllerRef.current === controller) {
+          toast.error('Connection error while fetching data');
+        }
+      }
     } finally {
-      setLoading(false);
-      if (isManual) setRefreshing(false);
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+        if (isManual) setRefreshing(false);
+      }
     }
   }, []);
 
@@ -360,59 +378,84 @@ export default function LiveActivity({ agents = [] }) {
             <thead className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase bg-gray-50/80 dark:bg-slate-900/50 border-b border-gray-100 dark:border-slate-700/60 sticky top-0 z-10 tracking-wider">
               <tr>
                 <th
-                  onClick={() => handleSortToggle('name')}
-                  className="px-6 py-3.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
+                  scope="col"
+                  aria-sort={sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="px-6 py-3.5"
                 >
-                  <div className="flex items-center gap-1.5">
-                    Agent Name
+                  <button
+                    type="button"
+                    onClick={() => handleSortToggle('name')}
+                    className="flex items-center gap-1.5 w-full text-left font-bold hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 rounded"
+                  >
+                    <span>Agent Name</span>
                     {sortBy === 'name' && (
                       <span className="text-orange-500 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                     )}
-                  </div>
+                  </button>
                 </th>
                 <th
-                  onClick={() => handleSortToggle('firstCall')}
-                  className="px-6 py-3.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
+                  scope="col"
+                  aria-sort={sortBy === 'firstCall' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="px-6 py-3.5"
                 >
-                  <div className="flex items-center gap-1.5">
-                    First Call
+                  <button
+                    type="button"
+                    onClick={() => handleSortToggle('firstCall')}
+                    className="flex items-center gap-1.5 w-full text-left font-bold hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 rounded"
+                  >
+                    <span>First Call</span>
                     {sortBy === 'firstCall' && (
                       <span className="text-orange-500 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                     )}
-                  </div>
+                  </button>
                 </th>
                 <th
-                  onClick={() => handleSortToggle('lastCall')}
-                  className="px-6 py-3.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
+                  scope="col"
+                  aria-sort={sortBy === 'lastCall' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="px-6 py-3.5"
                 >
-                  <div className="flex items-center gap-1.5">
-                    Last Call
+                  <button
+                    type="button"
+                    onClick={() => handleSortToggle('lastCall')}
+                    className="flex items-center gap-1.5 w-full text-left font-bold hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 rounded"
+                  >
+                    <span>Last Call</span>
                     {sortBy === 'lastCall' && (
                       <span className="text-orange-500 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                     )}
-                  </div>
+                  </button>
                 </th>
                 <th
-                  onClick={() => handleSortToggle('idleTime')}
-                  className="px-6 py-3.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
+                  scope="col"
+                  aria-sort={sortBy === 'idleTime' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="px-6 py-3.5"
                 >
-                  <div className="flex items-center gap-1.5">
-                    Idle Time
+                  <button
+                    type="button"
+                    onClick={() => handleSortToggle('idleTime')}
+                    className="flex items-center gap-1.5 w-full text-left font-bold hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 rounded"
+                  >
+                    <span>Idle Time</span>
                     {sortBy === 'idleTime' && (
                       <span className="text-orange-500 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                     )}
-                  </div>
+                  </button>
                 </th>
                 <th
-                  onClick={() => handleSortToggle('talkTime')}
-                  className="px-6 py-3.5 cursor-pointer hover:text-gray-900 dark:hover:text-white transition-colors"
+                  scope="col"
+                  aria-sort={sortBy === 'talkTime' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
+                  className="px-6 py-3.5"
                 >
-                  <div className="flex items-center gap-1.5">
-                    Talk Time
+                  <button
+                    type="button"
+                    onClick={() => handleSortToggle('talkTime')}
+                    className="flex items-center gap-1.5 w-full text-left font-bold hover:text-gray-900 dark:hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 rounded"
+                  >
+                    <span>Talk Time</span>
                     {sortBy === 'talkTime' && (
                       <span className="text-orange-500 font-bold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                     )}
-                  </div>
+                  </button>
                 </th>
               </tr>
             </thead>

@@ -212,7 +212,7 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
       };
     } else if (scopedAgentFilter === 'assigned') {
       scopedAgentMatch = {
-        agentIds: { $exists: true, $ne: [] }
+        agentIds: { $type: 'array', $ne: [] }
       };
     } else {
       scopedAgentMatch = { agentIds: scopedAgentFilter };

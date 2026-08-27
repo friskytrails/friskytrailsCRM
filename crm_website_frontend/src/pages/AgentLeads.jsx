@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import AgentMetricsTable from '../components/AgentMetricsTable';
 
@@ -9,12 +9,18 @@ const matchIds = (id1, id2) => {
   return norm1 !== '' && norm1 === norm2;
 };
 
+const cleanSlug = (str) => String(str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+export const getAgentSlug = (ag) => {
+  if (!ag) return '';
+  const raw = String(ag.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return raw ? encodeURIComponent(raw) : String(ag.id || ag._id || '');
+};
+
 export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics, refreshAgents, loading }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
-  const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
   const decodedParam = (() => {
     try {
       return decodeURIComponent(id || '').trim();
@@ -22,23 +28,31 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       return (id || '').trim();
     }
   })();
-  const normalizedParam = normalizeAgentSlug(decodedParam);
+  const normalizedParam = decodedParam.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
   const agent = (agents || []).find(a =>
     matchIds(a.id || a._id, id) ||
+    cleanSlug(a.id || a._id) === cleanSlug(id) ||
+    cleanSlug(a.name) === cleanSlug(decodedParam) ||
+    cleanSlug(a.name) === cleanSlug(id) ||
+    cleanSlug(a.email) === cleanSlug(decodedParam) ||
     a.name === decodedParam ||
     a.name?.toLowerCase() === decodedParam.toLowerCase() ||
     getAgentSlug(a) === normalizedParam ||
+    getAgentSlug(a) === id ||
     encodeURIComponent(a.name) === id
   );
 
-  const agentKey = agent ? (getAgentSlug(agent) || agent.id || agent._id) : (normalizedParam || id);
+  const targetAgentId = agent ? String(agent.id || agent._id || '') : (/^[0-9a-fA-F]{24}$/.test(id) ? id : '');
+  const agentKey = targetAgentId || normalizedParam || id || 'default';
 
+  const refreshedAgentsRef = useRef({});
   useEffect(() => {
-    if (refreshAgents && agent) {
-      refreshAgents(agent.id || agent._id);
+    if (refreshAgents && targetAgentId && !refreshedAgentsRef.current[targetAgentId]) {
+      refreshedAgentsRef.current[targetAgentId] = true;
+      refreshAgents(targetAgentId);
     }
-  }, [id, agent?.id]);
+  }, [targetAgentId, refreshAgents]);
 
   const [filterStatus, setFilterStatus] = useState(() => {
     return sessionStorage.getItem(`agentLeads_${agentKey}_filterStatus`) || 'all';
@@ -71,35 +85,42 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const [loadingLeads, setLoadingLeads] = useState(false);
 
   useEffect(() => {
+    if (!targetAgentId) return;
+
+    const controller = new AbortController();
+    let isCurrent = true;
+
     const fetchAgentLeads = async () => {
-      // If agents list is still loading, wait for it unless id is already a 24-char ObjectId
-      const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
-      if (!agent && !isObjectId) {
-        // Still resolving slug from agents list; do not fire with raw non-ObjectId string
-        return;
-      }
-
-      const targetAgentId = agent ? (agent.id || agent._id) : (isObjectId ? id : null);
-      if (!targetAgentId) return;
-
       setLoadingLeads(true);
       try {
         const token = localStorage.getItem('token');
         const res = await fetch(`${import.meta.env.VITE_API_URL}/leads?filterAgent=${targetAgentId}&pagination=false`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          signal: controller.signal
         });
-        if (res.ok) {
+        if (res.ok && isCurrent) {
           const data = await res.json();
-          setAgentLeadsData(Array.isArray(data) ? data : (data.leads || []));
+          if (isCurrent) {
+            setAgentLeadsData(Array.isArray(data) ? data : (data.leads || []));
+          }
         }
       } catch (err) {
-        console.error('Error fetching agent leads:', err);
+        if (err.name !== 'AbortError') {
+          console.error('Error fetching agent leads:', err);
+        }
       } finally {
-        setLoadingLeads(false);
+        if (isCurrent) {
+          setLoadingLeads(false);
+        }
       }
     };
     fetchAgentLeads();
-  }, [id, agent?.id, agent?._id, agent]);
+
+    return () => {
+      isCurrent = false;
+      controller.abort();
+    };
+  }, [targetAgentId]);
 
   const [searchQuery, setSearchQuery] = useState('');
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import toast, { Toaster } from "react-hot-toast";
 import Navbar from './components/Navbar';
@@ -284,7 +284,7 @@ function App() {
     }
   };
 
-  const refreshAgents = async (agentId) => {
+  const refreshAgents = useCallback(async (agentId) => {
     if (!token) return;
     try {
       if (agentId) {
@@ -321,7 +321,7 @@ function App() {
     } catch (e) {
       console.error("Failed to refresh agents:", e);
     }
-  };
+  }, [token]);
 
   const bookLeadAPI = async (leadId, bookingDetails) => {
     try {

@@ -29,10 +29,25 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
+      const dropdownMaxHeight = 240;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const shouldOpenUpwards = spaceBelow < dropdownMaxHeight && spaceAbove > spaceBelow;
+
+      let left = rect.left;
+      const width = Math.max(rect.width, 220);
+      if (left + width > window.innerWidth - 10) {
+        left = Math.max(10, window.innerWidth - width - 10);
+      }
+
       setCoords({
-        left: rect.left,
-        top: rect.bottom + window.scrollY,
-        width: Math.max(rect.width, 220)
+        left,
+        top: shouldOpenUpwards ? rect.top + window.scrollY - 4 : rect.bottom + window.scrollY + 4,
+        width,
+        openUpwards: shouldOpenUpwards,
+        maxHeight: shouldOpenUpwards
+          ? Math.min(240, Math.max(160, spaceAbove - 20))
+          : Math.min(240, Math.max(160, spaceBelow - 20))
       });
       // Focus search input on next frame
       setTimeout(() => {
@@ -117,12 +132,14 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
           onMouseDown={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
-            top: coords.top + 4,
+            top: coords.top,
             left: coords.left,
             width: coords.width,
+            transform: coords.openUpwards ? 'translateY(-100%)' : 'none',
+            maxHeight: coords.maxHeight || 240,
             zIndex: 9999
           }}
-          className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-60"
+          className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-xl shadow-2xl overflow-hidden flex flex-col"
         >
           {/* Search Header */}
           <div className="p-2 border-b border-gray-100 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-900/50 sticky top-0 z-20">
@@ -159,29 +176,50 @@ export default function AgentMultiSelect({ agents, selectedAgentIds = [], onChan
 
           {/* Agents List */}
           <div className="p-1 overflow-y-auto flex-1">
+            {Boolean(selectedAgent) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange([]);
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-bold cursor-pointer transition-colors border-b border-gray-100 dark:border-slate-700/60 mb-1 text-left"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span>Unassign Lead</span>
+              </button>
+            )}
+
             {filteredAgents.map(agent => {
               const agId = agent.id || agent._id;
               const isSelected = selectedAgentIds.includes(agId);
               const count = getAgentLeadCount ? (getAgentLeadCount(agId) ?? (agent.id ? getAgentLeadCount(agent.id) : 0)) : 0;
 
               return (
-                <label 
+                <div 
                   key={agId} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggle(agId);
+                  }}
                   className="flex items-center space-x-2 px-2 py-1.5 rounded hover:bg-orange-50/60 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
                 >
                   <input
                     type="radio"
                     checked={isSelected}
-                    onChange={() => handleToggle(agId)}
-                    className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded-full focus:ring-orange-500 dark:bg-slate-700 dark:border-slate-600 cursor-pointer"
+                    readOnly
+                    className="w-3.5 h-3.5 text-orange-600 border-gray-300 rounded-full focus:ring-orange-500 dark:bg-slate-700 dark:border-slate-600 cursor-pointer pointer-events-none"
                   />
-                  <span className="text-xs text-gray-700 dark:text-gray-300 font-medium truncate flex-1">
+                  <span className="text-xs text-gray-700 dark:text-gray-300 font-medium truncate flex-1 select-none">
                     {agent.name} 
                     <span className="text-gray-400 font-normal ml-1">
                       ({count} {count === 1 ? 'lead' : 'leads'})
                     </span>
                   </span>
-                </label>
+                </div>
               );
             })}
 
