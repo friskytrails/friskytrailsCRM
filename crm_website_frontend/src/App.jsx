@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import toast, { Toaster } from "react-hot-toast";
 import Navbar from './components/Navbar';
@@ -19,6 +19,7 @@ const Reports = lazy(() => import('./pages/Reports'));
 const GlobalSettings = lazy(() => import('./pages/GlobalSettings'));
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
 const BugReports = lazy(() => import('./pages/BugReports'));
+const LiveActivity = lazy(() => import('./pages/LiveActivity'));
 
 const API_URL = `${import.meta.env.VITE_API_URL}`;
 
@@ -283,7 +284,7 @@ function App() {
     }
   };
 
-  const refreshAgents = async (agentId) => {
+  const refreshAgents = useCallback(async (agentId) => {
     if (!token) return;
     try {
       if (agentId) {
@@ -320,7 +321,7 @@ function App() {
     } catch (e) {
       console.error("Failed to refresh agents:", e);
     }
-  };
+  }, [token]);
 
   const bookLeadAPI = async (leadId, bookingDetails) => {
     try {
@@ -684,6 +685,10 @@ function App() {
               <Route
                 path="/reports"
                 element={user?.isAdmin ? <Reports leads={leads} agents={agents} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/live-activity"
+                element={user?.isAdmin ? <LiveActivity agents={agents} /> : <Navigate to="/" replace />}
               />
 
               <Route

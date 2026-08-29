@@ -15,6 +15,21 @@ export default function AddLead({ addLead, user, products = [] }) {
     mailId: ''
   });
 
+  const defaultProducts = [
+    "Meghalaya Package",
+    "Hampta Pass Trek",
+    "Rishikesh Activities",
+    "Spiti Package",
+    "Ladakh Package",
+    "Kerala Trip",
+    "Adventure Activities",
+    "Others",
+    "Arunachal Pradesh Package",
+    "Goa Package",
+    "Darjeeling Gangtok Package"
+  ];
+  const availableProducts = (products && products.length > 0) ? products : defaultProducts;
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -172,7 +187,7 @@ export default function AddLead({ addLead, user, products = [] }) {
                     className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border cursor-pointer focus:outline-none"
                   >
                     <option value="">Select a product...</option>
-                    {products.map(p => (
+                    {availableProducts.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>

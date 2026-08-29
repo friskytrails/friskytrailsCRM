@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const normalizeAgentSlug = (value) => String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '');
-const getAgentSlug = (ag) => normalizeAgentSlug(ag?.name);
+const getAgentSlug = (ag) => {
+  if (!ag) return '';
+  const raw = String(ag.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return raw ? encodeURIComponent(raw) : String(ag.id || ag._id || '');
+};
 
 export default function AgentsList({ agents = [], leads = [], updateAgentStatus, updateAgentVerification, toggleManagerRole, toggleItineraryRole, assignAgentsToManager, loading }) {
   const [loadingAction, setLoadingAction] = useState({});
@@ -13,6 +16,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [agentLeadCounts, setAgentLeadCounts] = useState({});
+  const [assignLoadingManagerId, setAssignLoadingManagerId] = useState(null);
 
   useEffect(() => {
     sessionStorage.setItem('leadDetail_backUrl', '/agents');
@@ -32,11 +36,34 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           setAgentLeadCounts(data.agentCounts || {});
         }
       } catch (err) {
-        console.error('Error fetching lead counts for team list:', err);
+        console.error('Error fetching lead counts:', err);
       }
     };
     fetchLeadCounts();
   }, []);
+
+  const openAssignModal = (manager) => {
+    if (assignLoadingManagerId) return; // Prevent switching while request is in flight
+    // Pre-select agents currently assigned to this manager
+    const currentAgentIds = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).map(a => a.id);
+    setSelectedAgentIds(currentAgentIds);
+    setAssignModalManager(manager);
+    setAssignSearchQuery('');
+  };
+
+  const handleAssign = async () => {
+    if (!assignModalManager) return;
+    const targetManagerId = assignModalManager.id || assignModalManager._id;
+    setAssignLoadingManagerId(targetManagerId);
+    try {
+      const result = await assignAgentsToManager(targetManagerId, selectedAgentIds);
+      if (result) {
+        setAssignModalManager(prev => (prev && (prev.id === targetManagerId || prev._id === targetManagerId) ? null : prev));
+      }
+    } finally {
+      setAssignLoadingManagerId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -147,27 +174,6 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     }
   };
 
-  const openAssignModal = (manager) => {
-    // Pre-select agents currently assigned to this manager
-    const currentAgentIds = agents.filter(a => a.managerId === manager.id || a.managerId === manager._id).map(a => a.id);
-    setSelectedAgentIds(currentAgentIds);
-    setAssignModalManager(manager);
-    setAssignSearchQuery('');
-  };
-
-  const handleAssign = async () => {
-    if (!assignModalManager) return;
-    setAssignLoading(true);
-    try {
-      const result = await assignAgentsToManager(assignModalManager.id, selectedAgentIds);
-      if (result) {
-        setAssignModalManager(null);
-      }
-    } finally {
-      setAssignLoading(false);
-    }
-  };
-
   const toggleAgentSelection = (agentId) => {
     setSelectedAgentIds(prev =>
       prev.includes(agentId) ? prev.filter(id => id !== agentId) : [...prev, agentId]
@@ -204,7 +210,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
               {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
             </div>
             <div className="flex-1 min-w-0">
-              <Link to={`/agents/${agent.id || agent._id}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
+              <Link to={`/agents/${getAgentSlug(agent) || agent.id || agent._id}`} className="block text-sm font-bold text-gray-900 dark:text-slate-100 truncate hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
                 {agent.name}
               </Link>
               <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">{agent.email}</p>
@@ -247,7 +253,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
           </div>
           <div>
             <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-              <Link to={`/agents/${agent.id || agent._id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
+              <Link to={`/agents/${getAgentSlug(agent) || agent.id || agent._id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
               {agent.isItinerary && (
                 <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-900/50">Itinerary Team</span>
               )}
@@ -349,7 +355,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                         </div>
                         <div>
                           <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-                            <Link to={`/agents/${manager.id || manager._id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
+                            <Link to={`/agents/${getAgentSlug(manager) || manager.id || manager._id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
                             <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-900/50">Manager</span>
                             {status !== 'Active' && (
                               <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
@@ -491,7 +497,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                     {teamMembers.map(member => (
                       <li key={member.id}>
                         <Link 
-                          to={`/agents/${member.id || member._id}`}
+                          to={`/agents/${getAgentSlug(member) || member.id || member._id}`}
                           onClick={() => setViewTeamManager(null)}
                           className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-violet-50 dark:bg-slate-800/50 dark:hover:bg-slate-700/80 rounded-xl border border-gray-100 dark:border-slate-700 hover:border-violet-200 dark:hover:border-violet-900/50 transition-all group cursor-pointer"
                         >
@@ -596,16 +602,17 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             <div className="px-6 py-4 border-t border-gray-100 dark:border-slate-800 flex gap-3">
               <button
                 onClick={() => setAssignModalManager(null)}
-                className="flex-1 py-2.5 text-sm font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                disabled={!!assignLoadingManagerId}
+                className="flex-1 py-2.5 text-sm font-bold text-gray-600 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAssign}
-                disabled={assignLoading}
+                disabled={!!assignLoadingManagerId}
                 className="flex-1 py-2.5 text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors disabled:opacity-50 shadow-sm"
               >
-                {assignLoading ? 'Saving...' : `Assign ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? 's' : ''}`}
+                {assignLoadingManagerId ? 'Saving...' : `Assign ${selectedAgentIds.length} Agent${selectedAgentIds.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

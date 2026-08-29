@@ -191,7 +191,8 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   };
 }
 
-async function getLeadCounts(agentIdCondition = undefined) {
+async function getLeadCounts(agentIdCondition = undefined, options = {}) {
+  const { scopedAgentFilter = '' } = options;
   const baseQuery = {};
   if (agentIdCondition !== undefined) {
     if (Array.isArray(agentIdCondition)) {
@@ -203,6 +204,21 @@ async function getLeadCounts(agentIdCondition = undefined) {
 
   const inactiveStatuses = INACTIVE_STATUSES;
 
+  let scopedAgentMatch = {};
+  if (scopedAgentFilter && scopedAgentFilter !== 'all') {
+    if (scopedAgentFilter === 'unassigned') {
+      scopedAgentMatch = {
+        $or: [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }]
+      };
+    } else if (scopedAgentFilter === 'assigned') {
+      scopedAgentMatch = {
+        agentIds: { $type: 'array', $ne: [] }
+      };
+    } else {
+      scopedAgentMatch = { agentIds: scopedAgentFilter };
+    }
+  }
+
   const [facetResult] = await Lead.Model.aggregate([
     { $match: baseQuery },
     {
@@ -212,6 +228,10 @@ async function getLeadCounts(agentIdCondition = undefined) {
         ],
         productCounts: [
           { $match: { status: { $nin: inactiveStatuses } } },
+          { $group: { _id: '$product', count: { $sum: 1 } } }
+        ],
+        scopedProductCounts: [
+          { $match: { status: { $nin: inactiveStatuses }, ...scopedAgentMatch } },
           { $group: { _id: '$product', count: { $sum: 1 } } }
         ],
         agentCounts: [
@@ -249,6 +269,11 @@ async function getLeadCounts(agentIdCondition = undefined) {
     if (_id) productCounts[_id] = count;
   });
 
+  const scopedProductCounts = {};
+  (facetResult?.scopedProductCounts || []).forEach(({ _id, count }) => {
+    if (_id) scopedProductCounts[_id] = count;
+  });
+
   const agentCounts = {};
   (facetResult?.agentCounts || []).forEach(({ _id, count }) => {
     if (_id !== null && _id !== undefined) {
@@ -267,6 +292,7 @@ async function getLeadCounts(agentIdCondition = undefined) {
     assignedCount: Math.max(0, activeCount - unassignedCount),
     statusCounts,
     productCounts,
+    scopedProductCounts,
     agentCounts
   };
 }
