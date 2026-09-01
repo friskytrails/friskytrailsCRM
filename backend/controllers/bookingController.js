@@ -234,25 +234,30 @@ async function createBooking(req, res) {
       throw saveError;
     }
 
-    // 3. Update corresponding CRM Lead status if targetLead was validated
+    // 3. Update corresponding CRM Lead status atomically if targetLead was validated.
+    // Using findByIdAndUpdate (atomic, field-level) instead of targetLead.save() to avoid
+    // triggering full Mongoose document validation on unrelated fields. The previous .save()
+    // pattern was silently swallowing validation errors inside a try/catch, meaning the
+    // Lead.status was never written to MongoDB even though the API returned 201 OK.
     let leadSyncStatus = 'Not Attempted';
     if (targetLead) {
-      try {
-        const wasBooked = targetLead.status === 'Booked';
-        targetLead.status = 'Booked';
-        await targetLead.save();
+      const wasBooked = targetLead.status === 'Booked';
+      const syncedLead = await Lead.Model.findByIdAndUpdate(
+        targetLead._id,
+        { $set: { status: 'Booked' } },
+        { new: true }
+      );
+      if (syncedLead) {
         leadSyncStatus = 'Success';
-
         if (!wasBooked) {
-          const agentsToUpdate = (Array.isArray(targetLead.agentIds) && targetLead.agentIds.length > 0)
-            ? targetLead.agentIds
+          const agentsToUpdate = (Array.isArray(syncedLead.agentIds) && syncedLead.agentIds.length > 0)
+            ? syncedLead.agentIds
             : [req.user.userId || req.user.id || req.user._id].filter(Boolean);
-          
           await recordBookingForAgents(agentsToUpdate, numTotal);
         }
-      } catch (leadErr) {
-        console.error('Failed to sync CRM lead status:', leadErr);
-        leadSyncStatus = 'Failed: Error syncing lead';
+      } else {
+        leadSyncStatus = 'Failed: Lead not found during sync';
+        console.error(`[createBooking] Lead status sync failed — Lead ${targetLead._id} not found in DB`);
       }
     } else {
       const creatorId = req.user.userId || req.user.id || req.user._id;
