@@ -298,12 +298,31 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   // Inline Agent Assignment (instant 0 ms state update + background save)
   const handleInlineAssign = async (leadId, newIds) => {
-    setLeads(prev => prev.map(lead => {
-      if ((lead.id || lead._id) === leadId) {
-        return { ...lead, agentIds: newIds };
+    // Optimistically update agentIds in local state
+    setLeads(prev => {
+      const updated = prev.map(lead => {
+        if ((lead.id || lead._id) === leadId) {
+          return { ...lead, agentIds: newIds };
+        }
+        return lead;
+      });
+
+      // If viewing "unassigned only", remove the lead once it gets assigned
+      if (filterAgent === 'unassigned' && newIds && newIds.length > 0) {
+        return updated.filter(lead => (lead.id || lead._id) !== leadId);
       }
-      return lead;
-    }));
+      // If viewing "assigned only", remove the lead once it gets unassigned
+      if (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) {
+        return updated.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+      // If viewing a specific agent's leads and they were removed from that agent
+      const specialOptions = ['unassigned', 'assigned', 'all'];
+      if (!specialOptions.includes(filterAgent) && !newIds.includes(filterAgent)) {
+        return updated.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+
+      return updated;
+    });
 
     await assignAgent(leadId, newIds);
     fetchCounts();

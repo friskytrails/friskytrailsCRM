@@ -20,9 +20,24 @@ function formatDoc(doc) {
     }
   }
 
+  // Deduplicate and sanitize callLogs by date if present
+  if (Array.isArray(rest.callLogs) && rest.callLogs.length > 0) {
+    const logMap = new Map();
+    for (const log of rest.callLogs) {
+      if (log && log.date) {
+        const existing = logMap.get(log.date);
+        if (!existing || (log.dailyDial || 0) > (existing.dailyDial || 0)) {
+          logMap.set(log.date, log);
+        }
+      }
+    }
+    rest.callLogs = Array.from(logMap.values());
+  }
+
+  const idStr = _id ? _id.toString() : '';
   return { 
-    id: rest.leadId ? rest.leadId.toString() : _id.toString(), 
-    _id: _id.toString(), 
+    id: rest.leadId !== undefined && rest.leadId !== null ? rest.leadId.toString() : idStr, 
+    _id: idStr, 
     ...rest 
   };
 }

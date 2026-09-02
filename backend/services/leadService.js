@@ -891,53 +891,42 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   // Manage callLogs for the current date in IST (Asia/Kolkata)
   // Use Intl.DateTimeFormat for reliable IST date, regardless of server timezone
   const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-  
-  let query = {};
-  if (mongoose.Types.ObjectId.isValid(id) && typeof id === 'string' && id.length === 24) {
-    query = { _id: id };
-  } else {
-    query = { leadId: Number(id) };
-  }
-  if (agentIdCondition !== undefined) {
-    query.agentIds = agentIdCondition;
-  }
 
-  const baseSet = {
-    'booking.totalDial': totalDial,
-    'booking.dailyDial': dailyDial,
-    'booking.connected': connected,
-    'booking.talkTime': talkTime,
-    'booking.dailyTalkTime': dailyTalkTime,
-    'booking.firstCall': firstCall,
-    'booking.lastCall': lastCall
+  lead.booking = {
+    totalDial,
+    dailyDial,
+    connected,
+    talkTime,
+    dailyTalkTime,
+    firstCall,
+    lastCall
   };
 
-  let result = await Lead.Model.findOneAndUpdate(
-    { ...query, 'callLogs.date': todayDate },
-    {
-      $set: {
-        ...baseSet,
-        'callLogs.$.dailyDial': dailyDial,
-        'callLogs.$.dailyTalkTime': dailyTalkTime
+  // Build clean, deduplicated map of callLogs by date
+  const logsMap = new Map();
+  for (const log of (lead.callLogs || [])) {
+    if (log && log.date) {
+      const existing = logsMap.get(log.date);
+      if (!existing || (log.dailyDial || 0) > (existing.dailyDial || 0)) {
+        logsMap.set(log.date, {
+          date: log.date,
+          dailyDial: log.dailyDial || 0,
+          dailyTalkTime: log.dailyTalkTime || '0:0'
+        });
       }
-    },
-    { new: true }
-  );
-
-  if (!result) {
-    result = await Lead.Model.findOneAndUpdate(
-      query,
-      {
-        $set: baseSet,
-        $push: { callLogs: { date: todayDate, dailyDial, dailyTalkTime } }
-      },
-      { new: true }
-    );
+    }
   }
 
-  if (!result) {
-    throw new Error("Lead not found or unauthorized");
-  }
+  // Update or insert today's entry with the latest daily values
+  logsMap.set(todayDate, {
+    date: todayDate,
+    dailyDial,
+    dailyTalkTime
+  });
+
+  lead.callLogs = Array.from(logsMap.values());
+  await lead.save();
+
   return await getLeadById(id, agentIdCondition);
 }
 

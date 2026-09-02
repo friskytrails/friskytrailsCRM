@@ -17,6 +17,8 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [agentLeadCounts, setAgentLeadCounts] = useState({});
   const [assignLoadingManagerId, setAssignLoadingManagerId] = useState(null);
+  // Team filter tabs: 'active' | 'itinerary' | 'former'
+  const [teamFilter, setTeamFilter] = useState('active');
 
   useEffect(() => {
     sessionStorage.setItem('leadDetail_backUrl', '/agents');
@@ -78,32 +80,35 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
   const managersList = agents.filter(a => a.isManager && a.status !== 'Pending');
   
   const baseTeamList = agents.filter(a => !a.isManager && a.status !== 'Pending' && a.status !== 'Rejected');
+
+  // Apply teamFilter tab logic first, then apply search query
   const activeAgentsList = baseTeamList.filter(a => {
     const trimmedQuery = globalSearchQuery.trim().toLowerCase();
     const hasQuery = trimmedQuery.length > 0;
     const status = a.status || 'Active';
+    const isItinerary = !!(a.isItinerary || a.role === 'itinerary');
 
-    // Without search: show Active agents, and hide Inactive/Former Employee only after 24 hours
-    if (!hasQuery) {
-      if (status === 'Active') return true;
-
-      const changedAt = a.statusChangedAt || a.updatedAt || a.createdAt;
-      if (changedAt) {
-        const changedTime = new Date(changedAt).getTime();
-        const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
-        if (!isNaN(changedTime) && (Date.now() - changedTime < TWENTY_FOUR_HOURS)) {
-          return true;
-        }
-      }
-      return false;
+    // Determine which agents match the active tab
+    let matchesTab = false;
+    if (teamFilter === 'active') {
+      // Active Employees: status Active and NOT itinerary
+      matchesTab = status === 'Active' && !isItinerary;
+    } else if (teamFilter === 'itinerary') {
+      // Itinerary Team: isItinerary flag set (any status)
+      matchesTab = isItinerary;
+    } else if (teamFilter === 'former') {
+      // Former/Inactive: status is Inactive or Former Employee
+      matchesTab = status === 'Inactive' || status === 'Former Employee';
     }
 
-    // When searching, allow matching inactive or former employees as well
-    return (
+    if (!hasQuery) return matchesTab;
+
+    // When searching, filter within the currently selected tab
+    return matchesTab && (
       (a.name || '').toLowerCase().includes(trimmedQuery) ||
       (a.email || '').toLowerCase().includes(trimmedQuery) ||
       (a.phone || '').toLowerCase().includes(trimmedQuery) ||
-      (status).toLowerCase().includes(trimmedQuery)
+      status.toLowerCase().includes(trimmedQuery)
     );
   });
 
@@ -111,7 +116,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
     if (action === 'status' && (value === 'Inactive' || value === 'Former Employee')) {
       const agentObj = agents.find(a => a.id === agentId || a._id === agentId);
       const agentName = agentObj?.name || 'this agent';
-      const confirmed = window.confirm(`Are you sure you want to change the status of "${agentName}" to ${value}? They will be hidden from the Active Team list after 24 hours.`);
+      const confirmed = window.confirm(`Are you sure you want to change the status of "${agentName}" to ${value}? They will be moved to the Former / Inactive tab.`);
       if (!confirmed) return;
     }
 
@@ -398,40 +403,97 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
 
           {/* Active Agents Section */}
           <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl shadow-xl rounded-2xl p-6 md:p-8 border border-gray-200/50 dark:border-slate-700/50">
-            <div className="border-b border-gray-200 dark:border-slate-700 pb-5 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
-                  <span className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-xl text-orange-600 dark:text-orange-400">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                  </span>
-                  Active Team
-                  <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm py-0.5 px-2.5 rounded-full font-bold ml-1">{activeAgentsList.length}</span>
-                </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 font-medium">Manage your travel agents and promote them to manager role.</p>
+            <div className="border-b border-gray-200 dark:border-slate-700 pb-5 mb-6 flex flex-col gap-4">
+              {/* Header row */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                    <span className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-xl text-orange-600 dark:text-orange-400">
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    </span>
+                    Active Team
+                    <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-slate-300 text-sm py-0.5 px-2.5 rounded-full font-bold ml-1">{activeAgentsList.length}</span>
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 font-medium">Manage your travel agents and promote them to manager role.</p>
+                </div>
+                <div className="relative w-full md:w-80 lg:w-96">
+                  <input
+                    type="text"
+                    aria-label="Search agents by name, email, phone, or status"
+                    placeholder="Search agent by name, email, phone, or status..."
+                    value={globalSearchQuery}
+                    onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                    className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-9 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 shadow-sm"
+                  />
+                  <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  {globalSearchQuery && (
+                    <button
+                      onClick={() => setGlobalSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
+                      title="Clear search"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="relative w-full md:w-80 lg:w-96">
-                <input
-                  type="text"
-                  aria-label="Search agents by name, email, phone, or status"
-                  placeholder="Search agent by name, email, phone, or status..."
-                  value={globalSearchQuery}
-                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                  className="w-full text-sm bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl pl-9 pr-9 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 shadow-sm"
-                />
-                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                {globalSearchQuery && (
-                  <button
-                    onClick={() => setGlobalSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 cursor-pointer"
-                    title="Clear search"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
+
+              {/* Filter Tabs */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => { setTeamFilter('active'); setGlobalSearchQuery(''); }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    teamFilter === 'active'
+                      ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:border-orange-300 hover:text-orange-600'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197" /></svg>
+                  Active Employees
+                  <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    teamFilter === 'active' ? 'bg-white/25 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
+                  }`}>
+                    {baseTeamList.filter(a => (a.status || 'Active') === 'Active' && !(a.isItinerary || a.role === 'itinerary')).length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setTeamFilter('itinerary'); setGlobalSearchQuery(''); }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    teamFilter === 'itinerary'
+                      ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:border-blue-300 hover:text-blue-600'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                  Itinerary Team
+                  <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    teamFilter === 'itinerary' ? 'bg-white/25 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
+                  }`}>
+                    {baseTeamList.filter(a => !!(a.isItinerary || a.role === 'itinerary')).length}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => { setTeamFilter('former'); setGlobalSearchQuery(''); }}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                    teamFilter === 'former'
+                      ? 'bg-gray-600 text-white border-gray-600 shadow-sm'
+                      : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-600 hover:border-gray-400 hover:text-gray-700'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                  Former / Inactive
+                  <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    teamFilter === 'former' ? 'bg-white/25 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
+                  }`}>
+                    {baseTeamList.filter(a => { const s = a.status || 'Active'; return s === 'Inactive' || s === 'Former Employee'; }).length}
+                  </span>
+                </button>
               </div>
             </div>
 
