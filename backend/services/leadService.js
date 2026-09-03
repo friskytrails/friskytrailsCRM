@@ -835,9 +835,39 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
 }
 
 async function updateBooking(id, bookingData, agentIdCondition) {
-  const lead = await Lead.findById(id);
+  // Build the ownership-aware query up front so that no mutation happens
+  // before authorization is confirmed (fixes: unassigned agent could persist
+  // changes before the controller's 403 response).
+  let baseQuery = {};
+  const strId = id?.toString?.() || id;
+  if (mongoose.Types.ObjectId.isValid(strId) && typeof strId === 'string' && strId.length === 24) {
+    baseQuery._id = strId;
+  } else {
+    const numId = Number(strId);
+    if (!isNaN(numId)) {
+      baseQuery.leadId = numId;
+    } else {
+      throw new Error('Lead not found');
+    }
+  }
+  if (agentIdCondition !== undefined) {
+    if (Array.isArray(agentIdCondition)) {
+      baseQuery.agentIds = { $in: agentIdCondition };
+    } else {
+      baseQuery.agentIds = agentIdCondition;
+    }
+  }
+
+  // Load the current lead (with ownership check baked into the query).
+  const { Model: LeadModel } = require('../models/Lead');
+  const lead = await LeadModel.findOne(baseQuery);
   if (!lead) {
-    throw new Error("Lead not found");
+    // Distinguish between "not found" and "unauthorized" so callers can
+    // return the correct HTTP status code.
+    const exists = await LeadModel.findOne(
+      Object.fromEntries(Object.entries(baseQuery).filter(([k]) => k !== 'agentIds'))
+    );
+    throw new Error(exists ? 'Lead not found or unauthorized' : 'Lead not found');
   }
 
   const currentBooking = lead.booking || {};
@@ -852,7 +882,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   if (bookingData.firstCall !== undefined) {
     if (bookingData.firstCall) {
       const d = new Date(bookingData.firstCall);
-      if (isNaN(d.getTime())) throw new Error("Invalid firstCall date");
+      if (isNaN(d.getTime())) throw new Error('Invalid firstCall date');
       firstCall = d;
     } else {
       firstCall = null;
@@ -863,7 +893,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   if (bookingData.lastCall !== undefined) {
     if (bookingData.lastCall) {
       const d = new Date(bookingData.lastCall);
-      if (isNaN(d.getTime())) throw new Error("Invalid lastCall date");
+      if (isNaN(d.getTime())) throw new Error('Invalid lastCall date');
       lastCall = d;
     } else {
       lastCall = null;
@@ -881,26 +911,12 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
 
   if (!hasChanges) {
-    // If agentIdCondition is set, we must also ensure the current agent is still the owner
-    if (agentIdCondition !== undefined && !(lead.agentIds || []).includes(agentIdCondition)) {
-      throw new Error("Lead not found or unauthorized");
-    }
     return await getLeadById(id, agentIdCondition);
   }
 
   // Manage callLogs for the current date in IST (Asia/Kolkata)
   // Use Intl.DateTimeFormat for reliable IST date, regardless of server timezone
   const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-
-  lead.booking = {
-    totalDial,
-    dailyDial,
-    connected,
-    talkTime,
-    dailyTalkTime,
-    firstCall,
-    lastCall
-  };
 
   // Build clean, deduplicated map of callLogs by date
   const logsMap = new Map();
@@ -917,15 +933,34 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     }
   }
 
-  // Update or insert today's entry with the latest daily values
-  logsMap.set(todayDate, {
-    date: todayDate,
-    dailyDial,
-    dailyTalkTime
-  });
+  // Only overwrite today's entry when the incoming dailyDial is >= the stored
+  // value, so a stale/low-count request cannot reduce a previously-recorded
+  // higher counter (fixes: concurrent saves from stale snapshots).
+  const existingTodayLog = logsMap.get(todayDate);
+  const todayLog = { date: todayDate, dailyDial, dailyTalkTime };
+  if (!existingTodayLog || dailyDial >= existingTodayLog.dailyDial) {
+    logsMap.set(todayDate, todayLog);
+  }
 
-  lead.callLogs = Array.from(logsMap.values());
-  await lead.save();
+  const newCallLogs = Array.from(logsMap.values());
+
+  // Use a single atomic findOneAndUpdate to avoid lost-update races.
+  // The same ownership query (baseQuery) guards the write – an agent that
+  // was de-assigned between the read above and this write will get null back.
+  const updatedLead = await LeadModel.findOneAndUpdate(
+    baseQuery,
+    {
+      $set: {
+        booking: { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall },
+        callLogs: newCallLogs
+      }
+    },
+    { new: true }
+  );
+
+  if (!updatedLead) {
+    throw new Error('Lead not found or unauthorized');
+  }
 
   return await getLeadById(id, agentIdCondition);
 }

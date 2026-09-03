@@ -324,8 +324,20 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
       return updated;
     });
 
-    await assignAgent(leadId, newIds);
+    const result = await assignAgent(leadId, newIds);
+
+    if (result === null) {
+      // Assignment failed – roll back the optimistic update to match server state.
+      fetchLeads(page);
+      return;
+    }
+
+    // Success: refresh counts and re-fetch the current page so pagination stays
+    // consistent. fetchLeads updates totalPages state; clamp page to the new
+    // value so an empty final page is never left on screen.
     fetchCounts();
+    await fetchLeads(page);
+    setPage(prev => Math.min(prev, Math.max(1, totalPages)));
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
