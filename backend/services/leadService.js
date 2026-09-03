@@ -858,108 +858,141 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     }
   }
 
-  // Load the current lead (with ownership check baked into the query).
-  const { Model: LeadModel } = require('../models/Lead');
-  const lead = await LeadModel.findOne(baseQuery);
-  if (!lead) {
-    // Distinguish between "not found" and "unauthorized" so callers can
-    // return the correct HTTP status code.
-    const exists = await LeadModel.findOne(
-      Object.fromEntries(Object.entries(baseQuery).filter(([k]) => k !== 'agentIds'))
-    );
-    throw new Error(exists ? 'Lead not found or unauthorized' : 'Lead not found');
-  }
-
-  const currentBooking = lead.booking || {};
-
-  const totalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : (currentBooking.totalDial || 0);
-  const dailyDial = bookingData.dailyDial !== undefined ? (Number(bookingData.dailyDial) || 0) : (currentBooking.dailyDial || 0);
-  const connected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : (currentBooking.connected || 0);
-  const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
-  const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
-
-  let firstCall = currentBooking.firstCall || null;
+  // Pre-validate dates once before the retry loop
+  let parsedFirstCall = undefined;
   if (bookingData.firstCall !== undefined) {
     if (bookingData.firstCall) {
       const d = new Date(bookingData.firstCall);
       if (isNaN(d.getTime())) throw new Error('Invalid firstCall date');
-      firstCall = d;
+      parsedFirstCall = d;
     } else {
-      firstCall = null;
+      parsedFirstCall = null;
     }
   }
 
-  let lastCall = currentBooking.lastCall || null;
+  let parsedLastCall = undefined;
   if (bookingData.lastCall !== undefined) {
     if (bookingData.lastCall) {
       const d = new Date(bookingData.lastCall);
       if (isNaN(d.getTime())) throw new Error('Invalid lastCall date');
-      lastCall = d;
+      parsedLastCall = d;
     } else {
-      lastCall = null;
+      parsedLastCall = null;
     }
   }
 
-  // Check if any changes were actually made. If not, bypass the update.
-  const hasChanges =
-    totalDial !== (currentBooking.totalDial || 0) ||
-    dailyDial !== (currentBooking.dailyDial || 0) ||
-    connected !== (currentBooking.connected || 0) ||
-    talkTime !== (currentBooking.talkTime || '0:0') ||
-    dailyTalkTime !== (currentBooking.dailyTalkTime || '0:0') ||
-    (firstCall ? new Date(firstCall).getTime() : null) !== (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) ||
-    (lastCall ? new Date(lastCall).getTime() : null) !== (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null);
+  const { Model: LeadModel } = require('../models/Lead');
+  const MAX_RETRIES = 5;
 
-  if (!hasChanges) {
-    return await getLeadById(id, agentIdCondition);
-  }
+  // Optimistic concurrency loop with conflict retry:
+  // Ensures concurrent saves from the same snapshot do not overwrite
+  // higher counters or the latest todayDate callLogs entry.
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    // 1. Fetch fresh lead snapshot with ownership check baked into the query
+    const lead = await LeadModel.findOne(baseQuery);
+    if (!lead) {
+      // Distinguish between "not found" and "unauthorized" so callers can
+      // return the correct HTTP status code (404 vs 403).
+      const exists = await LeadModel.findOne(
+        Object.fromEntries(Object.entries(baseQuery).filter(([k]) => k !== 'agentIds'))
+      );
+      throw new Error(exists ? 'Lead not found or unauthorized' : 'Lead not found');
+    }
 
-  // Manage callLogs for the current date in IST (Asia/Kolkata)
-  // Use Intl.DateTimeFormat for reliable IST date, regardless of server timezone
-  const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const currentBooking = lead.booking || {};
 
-  // Build clean, deduplicated map of callLogs by date
-  const logsMap = new Map();
-  for (const log of (lead.callLogs || [])) {
-    if (log && log.date) {
-      const existing = logsMap.get(log.date);
-      if (!existing || (log.dailyDial || 0) > (existing.dailyDial || 0)) {
-        logsMap.set(log.date, {
-          date: log.date,
-          dailyDial: log.dailyDial || 0,
-          dailyTalkTime: log.dailyTalkTime || '0:0'
-        });
+    // 2. Preserve higher counters: monotonic counters (totalDial, dailyDial, connected)
+    // must never be downgraded by stale snapshots or lower submitted numbers.
+    const currentTotalDial = Number(currentBooking.totalDial) || 0;
+    const incomingTotalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : undefined;
+    const totalDial = incomingTotalDial !== undefined ? Math.max(incomingTotalDial, currentTotalDial) : currentTotalDial;
+
+    const currentDailyDial = Number(currentBooking.dailyDial) || 0;
+    const incomingDailyDial = bookingData.dailyDial !== undefined ? (Number(bookingData.dailyDial) || 0) : undefined;
+    const dailyDial = incomingDailyDial !== undefined ? Math.max(incomingDailyDial, currentDailyDial) : currentDailyDial;
+
+    const currentConnected = Number(currentBooking.connected) || 0;
+    const incomingConnected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : undefined;
+    const connected = incomingConnected !== undefined ? Math.max(incomingConnected, currentConnected) : currentConnected;
+
+    const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
+    const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
+
+    const firstCall = parsedFirstCall !== undefined ? parsedFirstCall : (currentBooking.firstCall || null);
+    const lastCall = parsedLastCall !== undefined ? parsedLastCall : (currentBooking.lastCall || null);
+
+    // 3. Manage callLogs for the current date in IST (Asia/Kolkata)
+    const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    // Build clean, deduplicated map of callLogs by date
+    const logsMap = new Map();
+    for (const log of (lead.callLogs || [])) {
+      if (log && log.date) {
+        const existing = logsMap.get(log.date);
+        if (!existing || (log.dailyDial || 0) > (existing.dailyDial || 0)) {
+          logsMap.set(log.date, {
+            date: log.date,
+            dailyDial: log.dailyDial || 0,
+            dailyTalkTime: log.dailyTalkTime || '0:0'
+          });
+        }
       }
     }
-  }
 
-  // Only overwrite today's entry when the incoming dailyDial is >= the stored
-  // value, so a stale/low-count request cannot reduce a previously-recorded
-  // higher counter (fixes: concurrent saves from stale snapshots).
-  const existingTodayLog = logsMap.get(todayDate);
-  const todayLog = { date: todayDate, dailyDial, dailyTalkTime };
-  if (!existingTodayLog || dailyDial >= existingTodayLog.dailyDial) {
-    logsMap.set(todayDate, todayLog);
-  }
+    // Preserve the existing entry for today unless incoming dailyDial is >= stored value
+    const existingTodayLog = logsMap.get(todayDate);
+    const resolvedTodayDailyDial = Math.max(dailyDial, existingTodayLog ? (existingTodayLog.dailyDial || 0) : 0);
+    const resolvedTodayTalkTime = (existingTodayLog && (existingTodayLog.dailyDial || 0) > dailyDial)
+      ? (existingTodayLog.dailyTalkTime || '0:0')
+      : dailyTalkTime;
 
-  const newCallLogs = Array.from(logsMap.values());
+    logsMap.set(todayDate, {
+      date: todayDate,
+      dailyDial: resolvedTodayDailyDial,
+      dailyTalkTime: resolvedTodayTalkTime
+    });
 
-  // Use a single atomic findOneAndUpdate to avoid lost-update races.
-  // The same ownership query (baseQuery) guards the write – an agent that
-  // was de-assigned between the read above and this write will get null back.
-  const updatedLead = await LeadModel.findOneAndUpdate(
-    baseQuery,
-    {
-      $set: {
-        booking: { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall },
-        callLogs: newCallLogs
-      }
-    },
-    { new: true }
-  );
+    const newCallLogs = Array.from(logsMap.values());
 
-  if (!updatedLead) {
-    throw new Error('Lead not found or unauthorized');
+    // Check if the freshly-loaded database state already has these identical values
+    const isIdentical =
+      totalDial === currentTotalDial &&
+      dailyDial === currentDailyDial &&
+      connected === currentConnected &&
+      talkTime === (currentBooking.talkTime || '0:0') &&
+      dailyTalkTime === (currentBooking.dailyTalkTime || '0:0') &&
+      (firstCall ? new Date(firstCall).getTime() : null) === (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) &&
+      (lastCall ? new Date(lastCall).getTime() : null) === (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null) &&
+      existingTodayLog &&
+      existingTodayLog.dailyDial === resolvedTodayDailyDial &&
+      existingTodayLog.dailyTalkTime === resolvedTodayTalkTime;
+
+    if (isIdentical) {
+      return await getLeadById(id, agentIdCondition);
+    }
+
+    // 4. Optimistic concurrency check using updatedAt in the query.
+    // If another concurrent request updated the lead, updatedAt in DB changed,
+    // causing findOneAndUpdate to return null and trigger a conflict retry.
+    const conflictQuery = (attempt === MAX_RETRIES - 1 || !lead.updatedAt)
+      ? { ...baseQuery }
+      : { ...baseQuery, updatedAt: lead.updatedAt };
+
+    const updatedLead = await LeadModel.findOneAndUpdate(
+      conflictQuery,
+      {
+        $set: {
+          booking: { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall },
+          callLogs: newCallLogs
+        }
+      },
+      { new: true }
+    );
+
+    if (updatedLead) {
+      return await getLeadById(id, agentIdCondition);
+    }
+    // Conflict detected: document was modified concurrently. Retrying with fresh snapshot!
   }
 
   return await getLeadById(id, agentIdCondition);

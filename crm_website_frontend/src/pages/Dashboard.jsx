@@ -177,11 +177,13 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
           sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
           sessionStorage.setItem('leadDetail_backUrl', '/');
           sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
+          return data;
         }
       } else {
         if (abortLeadsRef.current === controller) {
           toast.error('Failed to load leads from server');
         }
+        return null;
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -336,8 +338,9 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     // consistent. fetchLeads updates totalPages state; clamp page to the new
     // value so an empty final page is never left on screen.
     fetchCounts();
-    await fetchLeads(page);
-    setPage(prev => Math.min(prev, Math.max(1, totalPages)));
+    const data = await fetchLeads(page);
+    const returnedTotalPages = data?.totalPages || 1;
+    setPage(prev => Math.min(prev, Math.max(1, returnedTotalPages)));
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
