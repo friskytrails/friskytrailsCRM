@@ -177,11 +177,13 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
           sessionStorage.setItem('activeLeadIds', JSON.stringify(activeIds));
           sessionStorage.setItem('leadDetail_backUrl', '/');
           sessionStorage.setItem('leadDetail_backLabel', 'Dashboard');
+          return data;
         }
       } else {
         if (abortLeadsRef.current === controller) {
           toast.error('Failed to load leads from server');
         }
+        return null;
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -298,15 +300,47 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   // Inline Agent Assignment (instant 0 ms state update + background save)
   const handleInlineAssign = async (leadId, newIds) => {
-    setLeads(prev => prev.map(lead => {
-      if ((lead.id || lead._id) === leadId) {
-        return { ...lead, agentIds: newIds };
-      }
-      return lead;
-    }));
+    // Optimistically update agentIds in local state
+    setLeads(prev => {
+      const updated = prev.map(lead => {
+        if ((lead.id || lead._id) === leadId) {
+          return { ...lead, agentIds: newIds };
+        }
+        return lead;
+      });
 
-    await assignAgent(leadId, newIds);
+      // If viewing "unassigned only", remove the lead once it gets assigned
+      if (filterAgent === 'unassigned' && newIds && newIds.length > 0) {
+        return updated.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+      // If viewing "assigned only", remove the lead once it gets unassigned
+      if (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) {
+        return updated.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+      // If viewing a specific agent's leads and they were removed from that agent
+      const specialOptions = ['unassigned', 'assigned', 'all'];
+      if (!specialOptions.includes(filterAgent) && !newIds.includes(filterAgent)) {
+        return updated.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+
+      return updated;
+    });
+
+    const result = await assignAgent(leadId, newIds);
+
+    if (result === null) {
+      // Assignment failed – roll back the optimistic update to match server state.
+      fetchLeads(page);
+      return;
+    }
+
+    // Success: refresh counts and re-fetch the current page so pagination stays
+    // consistent. fetchLeads updates totalPages state; clamp page to the new
+    // value so an empty final page is never left on screen.
     fetchCounts();
+    const data = await fetchLeads(page);
+    const returnedTotalPages = data?.totalPages || 1;
+    setPage(prev => Math.min(prev, Math.max(1, returnedTotalPages)));
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');

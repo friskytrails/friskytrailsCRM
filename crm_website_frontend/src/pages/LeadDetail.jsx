@@ -1503,34 +1503,49 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       </div>
 
       {/* Historical Call Logs */}
-      {lead.callLogs && lead.callLogs.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
-          <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center mb-4">
-            <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Historical Call Logs
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700/50 dark:text-gray-400">
-                <tr>
-                  <th className="px-4 py-3 rounded-l-lg">Date</th>
-                  <th className="px-4 py-3">Dials</th>
-                  <th className="px-4 py-3 rounded-r-lg">Talk Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...lead.callLogs].reverse().map((log, idx) => (
-                  <tr key={idx} className="border-b last:border-0 border-gray-100 dark:border-slate-700">
-                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{formatDisplayDate(log.date)}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyDial}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyTalkTime}</td>
+      {lead.callLogs && lead.callLogs.length > 0 && (() => {
+        // Deduplicate callLogs by date — keep entry with highest dailyDial per date
+        const deduped = Object.values(
+          lead.callLogs.reduce((acc, log) => {
+            const key = log.date;
+            if (!acc[key] || (log.dailyDial || 0) > (acc[key].dailyDial || 0)) {
+              acc[key] = log;
+            }
+            return acc;
+          }, {})
+        ).sort((a, b) => (b.date > a.date ? 1 : -1)); // newest first
+
+        if (deduped.length === 0) return null;
+        return (
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center mb-4">
+              <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Historical Call Logs
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700/50 dark:text-gray-400">
+                  <tr>
+                    <th className="px-4 py-3 rounded-l-lg">Date</th>
+                    <th className="px-4 py-3">Dials</th>
+                    <th className="px-4 py-3 rounded-r-lg">Talk Time</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {deduped.map((log, idx) => (
+                    <tr key={idx} className="border-b last:border-0 border-gray-100 dark:border-slate-700">
+                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{formatDisplayDate(log.date)}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyDial}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyTalkTime}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
 
       {/* Two-section layout */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
