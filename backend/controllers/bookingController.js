@@ -183,9 +183,14 @@ async function createBooking(req, res) {
       verified: false
     };
 
+    const rawCreatorId = req.user.userId || req.user.id || req.user._id;
+    const createdBy = (rawCreatorId && mongoose.Types.ObjectId.isValid(rawCreatorId))
+      ? new mongoose.Types.ObjectId(rawCreatorId)
+      : (rawCreatorId || undefined);
+
     const assignedAgents = (targetLead && Array.isArray(targetLead.agentIds) && targetLead.agentIds.length > 0)
       ? targetLead.agentIds
-      : (req.user.userId ? [req.user.userId] : []);
+      : (rawCreatorId ? [createdBy] : []);
 
     const newBooking = new Booking({
       bookingId,
@@ -203,7 +208,7 @@ async function createBooking(req, res) {
       travellerName: travellerName.trim(),
       travellerEmail: travellerEmail.trim().toLowerCase(),
       travellerPhone: trimmedPhone,
-      createdBy: req.user.userId || req.user.id || req.user._id,
+      createdBy,
       status: 'Pending',
       tripStatus: 'Pending',
       assignedTo: assignedAgents,

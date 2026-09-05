@@ -755,9 +755,13 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     ? existingLead.agentIds
     : [];
 
-  const createdByUser = (agentIdCondition && !Array.isArray(agentIdCondition))
+  const rawCreatedByUser = (agentIdCondition && !Array.isArray(agentIdCondition))
     ? agentIdCondition
     : (Array.isArray(agentIdCondition) && agentIdCondition[0]) || (assignedAgents[0] || null);
+
+  const createdByUser = (rawCreatedByUser && mongoose.Types.ObjectId.isValid(rawCreatedByUser))
+    ? new mongoose.Types.ObjectId(rawCreatedByUser)
+    : rawCreatedByUser;
 
   const newBooking = new Booking({
     bookingId,
