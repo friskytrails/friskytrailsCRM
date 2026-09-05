@@ -3,6 +3,7 @@ const Lead = require('../models/Lead');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { getAgentIdCondition, recordBookingForAgents, adjustAgentTargetRevenue } = require('../services/agentService');
+const { isStrictObjectId } = require('../utils/helpers');
 
 // Generate unique bookingId: "FT" + 6 random uppercase chars
 async function generateBookingId() {
@@ -183,14 +184,15 @@ async function createBooking(req, res) {
       verified: false
     };
 
-    const rawCreatorId = req.user.userId || req.user.id || req.user._id;
-    const createdBy = (rawCreatorId && mongoose.Types.ObjectId.isValid(rawCreatorId))
-      ? new mongoose.Types.ObjectId(rawCreatorId)
-      : (rawCreatorId || undefined);
+    const rawCreatorId = req.user?.userId || req.user?.id || req.user?._id;
+    if (rawCreatorId && !isStrictObjectId(rawCreatorId)) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID.' });
+    }
+    const createdBy = rawCreatorId ? new mongoose.Types.ObjectId(rawCreatorId) : undefined;
 
     const assignedAgents = (targetLead && Array.isArray(targetLead.agentIds) && targetLead.agentIds.length > 0)
       ? targetLead.agentIds
-      : (rawCreatorId ? [createdBy] : []);
+      : (createdBy ? [createdBy] : []);
 
     const newBooking = new Booking({
       bookingId,
@@ -257,7 +259,7 @@ async function createBooking(req, res) {
         if (!wasBooked) {
           const agentsToUpdate = (Array.isArray(syncedLead.agentIds) && syncedLead.agentIds.length > 0)
             ? syncedLead.agentIds
-            : [req.user.userId || req.user.id || req.user._id].filter(Boolean);
+            : [createdBy].filter(Boolean);
           await recordBookingForAgents(agentsToUpdate, numTotal);
         }
       } else {
@@ -265,9 +267,8 @@ async function createBooking(req, res) {
         console.error(`[createBooking] Lead status sync failed — Lead ${targetLead._id} not found in DB`);
       }
     } else {
-      const creatorId = req.user.userId || req.user.id || req.user._id;
-      if (creatorId) {
-        await recordBookingForAgents([creatorId], numTotal);
+      if (createdBy) {
+        await recordBookingForAgents([createdBy], numTotal);
       }
     }
 
