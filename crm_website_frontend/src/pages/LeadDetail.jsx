@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
@@ -59,11 +59,13 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [travelDateInput, setTravelDateInput] = useState('');
   const [isEditingPersons, setIsEditingPersons] = useState(false);
   const [personsInput, setPersonsInput] = useState('');
-  const [isTripSectionOpen, setIsTripSectionOpen] = useState(true);
-
-  const [isEditingDates, setIsEditingDates] = useState(false);
-  const [dateForm, setDateForm] = useState({ startDate: '', dueDate: '' });
-  const [isSavingDates, setIsSavingDates] = useState(false);
+  const [isTripSectionOpen, setIsTripSectionOpen] = useState(false);
+  const [isCallMetricsOpen, setIsCallMetricsOpen] = useState(true);
+  const [isEditingTalkTime, setIsEditingTalkTime] = useState(false);
+  const [talkTimeInput, setTalkTimeInput] = useState('');
+  const [dailyTalkTimeInput, setDailyTalkTimeInput] = useState('');
+  const [isSavingTalkTime, setIsSavingTalkTime] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   // Active lead IDs for next/previous navigation
   const [navLeadIds, setNavLeadIds] = useState(() => {
@@ -81,48 +83,21 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     return [];
   });
 
-  const handleStartEditingDates = () => {
-    const rawStartDate = lead?.dates?.startDate || null;
-    const rawDueDate = lead?.dates?.dueDate || lead?.dates?.endDate || null;
-
-    setDateForm({
-      startDate: formatDate(rawStartDate),
-      dueDate: formatDate(rawDueDate)
-    });
-    setIsEditingDates(true);
-  };
-
-  const handleSaveDates = async () => {
-    try {
-      setIsSavingDates(true);
-      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}/dates`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          startDate: dateForm.startDate || null,
-          dueDate: dateForm.dueDate || null
-        })
-      });
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLead(updatedLead);
-        syncLeadToParent(updatedLead);
-        setIsEditingDates(false);
-        toast.success('Dates updated successfully!');
-      } else {
-        const errData = await res.json();
-        toast.error(errData.error || 'Failed to update dates');
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error('Server error updating dates');
-    } finally {
-      setIsSavingDates(false);
-    }
-  };
+  // Memoized call log deduplication — only recomputes when lead.callLogs changes.
+  // Previously this ran inline in JSX on every render (every state change).
+  const dedupedCallLogs = useMemo(() => {
+    if (!lead || !lead.callLogs || lead.callLogs.length === 0) return [];
+    const deduped = Object.values(
+      lead.callLogs.reduce((acc, log) => {
+        const key = log.date;
+        if (!acc[key] || (log.dailyDial || 0) > (acc[key].dailyDial || 0)) {
+          acc[key] = log;
+        }
+        return acc;
+      }, {})
+    ).sort((a, b) => (b.date > a.date ? 1 : -1)); // newest first
+    return deduped;
+  }, [lead?.callLogs]);
 
   const formatISTDateTime = (dateStr) => {
     if (!dateStr) return 'Not set';
@@ -723,8 +698,29 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const handleAssignAgent = async (newIds) => {
     if (!lead || !assignAgent) return;
     const previousLead = { ...lead };
-    setLead({ ...lead, agentIds: newIds }); // Optimistic update
-    syncLeadToParent({ ...lead, agentIds: newIds });
+    const currentAgents = (lead.agentIds || []).map(String).sort();
+    const nextAgents = (newIds || []).map(String).sort();
+    const isAgentChanged = currentAgents.length !== nextAgents.length || currentAgents.some((val, idx) => val !== nextAgents[idx]);
+
+    const resetBooking = isAgentChanged ? {
+      totalDial: 0,
+      dailyDial: 0,
+      connected: 0,
+      talkTime: '0:0',
+      dailyTalkTime: '0:0',
+      firstCall: null,
+      lastCall: null
+    } : (lead.booking || {});
+
+    const optimisticLead = {
+      ...lead,
+      agentIds: newIds,
+      booking: resetBooking,
+      callLogs: isAgentChanged ? [] : (lead.callLogs || [])
+    };
+
+    setLead(optimisticLead); // Optimistic update
+    syncLeadToParent(optimisticLead);
 
     const updated = await assignAgent(lead.id, newIds);
     if (updated) {
@@ -735,6 +731,89 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       setLead(previousLead);
       syncLeadToParent(previousLead);
     }
+  };
+
+  const handleOpenTalkTimeModal = () => {
+    if (!user?.isAdmin) return;
+    setTalkTimeInput(lead?.booking?.talkTime || '0:0');
+    setDailyTalkTimeInput(lead?.booking?.dailyTalkTime || '0:0');
+    setIsEditingTalkTime(true);
+  };
+
+  const handleSaveTalkTime = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!user?.isAdmin || !updateLeadBooking || !lead) return;
+    setIsSavingTalkTime(true);
+    try {
+      const currentBooking = lead.booking || {};
+      const updated = await updateLeadBooking(lead.id || lead._id, {
+        totalDial: currentBooking.totalDial ?? 0,
+        dailyDial: currentBooking.dailyDial ?? 0,
+        connected: currentBooking.connected ?? 0,
+        talkTime: talkTimeInput.trim() || '0:0',
+        dailyTalkTime: dailyTalkTimeInput.trim() || '0:0',
+        firstCall: currentBooking.firstCall || null,
+        lastCall: currentBooking.lastCall || null
+      });
+      if (updated) {
+        setLead(updated);
+        syncLeadToParent(updated);
+        setIsEditingTalkTime(false);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to update talk time");
+    } finally {
+      setIsSavingTalkTime(false);
+    }
+  };
+
+  const handleCopyLeadLink = () => {
+    setShowShareMenu(false);
+    const url = window.location.href;
+    navigator.clipboard.writeText(url)
+      .then(() => toast.success("Lead link copied to clipboard!"))
+      .catch(() => toast.error("Failed to copy link"));
+  };
+
+  const handleCopyLeadSummary = () => {
+    setShowShareMenu(false);
+    if (!lead) return;
+    const summary = [
+      `📋 Lead: ${lead.name || 'Unnamed'}`,
+      `📞 Phone: ${lead.phone || 'N/A'}`,
+      lead.mailId ? `✉️ Email: ${lead.mailId}` : null,
+      lead.destination ? `📍 Destination: ${lead.destination}` : null,
+      lead.product ? `📦 Package: ${lead.product}` : null,
+      lead.travelDate ? `📅 Travel Date: ${lead.travelDate}` : null,
+      lead.numberOfPersons ? `👥 Pax: ${lead.numberOfPersons}` : null,
+      `📊 Status: ${lead.status || 'Fresh Leads'}`,
+      `🔗 Link: ${window.location.href}`
+    ].filter(Boolean).join('\n');
+
+    navigator.clipboard.writeText(summary)
+      .then(() => toast.success("Lead details copied to clipboard!"))
+      .catch(() => toast.error("Failed to copy details"));
+  };
+
+  const handleShareWhatsApp = () => {
+    setShowShareMenu(false);
+    if (!lead) return;
+    const summary = [
+      `*Lead Details - Frisky Trails CRM*`,
+      `*Name:* ${lead.name || 'Unnamed'}`,
+      `*Phone:* ${lead.phone || 'N/A'}`,
+      lead.mailId ? `*Email:* ${lead.mailId}` : null,
+      lead.destination ? `*Destination:* ${lead.destination}` : null,
+      lead.product ? `*Package:* ${lead.product}` : null,
+      lead.travelDate ? `*Travel Date:* ${lead.travelDate}` : null,
+      lead.numberOfPersons ? `*Pax:* ${lead.numberOfPersons}` : null,
+      `*Status:* ${lead.status || 'Fresh Leads'}`,
+      `*CRM Link:* ${window.location.href}`
+    ].filter(Boolean).join('\n');
+
+    const encoded = encodeURIComponent(summary);
+    window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
 
   const computeAge = () => {
@@ -954,9 +1033,9 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-3">
         <button
           onClick={handleBackClick}
           className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
@@ -968,6 +1047,50 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         </button>
 
         <div className="flex items-center gap-2">
+          {/* Share Lead Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowShareMenu(!showShareMenu)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm cursor-pointer"
+              title="Share this lead"
+            >
+              <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Share
+            </button>
+
+            {showShareMenu && (
+              <div className="absolute right-0 mt-1 w-52 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                <button
+                  onClick={handleCopyLeadLink}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 dark:hover:text-orange-400 flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  Copy Lead Link
+                </button>
+                <button
+                  onClick={handleCopyLeadSummary}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-orange-50 dark:hover:bg-slate-700 hover:text-orange-600 dark:hover:text-orange-400 flex items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                  </svg>
+                  Copy Details (Text)
+                </button>
+                <button
+                  onClick={handleShareWhatsApp}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold text-gray-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-slate-700 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-2 cursor-pointer border-t border-gray-100 dark:border-slate-700/60 mt-1 pt-1.5 transition-colors"
+                >
+                  <span className="text-emerald-500 font-bold">💬</span>
+                  Share via WhatsApp
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => prevLeadId && navigate(`/leads/${prevLeadId}`)}
             disabled={!prevLeadId}
@@ -994,7 +1117,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       </div>
 
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4 sm:p-5 mb-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1 min-w-[250px]">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{lead.name || 'Unnamed Lead'}</h1>
@@ -1028,7 +1151,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-3 mt-5">
+        <div className="flex flex-wrap gap-2.5 mt-3">
           {lead.leadSource && (
             <span className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-semibold bg-blue-50 text-blue-700 border border-blue-100/50">
               Source: {lead.leadSource}
@@ -1187,441 +1310,157 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       </div>
 
       {/* Booking Status & Info Block */}
-      <div className="flex flex-col xl:flex-row gap-6 mb-6">
-
-        {/* Left Side: Status & Call Metrics */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 w-full">
-          <div className="flex flex-col md:flex-row md:items-start gap-6 h-full">
-            {/* Status Block */}
-            <div className="flex flex-col items-start gap-3 min-w-[200px]">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
-                <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Lead Status
-              </h2>
-              <select
-                value={lead.status || 'Fresh Leads'}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) || (lead.status === 'Booked' && !user?.isAdmin)}
-                className={`text-sm font-semibold py-2 px-4 rounded-lg border-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors ${getStatusDef(lead.status || 'Fresh Leads').color} ${(lead.status === 'Booked' && !user?.isAdmin) ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                {availableStatuses.map(st => (
-                  <option key={st} value={st}>{st}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Call Metrics Block */}
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
-                  <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                  Call Metrics
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Total Dial</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
-                </div>
-                <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
-                  <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Dial</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyDial || 0}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Connected</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Talk Time</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
-                </div>
-                <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-3 border border-blue-100 dark:border-blue-700/50">
-                  <span className="block text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-semibold">Daily Talk Time</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{lead.booking?.dailyTalkTime || '0:0'}</span>
-                </div>
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-3 border border-gray-100 dark:border-slate-600">
-                  <span className="block text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-semibold">Age</span>
-                  <span className="text-lg font-bold text-gray-800 dark:text-gray-100">{computeAge()}</span>
-                </div>
-                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">First Call</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '-------------------'}</span>
-                </div>
-                <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-3 border border-amber-100 dark:border-amber-700/50 col-span-2 sm:col-span-2">
-                  <span className="block text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-semibold">Last Call</span>
-                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '-------------------'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Trip Information & Multi-Trip List - Collapsible */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 mb-6 overflow-hidden">
-        {/* Simple Collapsible Header Bar */}
-        <div 
-          className="p-4 px-5 flex items-center justify-between gap-3 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 cursor-pointer select-none"
-          onClick={() => setIsTripSectionOpen(!isTripSectionOpen)}
-        >
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
-            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
-              Trip Information
-            </h2>
-            <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 text-xs font-bold rounded-full">
-              {lead.trips?.length || 0} Recorded
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-3.5 sm:p-4 mb-4">
+        {/* Status Bar: Status on Left, Call Metrics Header & Toggle on Right */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Status Block */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Status:
             </span>
+            <select
+              value={lead.status || 'Fresh Leads'}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) || (lead.status === 'Booked' && !user?.isAdmin)}
+              className={`text-xs font-bold py-1.5 px-3 rounded-lg border cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors shadow-sm ${getStatusDef(lead.status || 'Fresh Leads').color} ${(lead.status === 'Booked' && !user?.isAdmin) ? 'opacity-70 cursor-not-allowed' : ''}`}
+            >
+              {availableStatuses.map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsTripSectionOpen(!isTripSectionOpen)}
-            className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 flex items-center justify-center transition-colors cursor-pointer"
-            title={isTripSectionOpen ? "Collapse section" : "Expand section"}
-          >
-            <svg 
-              className={`w-4 h-4 transform transition-transform duration-200 ${isTripSectionOpen ? 'rotate-180' : 'rotate-0'}`} 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor" 
-              strokeWidth={2.5}
+          {/* Call Metrics Header & Toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              Call Metrics
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsCallMetricsOpen(!isCallMetricsOpen)}
+              className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 px-2 py-0.5 rounded-md border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/60 transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+              title={isCallMetricsOpen ? "Collapse Call Metrics" : "Expand Call Metrics"}
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+              <span>{isCallMetricsOpen ? 'Collapse' : 'Expand'}</span>
+              <svg className={`w-3 h-3 transform transition-transform duration-200 ${isCallMetricsOpen ? 'rotate-180' : 'rotate-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        {/* Content: Simple Trip List */}
-        {isTripSectionOpen && (
-          <div className="p-4">
-            {(!lead.trips || lead.trips.length === 0) ? (
-              <div className="p-6 text-center text-gray-500 dark:text-slate-400 text-xs font-medium">
-                No trips recorded for this lead yet.
+        {/* Call Metrics Grid: 1 compact row on desktop! */}
+        {isCallMetricsOpen && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mt-2.5 pt-2.5 border-t border-gray-100 dark:border-slate-700/60">
+            <div className="bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Total Dial</span>
+              <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.totalDial || 0}</span>
+            </div>
+            <div className="bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-2 border border-blue-100/60 dark:border-blue-700/40 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-bold truncate">Daily Dial</span>
+              <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.dailyDial || 0}</span>
+            </div>
+            <div className="bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Connected</span>
+              <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
+            </div>
+            <div 
+              onClick={handleOpenTalkTimeModal}
+              className={`bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center relative group ${user?.isAdmin ? 'cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50/30 dark:hover:bg-orange-950/20 transition-all' : ''}`}
+              title={user?.isAdmin ? "Click to edit talk time (Admin)" : undefined}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Talk Time</span>
+                {user?.isAdmin && (
+                  <svg className="w-2.5 h-2.5 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                )}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {(lead.trips || []).map((trip, idx) => {
-                  if (!trip) return null;
-                  const originalIndex = lead.trips && lead.trips.length > 0 ? idx : 0;
-                  return (
-                    <div 
-                      key={trip._id || trip.tripId || idx} 
-                      className="p-4 bg-gray-50 dark:bg-slate-900/70 rounded-xl border border-gray-200 dark:border-slate-700/80 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                    >
-                      {/* Left Side: Package & Travel Info */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-gray-900 dark:text-white text-sm">
-                            {trip.packageName || 'Trip Package'}
-                            {trip.location ? ` (${trip.location})` : ''}
-                          </span>
-                          <span className="text-[11px] text-gray-500 dark:text-slate-400 font-semibold">
-                            • {(() => {
-                              const adultCount = (Number(trip.adults) > 0)
-                                ? Number(trip.adults)
-                                : (Number(trip.noOfPax) > 0 ? Number(trip.noOfPax) : (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : 1));
-                              const childCount = Number(trip.children) || 0;
-                              const totalPax = adultCount + childCount;
-                              return `${totalPax} Pax${childCount > 0 ? ` (${adultCount} Adult${adultCount > 1 ? 's' : ''}, ${childCount} Child${childCount > 1 ? 'ren' : ''})` : ''}`;
-                            })()}
-                          </span>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-600 dark:text-slate-300 font-medium">
-                          <span className="flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            {trip.startDate ? new Date(trip.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'} - {trip.endDate ? new Date(trip.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            {trip.travellerName || trip.fullName || lead.name} ({trip.travellerPhone || trip.contactNumber || lead.phone})
-                          </span>
-                          {trip.emergencyContactNumber && (
-                            <span className="flex items-center gap-1 text-rose-500 font-semibold">
-                              <svg className="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                              </svg>
-                              Emergency: {trip.emergencyContactNumber}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right Side: Financials & Edit Button */}
-                      <div className="flex items-center gap-4 self-start md:self-auto">
-                        <div className="text-right">
-                          <div className="text-[10px] text-gray-400 dark:text-slate-400 font-bold uppercase tracking-wider">Total / Due Balance</div>
-                          <div className="font-bold text-gray-900 dark:text-slate-100 text-xs">
-                            ₹{Number(trip.totalAmount ?? trip.bookingDetails?.totalAmount ?? 0).toLocaleString('en-IN')}
-                            <span className="text-gray-400 font-normal mx-1">|</span>
-                            <span className={Number(trip.dueAmount ?? trip.bookingDetails?.dueAmount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
-                              Due: ₹{Number(trip.dueAmount ?? trip.bookingDetails?.dueAmount ?? 0).toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        </div>
-
-                        {!user?.isItinerary && (() => {
-                          const tripKey = trip.bookingId || trip._id || trip.id || trip.transactionId;
-                          const hasValidKey = !!tripKey;
-
-                          return (
-                            <button
-                              type="button"
-                              disabled={!hasValidKey}
-                              onClick={() => {
-                                try {
-                                  const lookupKey = tripKey;
-                                  setEditingBookingId(lookupKey);
-
-                                  let startDt = '';
-                                  let endDt = '';
-                                  if (trip.startDate) {
-                                    startDt = formatDate(trip.startDate);
-                                  }
-                                  if (trip.endDate) {
-                                    endDt = formatDate(trip.endDate);
-                                  }
-
-                                  const tot = (trip.totalAmount !== undefined && trip.totalAmount !== null) ? trip.totalAmount : (lead.bookingDetails?.totalAmount ?? '');
-                                  const pd = (trip.paidAmount !== undefined && trip.paidAmount !== null) ? trip.paidAmount : (lead.bookingDetails?.paidAmount ?? '');
-                                  const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : (trip.dueAmount ?? lead.bookingDetails?.dueAmount ?? 0);
-                                  const txn = trip.transactionId || trip.paymentId || (Array.isArray(trip.payments) && trip.payments[0] ? (trip.payments[0].details || trip.payments[0].transactionId) : '') || trip.details || lead.bookingDetails?.transactionId || lead.bookingDetails?.paymentId || lead.bookingDetails?.details || '';
-                                  const payMode = trip.paymentMode || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].paymentMode : '') || lead.bookingDetails?.paymentMode || 'Kalpana BOI';
-                                  const ssPreview = trip.screenshot || trip.screenshotUrl || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].attachment : '') || lead.bookingDetails?.screenshot || lead.bookingDetails?.screenshotUrl || lead.bookingDetails?.attachment || null;
-                                  const tripChildCount = (trip.children !== undefined && !isNaN(Number(trip.children))) ? Number(trip.children) : 0;
-                                  const tripExplicitAdults = (trip.adults !== undefined && trip.adults !== null && !isNaN(Number(trip.adults))) ? Number(trip.adults) : undefined;
-                                  const tripFallbackPax = (Number(trip.noOfPax) > 0 ? Number(trip.noOfPax) : (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : undefined));
-                                  const tripResolvedAdults = tripExplicitAdults !== undefined ? tripExplicitAdults : (tripFallbackPax !== undefined ? tripFallbackPax : (tripChildCount > 0 ? 0 : 1));
-
-                                  setBookingForm({
-                                    travellerName: trip.travellerName || trip.fullName || lead.name || '',
-                                    travellerEmail: trip.travellerEmail || trip.emailId || trip.email || lead.mailId || lead.email || '',
-                                    travellerPhone: trip.travellerPhone || trip.contactNumber || trip.phone || lead.phone || '',
-                                    adults: tripResolvedAdults,
-                                    children: tripChildCount,
-                                    packageName: trip.packageName || lead.product || '',
-                                    location: trip.location || trip.destination || trip.destinationLocation || lead.destination || lead.location || '',
-                                    startDate: startDt,
-                                    endDate: endDt,
-                                    totalAmount: tot,
-                                    paidAmount: pd,
-                                    dueAmount: due,
-                                    transactionId: txn,
-                                    paymentMode: payMode,
-                                    status: trip.status || lead.bookingDetails?.status || 'Pending',
-                                    screenshotFile: null,
-                                    screenshotPreview: ssPreview
-                                  });
-                                  setShowBookingModal(true);
-
-                                  if (getBookingAPI && lookupKey) {
-                                    setIsLoadingBooking(true);
-                                    const queryOptions = {};
-                                    if (trip.packageName) queryOptions.packageName = trip.packageName;
-                                    
-                                    getBookingAPI(lookupKey, queryOptions).then(res => {
-                                      setEditingBookingId(currentId => {
-                                        if (currentId !== lookupKey) return currentId;
-                                        
-                                        if (res) {
-                                          let fetchedStart = '';
-                                          let fetchedEnd = '';
-                                          if (res.startDate) {
-                                            fetchedStart = formatDate(res.startDate);
-                                          }
-                                          if (res.endDate) {
-                                            fetchedEnd = formatDate(res.endDate);
-                                          }
-
-                                          const resChildCount = (res.children !== undefined && !isNaN(Number(res.children))) ? Number(res.children) : 0;
-                                          const resExplicitAdults = (res.adults !== undefined && res.adults !== null && !isNaN(Number(res.adults))) ? Number(res.adults) : undefined;
-                                          const resFallbackPax = (Number(res.noOfPax) > 0 ? Number(res.noOfPax) : undefined);
-                                          const resResolvedAdults = resExplicitAdults !== undefined ? resExplicitAdults : (resFallbackPax !== undefined ? resFallbackPax : (resChildCount > 0 ? 0 : 1));
-
-                                          setBookingForm(prev => ({
-                                            ...prev,
-                                            travellerName: res.travellerName || res.fullName || prev.travellerName,
-                                            travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
-                                            travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
-                                            adults: resResolvedAdults,
-                                            children: resChildCount,
-                                            packageName: res.packageName || prev.packageName,
-                                            location: res.location || res.destination || res.destinationLocation || prev.location,
-                                            startDate: fetchedStart || prev.startDate,
-                                            endDate: fetchedEnd || prev.endDate,
-                                            totalAmount: res.totalAmount ?? prev.totalAmount,
-                                            paidAmount: res.paidAmount ?? prev.paidAmount,
-                                            dueAmount: res.dueAmount ?? prev.dueAmount,
-                                            transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
-                                            paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
-                                            status: res.status || prev.status,
-                                            screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
-                                          }));
-                                        }
-                                        
-                                        setIsLoadingBooking(false);
-                                        return currentId;
-                                      });
-                                    }).catch(err => {
-                                      console.error("Error fetching booking details:", err);
-                                      setEditingBookingId(currentId => {
-                                        if (currentId === lookupKey) setIsLoadingBooking(false);
-                                        return currentId;
-                                      });
-                                    });
-                                  }
-                                } catch (err) {
-                                  console.error("Error opening edit modal:", err);
-                                  setShowBookingModal(true);
-                                }
-                              }}
-                              className={`p-2 border rounded-lg flex items-center gap-1 font-bold text-xs transition-colors ${!hasValidKey ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100 cursor-pointer dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700'}`}
-                              title={!hasValidKey ? "Trip lacks an identifier" : "Edit Trip Details"}
-                            >
-                              <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                              Edit
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  );
-                })}
+              <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
+            </div>
+            <div 
+              onClick={handleOpenTalkTimeModal}
+              className={`bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-2 border border-blue-100/60 dark:border-blue-700/40 text-center flex flex-col justify-center relative group ${user?.isAdmin ? 'cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-all' : ''}`}
+              title={user?.isAdmin ? "Click to edit talk time (Admin)" : undefined}
+            >
+              <div className="flex items-center justify-center gap-1">
+                <span className="block text-[9px] uppercase tracking-wider text-blue-500 dark:text-blue-400 font-bold truncate">Daily Talk</span>
+                {user?.isAdmin && (
+                  <svg className="w-2.5 h-2.5 text-blue-400 group-hover:text-blue-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                )}
               </div>
-            )}
+              <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.dailyTalkTime || '0:0'}</span>
+            </div>
+            <div className="bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Age</span>
+              <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{computeAge()}</span>
+            </div>
+            <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-2 border border-amber-100/60 dark:border-amber-700/40 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-bold truncate">First Call</span>
+              <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200 truncate block" title={lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : 'No call recorded'}>
+                {lead.booking?.firstCall ? formatDisplayDate(lead.booking.firstCall) : '—'}
+              </span>
+            </div>
+            <div className="bg-amber-50/60 dark:bg-amber-900/30 rounded-lg p-2 border border-amber-100/60 dark:border-amber-700/40 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-amber-500 dark:text-amber-400 font-bold truncate">Last Call</span>
+              <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200 truncate block" title={lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : 'No call recorded'}>
+                {lead.booking?.lastCall ? formatDisplayDate(lead.booking.lastCall) : '—'}
+              </span>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Historical Call Logs */}
-      {lead.callLogs && lead.callLogs.length > 0 && (() => {
-        // Deduplicate callLogs by date — keep entry with highest dailyDial per date
-        const deduped = Object.values(
-          lead.callLogs.reduce((acc, log) => {
-            const key = log.date;
-            if (!acc[key] || (log.dailyDial || 0) > (acc[key].dailyDial || 0)) {
-              acc[key] = log;
-            }
-            return acc;
-          }, {})
-        ).sort((a, b) => (b.date > a.date ? 1 : -1)); // newest first
-
-        if (deduped.length === 0) return null;
-        return (
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 mb-6">
-            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center mb-4">
-              <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              Historical Call Logs
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-slate-700/50 dark:text-gray-400">
-                  <tr>
-                    <th className="px-4 py-3 rounded-l-lg">Date</th>
-                    <th className="px-4 py-3">Dials</th>
-                    <th className="px-4 py-3 rounded-r-lg">Talk Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deduped.map((log, idx) => (
-                    <tr key={idx} className="border-b last:border-0 border-gray-100 dark:border-slate-700">
-                      <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{formatDisplayDate(log.date)}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyDial}</td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{log.dailyTalkTime}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
-
-
-      {/* Two-section layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left section: Dates */}
+      {/* Two-section layout: Reminder & Trip Info on Left, Chat on Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 mb-4">
+        {/* Left section: Historical Call Logs, Reminder & Trip Information */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Dates */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center">
-                <svg className="w-4 h-4 mr-2 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                Dates
-              </h2>
-              {(user?.isAdmin || (lead.agentIds || []).includes(user?.id)) && (
-                !isEditingDates ? (
-                  <button
-                    onClick={handleStartEditingDates}
-                    className="p-1 text-gray-400 hover:text-orange-500 transition-colors cursor-pointer"
-                    title="Edit Dates"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleSaveDates}
-                      disabled={isSavingDates}
-                      className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded transition-colors cursor-pointer"
-                    >
-                      {isSavingDates ? 'Saving...' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => setIsEditingDates(false)}
-                      className="px-2.5 py-1 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-slate-300 font-bold text-xs rounded hover:bg-gray-300 transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-1.5">Start Date</label>
-                {isEditingDates ? (
-                  <input
-                    type="date"
-                    value={dateForm.startDate}
-                    onChange={(e) => setDateForm({ ...dateForm, startDate: e.target.value })}
-                    className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-gray-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  />
-                ) : (
-                  <div className="text-sm font-medium text-gray-800 dark:text-slate-200 bg-gray-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700">
-                    {formatDisplayDate(lead.dates?.startDate)}
-                  </div>
-                )}
+          {/* Historical Call Logs */}
+          {dedupedCallLogs.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-2">
+                  <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Historical Call Logs
+                </h2>
+                <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 text-[11px] font-bold rounded-full">
+                  {dedupedCallLogs.length} {dedupedCallLogs.length === 1 ? 'Day' : 'Days'}
+                </span>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider mb-1.5">Due Date / End Date</label>
-                {isEditingDates ? (
-                  <input
-                    type="date"
-                    value={dateForm.dueDate}
-                    onChange={(e) => setDateForm({ ...dateForm, dueDate: e.target.value })}
-                    className="w-full text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-2 text-gray-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500 focus:outline-none"
-                  />
-                ) : (
-                  <div className="text-sm font-medium text-gray-800 dark:text-slate-200 bg-gray-50 dark:bg-slate-900/60 p-2.5 rounded-lg border border-gray-200 dark:border-slate-700">
-                    {formatDisplayDate(lead.dates?.dueDate || lead.dates?.endDate)}
-                  </div>
-                )}
+              <div className="overflow-x-auto max-h-[220px] overflow-y-auto pr-0.5">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-[10px] text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-slate-700/50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 rounded-l-lg">Date</th>
+                      <th className="px-3 py-2 text-center">Dials</th>
+                      <th className="px-3 py-2 text-right rounded-r-lg">Talk Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dedupedCallLogs.map((log, idx) => (
+                      <tr key={idx} className="border-b last:border-0 border-gray-100 dark:border-slate-700 hover:bg-gray-50/50 dark:hover:bg-slate-700/30 transition-colors">
+                        <td className="px-3 py-2 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{formatDisplayDate(log.date)}</td>
+                        <td className="px-3 py-2 text-center font-bold text-gray-700 dark:text-gray-200">{log.dailyDial}</td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">{log.dailyTalkTime}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Reminder / Due Date Card */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
@@ -1725,12 +1564,258 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               );
             })()}
           </div>
+
+          {/* Trip Information & Multi-Trip List - Collapsible */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+            {/* Simple Collapsible Header Bar */}
+            <div 
+              className="p-4 px-5 flex items-center justify-between gap-3 bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 cursor-pointer select-none"
+              onClick={() => setIsTripSectionOpen(!isTripSectionOpen)}
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider">
+                  Trip Information
+                </h2>
+                <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 text-xs font-bold rounded-full">
+                  {lead.trips?.length || 0} Recorded
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsTripSectionOpen(!isTripSectionOpen);
+                }}
+                className="w-8 h-8 rounded-lg bg-white dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 border border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 flex items-center justify-center transition-colors cursor-pointer"
+                title={isTripSectionOpen ? "Collapse section" : "Expand section"}
+              >
+                <svg 
+                  className={`w-4 h-4 transform transition-transform duration-200 ${isTripSectionOpen ? 'rotate-180' : 'rotate-0'}`} 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
+                  strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content: Simple Trip List */}
+            {isTripSectionOpen && (
+              <div className="p-4">
+                {(!lead.trips || lead.trips.length === 0) ? (
+                  <div className="p-6 text-center text-gray-500 dark:text-slate-400 text-xs font-medium">
+                    No trips recorded for this lead yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(lead.trips || []).map((trip, idx) => {
+                      if (!trip) return null;
+                      return (
+                        <div 
+                          key={trip._id || trip.tripId || idx} 
+                          className="p-4 bg-gray-50 dark:bg-slate-900/70 rounded-xl border border-gray-200 dark:border-slate-700/80 flex flex-col xl:flex-row xl:items-center justify-between gap-3 text-xs"
+                        >
+                          {/* Left Side: Package & Travel Info */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-gray-900 dark:text-white text-sm">
+                                {trip.packageName || 'Trip Package'}
+                                {trip.location ? ` (${trip.location})` : ''}
+                              </span>
+                              <span className="text-[11px] text-gray-500 dark:text-slate-400 font-semibold">
+                                • {(() => {
+                                  const adultCount = (Number(trip.adults) > 0)
+                                    ? Number(trip.adults)
+                                    : (Number(trip.noOfPax) > 0 ? Number(trip.noOfPax) : (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : 1));
+                                  const childCount = Number(trip.children) || 0;
+                                  const totalPax = adultCount + childCount;
+                                  return `${totalPax} Pax${childCount > 0 ? ` (${adultCount} Adult${adultCount > 1 ? 's' : ''}, ${childCount} Child${childCount > 1 ? 'ren' : ''})` : ''}`;
+                                })()}
+                              </span>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-600 dark:text-slate-300 font-medium">
+                              <span className="flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                {trip.startDate ? new Date(trip.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'} - {trip.endDate ? new Date(trip.endDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5 text-gray-400 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                {trip.travellerName || trip.fullName || lead.name} ({trip.travellerPhone || trip.contactNumber || lead.phone})
+                              </span>
+                              {trip.emergencyContactNumber && (
+                                <span className="flex items-center gap-1 text-rose-500 font-semibold">
+                                  <svg className="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                  </svg>
+                                  Emergency: {trip.emergencyContactNumber}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Side: Financials & Edit Button */}
+                          <div className="flex items-center gap-4 self-start md:self-auto">
+                            <div className="text-right">
+                              <div className="text-[10px] text-gray-400 dark:text-slate-400 font-bold uppercase tracking-wider">Total / Due Balance</div>
+                              <div className="font-bold text-gray-900 dark:text-slate-100 text-xs">
+                                ₹{Number(trip.totalAmount ?? trip.bookingDetails?.totalAmount ?? 0).toLocaleString('en-IN')}
+                                <span className="text-gray-400 font-normal mx-1">|</span>
+                                <span className={Number(trip.dueAmount ?? trip.bookingDetails?.dueAmount ?? 0) > 0 ? 'text-rose-600 dark:text-rose-400 font-extrabold' : 'text-emerald-600 dark:text-emerald-400 font-bold'}>
+                                  Due: ₹{Number(trip.dueAmount ?? trip.bookingDetails?.dueAmount ?? 0).toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                            </div>
+
+                            {!user?.isItinerary && (() => {
+                              const tripKey = trip.bookingId || trip._id || trip.id || trip.transactionId;
+                              const hasValidKey = !!tripKey;
+
+                              return (
+                                <button
+                                  type="button"
+                                  disabled={!hasValidKey}
+                                  onClick={() => {
+                                    try {
+                                      const lookupKey = tripKey;
+                                      setEditingBookingId(lookupKey);
+
+                                      let startDt = '';
+                                      let endDt = '';
+                                      if (trip.startDate) {
+                                        startDt = formatDate(trip.startDate);
+                                      }
+                                      if (trip.endDate) {
+                                        endDt = formatDate(trip.endDate);
+                                      }
+
+                                      const tot = (trip.totalAmount !== undefined && trip.totalAmount !== null) ? trip.totalAmount : (lead.bookingDetails?.totalAmount ?? '');
+                                      const pd = (trip.paidAmount !== undefined && trip.paidAmount !== null) ? trip.paidAmount : (lead.bookingDetails?.paidAmount ?? '');
+                                      const due = (tot !== '' && pd !== '') ? Math.max(0, Number(tot) - Number(pd)) : (trip.dueAmount ?? lead.bookingDetails?.dueAmount ?? 0);
+                                      const txn = trip.transactionId || trip.paymentId || (Array.isArray(trip.payments) && trip.payments[0] ? (trip.payments[0].details || trip.payments[0].transactionId) : '') || trip.details || lead.bookingDetails?.transactionId || lead.bookingDetails?.paymentId || lead.bookingDetails?.details || '';
+                                      const payMode = trip.paymentMode || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].paymentMode : '') || lead.bookingDetails?.paymentMode || 'Kalpana BOI';
+                                      const ssPreview = trip.screenshot || trip.screenshotUrl || (Array.isArray(trip.payments) && trip.payments[0] ? trip.payments[0].attachment : '') || lead.bookingDetails?.screenshot || lead.bookingDetails?.screenshotUrl || lead.bookingDetails?.attachment || null;
+                                      const tripChildCount = (trip.children !== undefined && !isNaN(Number(trip.children))) ? Number(trip.children) : 0;
+                                      const tripExplicitAdults = (trip.adults !== undefined && trip.adults !== null && !isNaN(Number(trip.adults))) ? Number(trip.adults) : undefined;
+                                      const tripFallbackPax = (Number(trip.noOfPax) > 0 ? Number(trip.noOfPax) : (Number(lead.numberOfPersons) > 0 ? Number(lead.numberOfPersons) : undefined));
+                                      const tripResolvedAdults = tripExplicitAdults !== undefined ? tripExplicitAdults : (tripFallbackPax !== undefined ? tripFallbackPax : (tripChildCount > 0 ? 0 : 1));
+
+                                      setBookingForm({
+                                        travellerName: trip.travellerName || trip.fullName || lead.name || '',
+                                        travellerEmail: trip.travellerEmail || trip.emailId || trip.email || lead.mailId || lead.email || '',
+                                        travellerPhone: trip.travellerPhone || trip.contactNumber || trip.phone || lead.phone || '',
+                                        adults: tripResolvedAdults,
+                                        children: tripChildCount,
+                                        packageName: trip.packageName || lead.product || '',
+                                        location: trip.location || trip.destination || trip.destinationLocation || lead.destination || lead.location || '',
+                                        startDate: startDt,
+                                        endDate: endDt,
+                                        totalAmount: tot,
+                                        paidAmount: pd,
+                                        dueAmount: due,
+                                        transactionId: txn,
+                                        paymentMode: payMode,
+                                        status: trip.status || lead.bookingDetails?.status || 'Pending',
+                                        screenshotFile: null,
+                                        screenshotPreview: ssPreview
+                                      });
+                                      setShowBookingModal(true);
+
+                                      if (getBookingAPI && lookupKey) {
+                                        setIsLoadingBooking(true);
+                                        const queryOptions = {};
+                                        if (trip.packageName) queryOptions.packageName = trip.packageName;
+                                        
+                                        getBookingAPI(lookupKey, queryOptions).then(res => {
+                                          setEditingBookingId(currentId => {
+                                            if (currentId !== lookupKey) return currentId;
+                                            
+                                            if (res) {
+                                              let fetchedStart = '';
+                                              let fetchedEnd = '';
+                                              if (res.startDate) {
+                                                fetchedStart = formatDate(res.startDate);
+                                              }
+                                              if (res.endDate) {
+                                                fetchedEnd = formatDate(res.endDate);
+                                              }
+
+                                              const resChildCount = (res.children !== undefined && !isNaN(Number(res.children))) ? Number(res.children) : 0;
+                                              const resExplicitAdults = (res.adults !== undefined && res.adults !== null && !isNaN(Number(res.adults))) ? Number(res.adults) : undefined;
+                                              const resFallbackPax = (Number(res.noOfPax) > 0 ? Number(res.noOfPax) : undefined);
+                                              const resResolvedAdults = resExplicitAdults !== undefined ? resExplicitAdults : (resFallbackPax !== undefined ? resFallbackPax : (resChildCount > 0 ? 0 : 1));
+
+                                              setBookingForm(prev => ({
+                                                ...prev,
+                                                travellerName: res.travellerName || res.fullName || prev.travellerName,
+                                                travellerEmail: res.travellerEmail || res.emailId || res.email || prev.travellerEmail,
+                                                travellerPhone: res.travellerPhone || res.contactNumber || res.phone || prev.travellerPhone,
+                                                adults: resResolvedAdults,
+                                                children: resChildCount,
+                                                packageName: res.packageName || prev.packageName,
+                                                location: res.location || res.destination || res.destinationLocation || prev.location,
+                                                startDate: fetchedStart || prev.startDate,
+                                                endDate: fetchedEnd || prev.endDate,
+                                                totalAmount: res.totalAmount ?? prev.totalAmount,
+                                                paidAmount: res.paidAmount ?? prev.paidAmount,
+                                                dueAmount: res.dueAmount ?? prev.dueAmount,
+                                                transactionId: res.transactionId || res.paymentId || (Array.isArray(res.payments) && res.payments[0] ? (res.payments[0].details || res.payments[0].transactionId) : '') || prev.transactionId,
+                                                paymentMode: res.paymentMode || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].paymentMode : '') || prev.paymentMode,
+                                                status: res.status || prev.status,
+                                                screenshotPreview: res.screenshot || res.screenshotUrl || (Array.isArray(res.payments) && res.payments[0] ? res.payments[0].attachment : '') || prev.screenshotPreview
+                                              }));
+                                            }
+                                            
+                                            setIsLoadingBooking(false);
+                                            return currentId;
+                                          });
+                                        }).catch(err => {
+                                          console.error("Error fetching booking details:", err);
+                                          setEditingBookingId(currentId => {
+                                            if (currentId === lookupKey) setIsLoadingBooking(false);
+                                            return currentId;
+                                          });
+                                        });
+                                      }
+                                    } catch (err) {
+                                      console.error("Error opening edit modal:", err);
+                                      setShowBookingModal(true);
+                                    }
+                                  }}
+                                  className={`p-2 border rounded-lg flex items-center gap-1 font-bold text-xs transition-colors ${!hasValidKey ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100 cursor-pointer dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-700'}`}
+                                  title={!hasValidKey ? "Trip lacks an identifier" : "Edit Trip Details"}
+                                >
+                                  <svg className="w-3.5 h-3.5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                  Edit
+                                </button>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* Right section: Comments & Activity */}
+        {/* Right section: Comments & Activity (Chat) */}
         <div className="lg:col-span-3">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center mb-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-5">
+            <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center mb-4">
               <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
               Comments & Activity
             </h2>
@@ -2160,6 +2245,86 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                 </button>
               </div>
               </fieldset>
+            </form>
+          </div>
+        </div>
+      </FocusTrap>
+    )}
+
+    {/* Admin Edit Talk Time Modal */}
+    {isEditingTalkTime && user?.isAdmin && (
+      <FocusTrap>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-slate-700 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Edit Talk Time</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Admin Control — Adjust call duration</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingTalkTime(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTalkTime} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                  Total Talk Time
+                </label>
+                <input
+                  type="text"
+                  value={talkTimeInput}
+                  onChange={(e) => setTalkTimeInput(e.target.value)}
+                  placeholder="e.g. 15:30 or 1:05:20"
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                />
+                <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">Format: MM:SS or HH:MM:SS</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
+                  Daily Talk Time
+                </label>
+                <input
+                  type="text"
+                  value={dailyTalkTimeInput}
+                  onChange={(e) => setDailyTalkTimeInput(e.target.value)}
+                  placeholder="e.g. 05:30"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                />
+                <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">Today's recorded talk time for this lead</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTalkTime(false)}
+                  className="px-4 py-2 rounded-xl border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingTalkTime}
+                  className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow hover:shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSavingTalkTime ? 'Saving...' : 'Save Talk Time'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

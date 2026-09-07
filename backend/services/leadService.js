@@ -8,6 +8,31 @@ const mongoose = require('mongoose');
 const crypto = require('crypto');
 const { generateBookingId, generatePaymentId } = require('../controllers/bookingController');
 
+// ---------------------------------------------------------------------------
+// In-memory TTL cache for getLeadCounts aggregation results.
+// The $facet aggregation is the most expensive query in the app. Since counts
+// only change when leads are created, assigned, or status-changed, a 30-second
+// cache is safe and reduces Atlas load significantly.
+// ---------------------------------------------------------------------------
+const _countsCache = new Map(); // key: JSON string → { data, expiresAt }
+const COUNTS_CACHE_TTL_MS = 30_000; // 30 seconds
+
+function _getCachedCounts(key) {
+  const entry = _countsCache.get(key);
+  if (entry && Date.now() < entry.expiresAt) return entry.data;
+  _countsCache.delete(key);
+  return null;
+}
+
+function _setCachedCounts(key, data) {
+  _countsCache.set(key, { data, expiresAt: Date.now() + COUNTS_CACHE_TTL_MS });
+}
+
+// Call this whenever a lead is mutated so the next counts fetch is fresh.
+function _invalidateCountsCache() {
+  _countsCache.clear();
+}
+
 /**
  * Shared helper: fetches bookings from the Booking collection and merges them
  * with any legacy trips already embedded on lead documents. Deduplicates by
@@ -121,20 +146,20 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
     }
   }
 
-  // 3. Search query
+  // 3. Search query — uses MongoDB text index (see Lead.js: 'lead_text_search' index)
+  // The text index covers: name, phone, origin, destination, mailId, product.
+  // This is orders of magnitude faster than the previous regex $or scan.
   const trimmedSearch = typeof search === 'string' ? search.trim() : '';
   const hasSearch = trimmedSearch.length > 0;
   if (hasSearch) {
-    const escaped = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escaped, 'i');
-    query.$or = [
-      { name: regex },
-      { phone: regex },
-      { origin: regex },
-      { destination: regex },
-      { mailId: regex },
-      { product: regex }
-    ];
+    const isPhoneSearch = /^\d+$/.test(trimmedSearch); // all digits = phone search
+    if (isPhoneSearch) {
+      // Phone prefix search — uses the unique phone index efficiently
+      query.phone = { $regex: `^${trimmedSearch}` };
+    } else {
+      // Full-text search for names, destinations, origins etc.
+      query.$text = { $search: trimmedSearch };
+    }
   }
 
   // 4. Status filter
@@ -193,6 +218,12 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
 
 async function getLeadCounts(agentIdCondition = undefined, options = {}) {
   const { scopedAgentFilter = '' } = options;
+
+  // Serve from cache if available
+  const cacheKey = JSON.stringify({ agentIdCondition, scopedAgentFilter });
+  const cached = _getCachedCounts(cacheKey);
+  if (cached) return cached;
+
   const baseQuery = {};
   if (agentIdCondition !== undefined) {
     if (Array.isArray(agentIdCondition)) {
@@ -285,7 +316,7 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
   const activeCount = facetResult?.activeCount?.[0]?.count || 0;
   const unassignedCount = facetResult?.unassignedCount?.[0]?.count || 0;
 
-  return {
+  const result = {
     totalLeads: totalCount,
     allActiveCount: activeCount,
     unassignedCount,
@@ -295,9 +326,13 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
     scopedProductCounts,
     agentCounts
   };
+
+  _setCachedCounts(cacheKey, result);
+  return result;
 }
 
 async function createLead(name, phone, age, origin, destination, leadSource, mailId, product, createdByUser) {
+  _invalidateCountsCache();
   if (!phone) {
     throw new Error("Phone number is required");
   }
@@ -307,25 +342,25 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
     throw new Error("Phone number must be exactly 10 digits with no spaces");
   }
 
-  const existingPhone = await Lead.Model.findOne({ phone: cleanPhone });
+  // Run all pre-flight reads in parallel instead of sequentially
+  const [existingPhone, existingMail, creatorUser] = await Promise.all([
+    Lead.Model.findOne({ phone: cleanPhone }).select('_id').lean(),
+    mailId ? Lead.Model.findOne({ mailId }).select('_id').lean() : null,
+    (createdByUser && createdByUser.userId) ? User.findById(createdByUser.userId).select('name email').lean() : null
+  ]);
+
   if (existingPhone) {
     throw new Error("A lead with this phone number already exists.");
   }
 
-  if (mailId) {
-    const existingMail = await Lead.Model.findOne({ mailId });
-    if (existingMail) {
-      throw new Error("A lead with this email already exists.");
-    }
+  if (mailId && existingMail) {
+    throw new Error("A lead with this email already exists.");
   }
 
   let createdBy = { name: '', email: '' };
-  if (createdByUser && createdByUser.userId) {
-    const user = await User.findById(createdByUser.userId);
-    if (user) {
-      createdBy.name = user.name || '';
-      createdBy.email = user.email || '';
-    }
+  if (creatorUser) {
+    createdBy.name = creatorUser.name || '';
+    createdBy.email = creatorUser.email || '';
   }
 
   const lead = {
@@ -448,6 +483,7 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
 }
 
 async function assignLead(id, agentIds) {
+  _invalidateCountsCache();
   const updateVal = Array.isArray(agentIds) ? agentIds : (agentIds ? [agentIds] : []);
   
   // Enforce single agent assignment
@@ -455,10 +491,14 @@ async function assignLead(id, agentIds) {
     throw new Error("A lead can only be assigned to one agent at a time.");
   }
 
-  // Verify all agents are verified before assigning
+  // Verify all agents are verified before assigning — fetch concurrently
   if (updateVal.length > 0) {
-    for (const agentId of updateVal) {
-      const agent = await User.findById(agentId);
+    const agentDocs = await Promise.all(
+      updateVal.map(agentId => User.findById(agentId).select('name isVerified status isAdmin').lean())
+    );
+    for (let i = 0; i < updateVal.length; i++) {
+      const agent = agentDocs[i];
+      const agentId = updateVal[i];
       if (!agent) {
         throw new Error(`Agent with ID ${agentId} not found`);
       }
@@ -474,7 +514,30 @@ async function assignLead(id, agentIds) {
     }
   }
 
-  const result = await Lead.updateLead(id, { agentIds: updateVal });
+  const existingLead = await Lead.findById(id);
+  if (!existingLead) {
+    throw new Error("Lead not found");
+  }
+
+  const currentAgents = (existingLead.agentIds || []).map(String).sort();
+  const nextAgents = updateVal.map(String).sort();
+  const isAgentChanged = currentAgents.length !== nextAgents.length || currentAgents.some((val, idx) => val !== nextAgents[idx]);
+
+  const updateDoc = { agentIds: updateVal };
+  if (isAgentChanged) {
+    updateDoc.booking = {
+      totalDial: 0,
+      dailyDial: 0,
+      connected: 0,
+      talkTime: '0:0',
+      dailyTalkTime: '0:0',
+      firstCall: null,
+      lastCall: null
+    };
+    updateDoc.callLogs = [];
+  }
+
+  const result = await Lead.updateLead(id, updateDoc);
 
   if (!result) {
     throw new Error("Lead not found");
@@ -523,7 +586,7 @@ async function addNote(id, text, userId, imageUrl, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition);
+  return await getLeadById(id, agentIdCondition, { withBookings: false });
 }
 
 async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
@@ -554,10 +617,12 @@ async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition);
+  return await getLeadById(id, agentIdCondition, { withBookings: false });
 }
 
-async function getLeadById(id, agentIdCondition = undefined) {
+async function getLeadById(id, agentIdCondition = undefined, options = {}) {
+  const { withBookings = true } = options;
+
   const lead = await Lead.findById(id);
   if (!lead) {
     throw new Error("Lead not found");
@@ -574,8 +639,12 @@ async function getLeadById(id, agentIdCondition = undefined) {
 
   const formattedLead = formatDoc(lead);
 
-  // Dynamically fetch and stitch bookings using shared helper
-  await stitchBookingsForLeads([formattedLead]);
+  // Only stitch bookings when the caller needs them (e.g., GET lead detail).
+  // Mutations that don't touch bookings (note/label/reminder/status updates)
+  // pass { withBookings: false } to skip this extra DB round-trip.
+  if (withBookings) {
+    await stitchBookingsForLeads([formattedLead]);
+  }
 
   return formattedLead;
 }
@@ -585,7 +654,7 @@ async function updateLabels(id, labels, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition);
+  return await getLeadById(id, agentIdCondition, { withBookings: false });
 }
 
 async function updateDates(id, dates, agentIdCondition) {
@@ -616,7 +685,7 @@ async function updateDates(id, dates, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition);
+  return await getLeadById(id, agentIdCondition, { withBookings: false });
 }
 
 async function updateReminder(id, reminderDate, agentIdCondition) {
@@ -631,10 +700,11 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition);
+  return await getLeadById(id, agentIdCondition, { withBookings: false });
 }
 
 async function updateStatus(id, status, agentIdCondition) {
+  _invalidateCountsCache();
   let validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
   try {
     const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
@@ -653,10 +723,11 @@ async function updateStatus(id, status, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition);
+  return await getLeadById(id, agentIdCondition, { withBookings: false });
 }
 
 async function bookLead(id, bookingDetails, agentIdCondition) {
+  _invalidateCountsCache();
   const existingLead = await Lead.findById(id);
   if (!existingLead) {
     throw new Error("Lead not found or unauthorized");
@@ -942,9 +1013,11 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     // Preserve the existing entry for today unless incoming dailyDial is >= stored value
     const existingTodayLog = logsMap.get(todayDate);
     const resolvedTodayDailyDial = Math.max(dailyDial, existingTodayLog ? (existingTodayLog.dailyDial || 0) : 0);
-    const resolvedTodayTalkTime = (existingTodayLog && (existingTodayLog.dailyDial || 0) > dailyDial)
-      ? (existingTodayLog.dailyTalkTime || '0:0')
-      : dailyTalkTime;
+    const resolvedTodayTalkTime = (bookingData.dailyTalkTime !== undefined)
+      ? dailyTalkTime
+      : ((existingTodayLog && (existingTodayLog.dailyDial || 0) > dailyDial)
+          ? (existingTodayLog.dailyTalkTime || '0:0')
+          : dailyTalkTime);
 
     logsMap.set(todayDate, {
       date: todayDate,
