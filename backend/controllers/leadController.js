@@ -272,6 +272,19 @@ async function updateBooking(req, res) {
     if (req.user.isItinerary) return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot modify booking info" });
     const { id } = req.params;
     const { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall } = req.body;
+
+    const isValidTalkTime = (val) => typeof val === 'string' && /^\d+(:[0-5]?\d){1,2}$/.test(val.trim());
+    if (talkTime !== undefined && talkTime !== null && String(talkTime).trim() !== '') {
+      if (!isValidTalkTime(talkTime)) {
+        return res.status(400).json({ error: "Invalid talkTime format. Expected MM:SS or HH:MM:SS (e.g. 15:30 or 120:30)" });
+      }
+    }
+    if (dailyTalkTime !== undefined && dailyTalkTime !== null && String(dailyTalkTime).trim() !== '') {
+      if (!isValidTalkTime(dailyTalkTime)) {
+        return res.status(400).json({ error: "Invalid dailyTalkTime format. Expected MM:SS or HH:MM:SS (e.g. 05:30)" });
+      }
+    }
+
     const agentIdCondition = await getAgentIdCondition(req.user);
     const result = await leadService.updateBooking(id, { totalDial, dailyDial, connected, talkTime, dailyTalkTime, firstCall, lastCall }, agentIdCondition);
     res.json(result);

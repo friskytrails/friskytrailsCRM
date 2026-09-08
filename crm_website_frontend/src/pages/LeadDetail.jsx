@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import NoteItem from '../components/NoteItem';
@@ -66,6 +66,80 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [dailyTalkTimeInput, setDailyTalkTimeInput] = useState('');
   const [isSavingTalkTime, setIsSavingTalkTime] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const shareMenuRef = useRef(null);
+
+  // Keep the parent leads array in sync
+  const syncLeadToParent = useCallback((updatedLead) => {
+    if (setLeads && updatedLead) {
+      setLeads(prev => prev.map(l => (l.id === updatedLead.id || l._id === updatedLead._id) ? updatedLead : l));
+    }
+  }, [setLeads]);
+
+  // Safely updates local lead state while preserving stitched booking trips
+  // if a mutation response was returned without stitched trips ({ withBookings: false })
+  const updateLocalLead = useCallback((updatedLead) => {
+    if (!updatedLead) return;
+    setLead(prev => {
+      const trips = (Array.isArray(updatedLead.trips) && updatedLead.trips.length > 0)
+        ? updatedLead.trips
+        : (prev?.trips || updatedLead.trips || []);
+      const merged = { ...updatedLead, trips };
+      syncLeadToParent(merged);
+      return merged;
+    });
+  }, [syncLeadToParent]);
+
+  // Safe clipboard helper with fallback for environments lacking navigator.clipboard
+  const copyToClipboard = useCallback(async (text, successMsg, errorMsg) => {
+    if (navigator?.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success(successMsg);
+        return;
+      } catch (err) {
+        console.warn("navigator.clipboard failed, attempting fallback:", err);
+      }
+    }
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (success) {
+        toast.success(successMsg);
+        return;
+      }
+    } catch (fallbackErr) {
+      console.error("Fallback clipboard copy failed:", fallbackErr);
+    }
+    toast.error(errorMsg || "Failed to copy to clipboard");
+  }, []);
+
+  // Close share dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!showShareMenu) return;
+    const handleClickOutside = (e) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target)) {
+        setShowShareMenu(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowShareMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showShareMenu]);
 
   // Active lead IDs for next/previous navigation
   const [navLeadIds, setNavLeadIds] = useState(() => {
@@ -173,8 +247,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       });
       if (res.ok) {
         const updatedLead = await res.json();
-        setLead(updatedLead);
-        syncLeadToParent(updatedLead);
+        updateLocalLead(updatedLead);
         setIsEditingReminder(false);
         toast.success(targetReminderDate ? 'Reminder updated!' : 'Reminder cleared!');
       } else {
@@ -202,8 +275,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       });
       if (res.ok) {
         const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
+        updateLocalLead(updated);
         setIsEditingProduct(false);
         toast.success("Product package updated successfully!");
       } else {
@@ -223,8 +295,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       });
       if (res.ok) {
         const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
+        updateLocalLead(updated);
         setIsEditingTravelDate(false);
         toast.success("Travel date updated successfully!");
       } else {
@@ -254,8 +325,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       });
       if (res.ok) {
         const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
+        updateLocalLead(updated);
         setIsEditingPersons(false);
         toast.success("Number of persons updated successfully!");
       } else {
@@ -417,8 +487,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       });
       if (res.ok) {
         const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
+        updateLocalLead(updated);
         setNoteInput('');
         setSelectedImage(null);
         setImageFile(null);
@@ -445,8 +514,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       });
       if (res.ok) {
         const updated = await res.json();
-        setLead(updated);
-        syncLeadToParent(updated);
+        updateLocalLead(updated);
         toast.success('Note deleted');
       } else {
         toast.error('Failed to delete note');
@@ -454,13 +522,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     } catch (error) {
       console.error(error);
       toast.error('Server connection error');
-    }
-  };
-
-  // Keep the parent leads array in sync
-  const syncLeadToParent = (updatedLead) => {
-    if (setLeads) {
-      setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
     }
   };
 
@@ -530,8 +591,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     setLead({ ...lead, status: newStatus });
     const updated = await updateLeadStatus(lead.id, newStatus);
     if (updated) {
-      setLead(updated);
-      syncLeadToParent(updated);
+      updateLocalLead(updated);
       fetchLeadCounts();
     } else {
       setLead(previousLead);
@@ -724,8 +784,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
     const updated = await assignAgent(lead.id, newIds);
     if (updated) {
-      setLead(updated);
-      syncLeadToParent(updated);
+      updateLocalLead(updated);
       fetchLeadCounts();
     } else {
       setLead(previousLead);
@@ -743,6 +802,20 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const handleSaveTalkTime = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!user?.isAdmin || !updateLeadBooking || !lead) return;
+
+    const trimmedTalk = talkTimeInput.trim();
+    const trimmedDaily = dailyTalkTimeInput.trim();
+    const talkTimeRegex = /^\d+(:[0-5]?\d){1,2}$/;
+
+    if (trimmedTalk && !talkTimeRegex.test(trimmedTalk)) {
+      toast.error("Invalid Total Talk Time format. Use MM:SS or HH:MM:SS (e.g. 15:30 or 120:30)");
+      return;
+    }
+    if (trimmedDaily && !talkTimeRegex.test(trimmedDaily)) {
+      toast.error("Invalid Daily Talk Time format. Use MM:SS or HH:MM:SS (e.g. 05:30)");
+      return;
+    }
+
     setIsSavingTalkTime(true);
     try {
       const currentBooking = lead.booking || {};
@@ -750,19 +823,18 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         totalDial: currentBooking.totalDial ?? 0,
         dailyDial: currentBooking.dailyDial ?? 0,
         connected: currentBooking.connected ?? 0,
-        talkTime: talkTimeInput.trim() || '0:0',
-        dailyTalkTime: dailyTalkTimeInput.trim() || '0:0',
+        talkTime: trimmedTalk || '0:0',
+        dailyTalkTime: trimmedDaily || '0:0',
         firstCall: currentBooking.firstCall || null,
         lastCall: currentBooking.lastCall || null
       });
       if (updated) {
-        setLead(updated);
-        syncLeadToParent(updated);
+        updateLocalLead(updated);
         setIsEditingTalkTime(false);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to update talk time");
+      toast.error(err.message || "Failed to update talk time");
     } finally {
       setIsSavingTalkTime(false);
     }
@@ -770,10 +842,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const handleCopyLeadLink = () => {
     setShowShareMenu(false);
-    const url = window.location.href;
-    navigator.clipboard.writeText(url)
-      .then(() => toast.success("Lead link copied to clipboard!"))
-      .catch(() => toast.error("Failed to copy link"));
+    copyToClipboard(window.location.href, "Lead link copied to clipboard!", "Failed to copy link");
   };
 
   const handleCopyLeadSummary = () => {
@@ -791,9 +860,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       `🔗 Link: ${window.location.href}`
     ].filter(Boolean).join('\n');
 
-    navigator.clipboard.writeText(summary)
-      .then(() => toast.success("Lead details copied to clipboard!"))
-      .catch(() => toast.error("Failed to copy details"));
+    copyToClipboard(summary, "Lead details copied to clipboard!", "Failed to copy details");
   };
 
   const handleShareWhatsApp = () => {
@@ -1048,7 +1115,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
         <div className="flex items-center gap-2">
           {/* Share Lead Dropdown */}
-          <div className="relative">
+          <div className="relative" ref={shareMenuRef}>
             <button
               onClick={() => setShowShareMenu(!showShareMenu)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-all shadow-sm cursor-pointer"
@@ -1372,6 +1439,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             </div>
             <div 
               onClick={handleOpenTalkTimeModal}
+              role={user?.isAdmin ? "button" : undefined}
+              tabIndex={user?.isAdmin ? 0 : undefined}
+              onKeyDown={user?.isAdmin ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleOpenTalkTimeModal();
+                }
+              } : undefined}
               className={`bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center relative group ${user?.isAdmin ? 'cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50/30 dark:hover:bg-orange-950/20 transition-all' : ''}`}
               title={user?.isAdmin ? "Click to edit talk time (Admin)" : undefined}
             >
@@ -1387,6 +1462,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             </div>
             <div 
               onClick={handleOpenTalkTimeModal}
+              role={user?.isAdmin ? "button" : undefined}
+              tabIndex={user?.isAdmin ? 0 : undefined}
+              onKeyDown={user?.isAdmin ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleOpenTalkTimeModal();
+                }
+              } : undefined}
               className={`bg-blue-50/60 dark:bg-blue-900/30 rounded-lg p-2 border border-blue-100/60 dark:border-blue-700/40 text-center flex flex-col justify-center relative group ${user?.isAdmin ? 'cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-all' : ''}`}
               title={user?.isAdmin ? "Click to edit talk time (Admin)" : undefined}
             >
@@ -2253,7 +2336,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
     {/* Admin Edit Talk Time Modal */}
     {isEditingTalkTime && user?.isAdmin && (
-      <FocusTrap>
+      <FocusTrap focusTrapOptions={{ onDeactivate: () => setIsEditingTalkTime(false) }}>
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-slate-700 mb-4">

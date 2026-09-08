@@ -16,6 +16,7 @@ const { generateBookingId, generatePaymentId } = require('../controllers/booking
 // ---------------------------------------------------------------------------
 const _countsCache = new Map(); // key: JSON string → { data, expiresAt }
 const COUNTS_CACHE_TTL_MS = 30_000; // 30 seconds
+const COUNTS_CACHE_MAX_ENTRIES = 1_000;
 
 function _getCachedCounts(key) {
   const entry = _countsCache.get(key);
@@ -25,7 +26,16 @@ function _getCachedCounts(key) {
 }
 
 function _setCachedCounts(key, data) {
-  _countsCache.set(key, { data, expiresAt: Date.now() + COUNTS_CACHE_TTL_MS });
+  const now = Date.now();
+  for (const [cacheKey, entry] of _countsCache) {
+    if (now >= entry.expiresAt) _countsCache.delete(cacheKey);
+  }
+  while (_countsCache.size >= COUNTS_CACHE_MAX_ENTRIES) {
+    const oldestKey = _countsCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    _countsCache.delete(oldestKey);
+  }
+  _countsCache.set(key, { data, expiresAt: now + COUNTS_CACHE_TTL_MS });
 }
 
 // Call this whenever a lead is mutated so the next counts fetch is fresh.
@@ -146,10 +156,9 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
     }
   }
 
-  // 3. Search query — uses MongoDB text index (see Lead.js: 'lead_text_search' index)
-  // The text index covers: name, phone, origin, destination, mailId, product.
-  // This is orders of magnitude faster than the previous regex $or scan.
-  const trimmedSearch = typeof search === 'string' ? search.trim() : '';
+  // 3. Search query — uses indexed phone prefix search for numeric queries
+  // and bounded, escaped regex for partial nonnumeric searches (names, destinations, origins, etc.)
+  const trimmedSearch = typeof search === 'string' ? search.trim().slice(0, 100) : '';
   const hasSearch = trimmedSearch.length > 0;
   if (hasSearch) {
     const isPhoneSearch = /^\d+$/.test(trimmedSearch); // all digits = phone search
@@ -157,8 +166,16 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
       // Phone prefix search — uses the unique phone index efficiently
       query.phone = { $regex: `^${trimmedSearch}` };
     } else {
-      // Full-text search for names, destinations, origins etc.
-      query.$text = { $search: trimmedSearch };
+      // Bounded escaped regex preserves partial word/prefix matching across text fields
+      const escaped = trimmedSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      query.$or = [
+        { name: regex },
+        { origin: regex },
+        { destination: regex },
+        { mailId: regex },
+        { product: regex }
+      ];
     }
   }
 
@@ -479,6 +496,8 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
     throw new Error("Lead not found or unauthorized");
   }
 
+  _invalidateCountsCache();
+
   return await getLeadById(id, agentIdCondition);
 }
 
@@ -586,7 +605,7 @@ async function addNote(id, text, userId, imageUrl, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition, { withBookings: false });
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
@@ -617,7 +636,7 @@ async function deleteNote(id, noteId, userId, isAdmin, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition, { withBookings: false });
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function getLeadById(id, agentIdCondition = undefined, options = {}) {
@@ -654,7 +673,7 @@ async function updateLabels(id, labels, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition, { withBookings: false });
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateDates(id, dates, agentIdCondition) {
@@ -685,7 +704,7 @@ async function updateDates(id, dates, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition, { withBookings: false });
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateReminder(id, reminderDate, agentIdCondition) {
@@ -700,7 +719,7 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition, { withBookings: false });
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function updateStatus(id, status, agentIdCondition) {
@@ -723,7 +742,7 @@ async function updateStatus(id, status, agentIdCondition) {
   if (!result) {
     throw new Error("Lead not found or unauthorized");
   }
-  return await getLeadById(id, agentIdCondition, { withBookings: false });
+  return await getLeadById(id, agentIdCondition);
 }
 
 async function bookLead(id, bookingDetails, agentIdCondition) {
@@ -949,6 +968,19 @@ async function updateBooking(id, bookingData, agentIdCondition) {
       parsedLastCall = d;
     } else {
       parsedLastCall = null;
+    }
+  }
+
+  // Validate talkTime and dailyTalkTime format (e.g. MM:SS or HH:MM:SS)
+  const isValidTalkTime = (val) => typeof val === 'string' && /^\d+(:[0-5]?\d){1,2}$/.test(val.trim());
+  if (bookingData.talkTime !== undefined && bookingData.talkTime !== null && String(bookingData.talkTime).trim() !== '') {
+    if (!isValidTalkTime(bookingData.talkTime)) {
+      throw new Error('Invalid talkTime format. Expected MM:SS or HH:MM:SS (e.g. 15:30 or 120:30)');
+    }
+  }
+  if (bookingData.dailyTalkTime !== undefined && bookingData.dailyTalkTime !== null && String(bookingData.dailyTalkTime).trim() !== '') {
+    if (!isValidTalkTime(bookingData.dailyTalkTime)) {
+      throw new Error('Invalid dailyTalkTime format. Expected MM:SS or HH:MM:SS (e.g. 05:30)');
     }
   }
 
