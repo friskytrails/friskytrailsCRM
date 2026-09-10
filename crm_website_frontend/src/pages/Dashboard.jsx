@@ -524,6 +524,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                 className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
               >
                 <option value="all">All Active Statuses ({summaryCounts.allActiveCount} leads)</option>
+                <option value="any">All Statuses (Including Closed) ({summaryCounts.totalLeads} leads)</option>
                 {((statuses && statuses.length > 0) ? statuses : STATUS_OPTIONS.map(s => s.value)).map(st => {
                   const count = summaryCounts.statusCounts?.[st] || 0;
                   return (

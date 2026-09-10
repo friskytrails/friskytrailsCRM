@@ -132,7 +132,7 @@ function App() {
         if (user?.isAdmin) {
           toast.success((t) => (
             <div className="flex items-center justify-between gap-3 min-w-[260px]">
-              <span className="font-semibold text-xs text-gray-800 dark:text-gray-200">Lead created successfully!</span>
+              <span className="font-semibold text-xs text-black" style={{ color: '#000000' }}>Lead created successfully!</span>
               <a
                 href={`/leads/${leadId}`}
                 onClick={(e) => {
@@ -145,9 +145,11 @@ function App() {
                 View Lead →
               </a>
             </div>
-          ), { duration: 6000 });
+          ), { duration: 6000, style: { color: '#000000' } });
         } else {
-          toast.success("Lead created successfully.");
+          toast.success("Lead created successfully.", {
+            style: { color: '#000000' }
+          });
         }
 
         return true;

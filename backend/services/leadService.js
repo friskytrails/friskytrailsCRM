@@ -180,8 +180,12 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   }
 
   // 4. Status filter
-  if (status && status !== 'all') {
+  if (status && status !== 'all' && status !== 'any') {
     query.status = status;
+  } else if (status !== 'any' && !hasSearch) {
+    // When viewing 'all' statuses without search, only show active pipeline leads
+    // (excludes Booked, Rejected, Future, and Non Responding)
+    query.status = { $nin: INACTIVE_STATUSES };
   }
 
   // 5. Product filter
@@ -363,7 +367,9 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   const [existingPhone, existingMail, creatorUser] = await Promise.all([
     Lead.Model.findOne({ phone: cleanPhone }).select('_id').lean(),
     mailId ? Lead.Model.findOne({ mailId }).select('_id').lean() : null,
-    (createdByUser && createdByUser.userId) ? User.findById(createdByUser.userId).select('name email').lean() : null
+    (createdByUser && createdByUser.userId && mongoose.Types.ObjectId.isValid(createdByUser.userId))
+      ? (User.Model || User).findById(createdByUser.userId).select('name email').lean()
+      : null
   ]);
 
   if (existingPhone) {
@@ -513,7 +519,10 @@ async function assignLead(id, agentIds) {
   // Verify all agents are verified before assigning — fetch concurrently
   if (updateVal.length > 0) {
     const agentDocs = await Promise.all(
-      updateVal.map(agentId => User.findById(agentId).select('name isVerified status isAdmin').lean())
+      updateVal.map(agentId => {
+        if (!agentId || !mongoose.Types.ObjectId.isValid(agentId)) return null;
+        return (User.Model || User).findById(agentId).select('name isVerified status isAdmin').lean();
+      })
     );
     for (let i = 0; i < updateVal.length; i++) {
       const agent = agentDocs[i];
@@ -1012,28 +1021,48 @@ async function updateBooking(id, bookingData, agentIdCondition) {
 
     const currentBooking = lead.booking || {};
 
-    // 2. Preserve higher counters: monotonic counters (totalDial, dailyDial, connected)
-    // must never be downgraded by stale snapshots or lower submitted numbers.
     const currentTotalDial = Number(currentBooking.totalDial) || 0;
     const incomingTotalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : undefined;
-    const totalDial = incomingTotalDial !== undefined ? Math.max(incomingTotalDial, currentTotalDial) : currentTotalDial;
+    let totalDial = incomingTotalDial !== undefined ? Math.max(incomingTotalDial, currentTotalDial) : currentTotalDial;
 
     const currentDailyDial = Number(currentBooking.dailyDial) || 0;
     const incomingDailyDial = bookingData.dailyDial !== undefined ? (Number(bookingData.dailyDial) || 0) : undefined;
-    const dailyDial = incomingDailyDial !== undefined ? Math.max(incomingDailyDial, currentDailyDial) : currentDailyDial;
+    let dailyDial = incomingDailyDial !== undefined ? Math.max(incomingDailyDial, currentDailyDial) : currentDailyDial;
 
     const currentConnected = Number(currentBooking.connected) || 0;
     const incomingConnected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : undefined;
-    const connected = incomingConnected !== undefined ? Math.max(incomingConnected, currentConnected) : currentConnected;
+    let connected = incomingConnected !== undefined ? Math.max(incomingConnected, currentConnected) : currentConnected;
 
-    const talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
     const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
+    let talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
+    if (bookingData.talkTime === undefined && (!talkTime || talkTime === '0:0') && dailyTalkTime && dailyTalkTime !== '0:0') {
+      talkTime = dailyTalkTime;
+    }
 
-    const firstCall = parsedFirstCall !== undefined ? parsedFirstCall : (currentBooking.firstCall || null);
-    const lastCall = parsedLastCall !== undefined ? parsedLastCall : (currentBooking.lastCall || null);
+    if (dailyTalkTime && dailyTalkTime !== '0:0') {
+      dailyDial = Math.max(dailyDial, 1);
+      totalDial = Math.max(totalDial, dailyDial, 1);
+      connected = Math.max(connected, 1);
+    }
 
-    // 3. Manage callLogs for the current date in IST (Asia/Kolkata)
+    let firstCall = parsedFirstCall !== undefined ? parsedFirstCall : (currentBooking.firstCall || null);
+    let lastCall = parsedLastCall !== undefined ? parsedLastCall : (currentBooking.lastCall || null);
+
+    // Auto-initialize firstCall and lastCall ONLY if they were not already present
+    if (bookingData.talkTime || bookingData.dailyTalkTime) {
+      if (!firstCall) {
+        firstCall = new Date();
+      }
+      if (!lastCall) {
+        lastCall = new Date();
+      }
+    }
+
+    // 3. Manage callLogs for the target date in IST (Asia/Kolkata)
     const todayDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const targetDate = (bookingData.logDate && typeof bookingData.logDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(bookingData.logDate.trim()))
+      ? bookingData.logDate.trim()
+      : todayDate;
 
     // Build clean, deduplicated map of callLogs by date
     const logsMap = new Map();
@@ -1050,19 +1079,23 @@ async function updateBooking(id, bookingData, agentIdCondition) {
       }
     }
 
-    // Preserve the existing entry for today unless incoming dailyDial is >= stored value
-    const existingTodayLog = logsMap.get(todayDate);
-    const resolvedTodayDailyDial = Math.max(dailyDial, existingTodayLog ? (existingTodayLog.dailyDial || 0) : 0);
-    const resolvedTodayTalkTime = (bookingData.dailyTalkTime !== undefined)
-      ? dailyTalkTime
-      : ((existingTodayLog && (existingTodayLog.dailyDial || 0) > dailyDial)
-          ? (existingTodayLog.dailyTalkTime || '0:0')
-          : dailyTalkTime);
+    const existingTargetLog = logsMap.get(targetDate);
+    const resolvedTargetDailyDial = (targetDate === todayDate)
+      ? Math.max(dailyDial, existingTargetLog ? (existingTargetLog.dailyDial || 0) : 0)
+      : (existingTargetLog ? (existingTargetLog.dailyDial || 0) : 1);
 
-    logsMap.set(todayDate, {
-      date: todayDate,
-      dailyDial: resolvedTodayDailyDial,
-      dailyTalkTime: resolvedTodayTalkTime
+    const finalTargetDailyDial = (resolvedTargetDailyDial === 0 && dailyTalkTime && dailyTalkTime !== '0:0')
+      ? 1
+      : resolvedTargetDailyDial;
+
+    const resolvedTargetTalkTime = (bookingData.dailyTalkTime !== undefined)
+      ? dailyTalkTime
+      : (existingTargetLog?.dailyTalkTime || '0:0');
+
+    logsMap.set(targetDate, {
+      date: targetDate,
+      dailyDial: finalTargetDailyDial,
+      dailyTalkTime: resolvedTargetTalkTime
     });
 
     const newCallLogs = Array.from(logsMap.values());
@@ -1076,9 +1109,9 @@ async function updateBooking(id, bookingData, agentIdCondition) {
       dailyTalkTime === (currentBooking.dailyTalkTime || '0:0') &&
       (firstCall ? new Date(firstCall).getTime() : null) === (currentBooking.firstCall ? new Date(currentBooking.firstCall).getTime() : null) &&
       (lastCall ? new Date(lastCall).getTime() : null) === (currentBooking.lastCall ? new Date(currentBooking.lastCall).getTime() : null) &&
-      existingTodayLog &&
-      existingTodayLog.dailyDial === resolvedTodayDailyDial &&
-      existingTodayLog.dailyTalkTime === resolvedTodayTalkTime;
+      existingTargetLog &&
+      existingTargetLog.dailyDial === finalTargetDailyDial &&
+      existingTargetLog.dailyTalkTime === resolvedTargetTalkTime;
 
     if (isIdentical) {
       return await getLeadById(id, agentIdCondition);

@@ -62,7 +62,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [isTripSectionOpen, setIsTripSectionOpen] = useState(false);
   const [isCallMetricsOpen, setIsCallMetricsOpen] = useState(true);
   const [isEditingTalkTime, setIsEditingTalkTime] = useState(false);
-  const [talkTimeInput, setTalkTimeInput] = useState('');
   const [dailyTalkTimeInput, setDailyTalkTimeInput] = useState('');
   const [isSavingTalkTime, setIsSavingTalkTime] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -792,9 +791,9 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
   };
 
-  const handleOpenTalkTimeModal = () => {
+  const handleOpenTalkTimeModal = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
     if (!user?.isAdmin) return;
-    setTalkTimeInput(lead?.booking?.talkTime || '0:0');
     setDailyTalkTimeInput(lead?.booking?.dailyTalkTime || '0:0');
     setIsEditingTalkTime(true);
   };
@@ -803,15 +802,14 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     if (e && e.preventDefault) e.preventDefault();
     if (!user?.isAdmin || !updateLeadBooking || !lead) return;
 
-    const trimmedTalk = talkTimeInput.trim();
-    const trimmedDaily = dailyTalkTimeInput.trim();
+    const trimmedDaily = (dailyTalkTimeInput || '').trim();
     const talkTimeRegex = /^\d+(:[0-5]?\d){1,2}$/;
 
-    if (trimmedTalk && !talkTimeRegex.test(trimmedTalk)) {
-      toast.error("Invalid Total Talk Time format. Use MM:SS or HH:MM:SS (e.g. 15:30 or 120:30)");
+    if (!trimmedDaily) {
+      toast.error("Please enter daily talk time");
       return;
     }
-    if (trimmedDaily && !talkTimeRegex.test(trimmedDaily)) {
+    if (!talkTimeRegex.test(trimmedDaily)) {
       toast.error("Invalid Daily Talk Time format. Use MM:SS or HH:MM:SS (e.g. 05:30)");
       return;
     }
@@ -819,18 +817,26 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     setIsSavingTalkTime(true);
     try {
       const currentBooking = lead.booking || {};
-      const updated = await updateLeadBooking(lead.id || lead._id, {
-        totalDial: currentBooking.totalDial ?? 0,
-        dailyDial: currentBooking.dailyDial ?? 0,
-        connected: currentBooking.connected ?? 0,
-        talkTime: trimmedTalk || '0:0',
-        dailyTalkTime: trimmedDaily || '0:0',
-        firstCall: currentBooking.firstCall || null,
-        lastCall: currentBooking.lastCall || null
-      });
+      const now = new Date().toISOString();
+      const payload = {
+        dailyTalkTime: trimmedDaily,
+        dailyDial: Math.max(Number(currentBooking.dailyDial) || 0, 1),
+        totalDial: Math.max(Number(currentBooking.totalDial) || 0, 1),
+        connected: Math.max(Number(currentBooking.connected) || 0, 1)
+      };
+
+      if (!currentBooking.firstCall) {
+        payload.firstCall = now;
+      }
+      if (!currentBooking.lastCall) {
+        payload.lastCall = now;
+      }
+
+      const updated = await updateLeadBooking(lead.id || lead._id, payload);
       if (updated) {
         updateLocalLead(updated);
         setIsEditingTalkTime(false);
+        toast.success("Daily talk time and call log updated successfully");
       }
     } catch (err) {
       console.error(err);
@@ -1437,27 +1443,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
               <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Connected</span>
               <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.connected || 0}</span>
             </div>
-            <div 
-              onClick={handleOpenTalkTimeModal}
-              role={user?.isAdmin ? "button" : undefined}
-              tabIndex={user?.isAdmin ? 0 : undefined}
-              onKeyDown={user?.isAdmin ? (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleOpenTalkTimeModal();
-                }
-              } : undefined}
-              className={`bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center relative group ${user?.isAdmin ? 'cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50/30 dark:hover:bg-orange-950/20 transition-all' : ''}`}
-              title={user?.isAdmin ? "Click to edit talk time (Admin)" : undefined}
-            >
-              <div className="flex items-center justify-center gap-1">
-                <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Talk Time</span>
-                {user?.isAdmin && (
-                  <svg className="w-2.5 h-2.5 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                )}
-              </div>
+            <div className="bg-gray-50 dark:bg-slate-700/40 rounded-lg p-2 border border-gray-100 dark:border-slate-600/50 text-center flex flex-col justify-center">
+              <span className="block text-[9px] uppercase tracking-wider text-gray-400 dark:text-gray-400 font-bold truncate">Talk Time</span>
               <span className="text-sm font-extrabold text-gray-800 dark:text-gray-100">{lead.booking?.talkTime || '0:0'}</span>
             </div>
             <div 
@@ -2336,8 +2323,24 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
     {/* Admin Edit Talk Time Modal */}
     {isEditingTalkTime && user?.isAdmin && (
-      <FocusTrap focusTrapOptions={{ onDeactivate: () => setIsEditingTalkTime(false) }}>
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, fallbackFocus: '.talk-time-modal' }}>
+        <div 
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 talk-time-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit Talk Time"
+          tabIndex="-1"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsEditingTalkTime(false);
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsEditingTalkTime(false);
+            }
+          }}
+        >
           <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3.5 border-b border-gray-100 dark:border-slate-700 mb-4">
               <div className="flex items-center gap-2.5">
@@ -2347,8 +2350,8 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Edit Talk Time</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Admin Control — Adjust call duration</p>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Edit Daily Talk Time</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Admin Control — Adjust daily duration and log</p>
                 </div>
               </div>
               <button
@@ -2365,31 +2368,17 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             <form onSubmit={handleSaveTalkTime} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
-                  Total Talk Time
-                </label>
-                <input
-                  type="text"
-                  value={talkTimeInput}
-                  onChange={(e) => setTalkTimeInput(e.target.value)}
-                  placeholder="e.g. 15:30 or 1:05:20"
-                  autoFocus
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                />
-                <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">Format: MM:SS or HH:MM:SS</p>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
                   Daily Talk Time
                 </label>
                 <input
                   type="text"
                   value={dailyTalkTimeInput}
                   onChange={(e) => setDailyTalkTimeInput(e.target.value)}
-                  placeholder="e.g. 05:30"
+                  placeholder="e.g. 05:30 or 1:05:20"
+                  autoFocus
                   className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                 />
-                <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">Today's recorded talk time for this lead</p>
+                <p className="text-[11px] text-gray-400 dark:text-slate-400 mt-1">Format: MM:SS or HH:MM:SS</p>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100 dark:border-slate-700">
@@ -2405,7 +2394,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   disabled={isSavingTalkTime}
                   className="px-5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow hover:shadow-md transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
-                  {isSavingTalkTime ? 'Saving...' : 'Save Talk Time'}
+                  {isSavingTalkTime ? 'Saving...' : 'Save Daily Talk Time'}
                 </button>
               </div>
             </form>
