@@ -180,8 +180,12 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   }
 
   // 4. Status filter
-  if (status && status !== 'all') {
+  if (status && status !== 'all' && status !== 'any') {
     query.status = status;
+  } else if (status !== 'any' && !hasSearch) {
+    // When viewing 'all' statuses without search, only show active pipeline leads
+    // (excludes Booked, Rejected, Future, and Non Responding)
+    query.status = { $nin: INACTIVE_STATUSES };
   }
 
   // 5. Product filter
