@@ -131,10 +131,10 @@ module.exports = {
   Schema: UserSchema,
   Model: User,
   // Helper queries to retain service compatibility
-  findById: async (id) => {
+  findById: (id) => {
     return User.findById(id);
   },
-  findByEmail: async (email) => {
+  findByEmail: (email) => {
     return User.findOne({ email: email.toLowerCase() }).select('+verificationOtp +otpExpiresAt +otpAttempts +resetPasswordOtp +resetPasswordExpiresAt +resetPasswordAttempts');
   },
   insertUser: async (userData) => {
@@ -144,7 +144,7 @@ module.exports = {
   },
   // Returns all non-admin users (agents + managers)
   // Projection excludes password hash and OTP fields to reduce payload size
-  findAgents: async () => {
+  findAgents: () => {
     return User.find({ isAdmin: false }).select(
       'name email isAdmin isManager isItinerary status isVerified managerId ' +
       'monthlyTarget targetCompleted bookingCount targetBookingCount ' +
@@ -153,11 +153,11 @@ module.exports = {
     );
   },
   // Returns only users promoted to manager role
-  findManagers: async () => {
+  findManagers: () => {
     return User.find({ isAdmin: false, isManager: true });
   },
   // Returns agents assigned to a specific manager
-  findAgentsByManager: async (managerId) => {
+  findAgentsByManager: (managerId) => {
     return User.find({ managerId: managerId });
   }
 };

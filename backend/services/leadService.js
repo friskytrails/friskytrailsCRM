@@ -363,7 +363,9 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   const [existingPhone, existingMail, creatorUser] = await Promise.all([
     Lead.Model.findOne({ phone: cleanPhone }).select('_id').lean(),
     mailId ? Lead.Model.findOne({ mailId }).select('_id').lean() : null,
-    (createdByUser && createdByUser.userId) ? User.findById(createdByUser.userId).select('name email').lean() : null
+    (createdByUser && createdByUser.userId && mongoose.Types.ObjectId.isValid(createdByUser.userId))
+      ? (User.Model || User).findById(createdByUser.userId).select('name email').lean()
+      : null
   ]);
 
   if (existingPhone) {
@@ -513,7 +515,10 @@ async function assignLead(id, agentIds) {
   // Verify all agents are verified before assigning — fetch concurrently
   if (updateVal.length > 0) {
     const agentDocs = await Promise.all(
-      updateVal.map(agentId => User.findById(agentId).select('name isVerified status isAdmin').lean())
+      updateVal.map(agentId => {
+        if (!agentId || !mongoose.Types.ObjectId.isValid(agentId)) return null;
+        return (User.Model || User).findById(agentId).select('name isVerified status isAdmin').lean();
+      })
     );
     for (let i = 0; i < updateVal.length; i++) {
       const agent = agentDocs[i];
