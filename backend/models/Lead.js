@@ -154,6 +154,27 @@ LeadSchema.index({ agentIds: 1, createdAt: -1 });
 LeadSchema.index({ status: 1, createdAt: -1 });
 LeadSchema.index({ agentIds: 1, status: 1, createdAt: -1 });
 
+// Product filter index — used in getLeads product filter
+LeadSchema.index({ product: 1 });
+LeadSchema.index({ product: 1, status: 1 });
+
+// Reminder date index — for reminder-based queries/alerts
+LeadSchema.index({ 'dates.reminderDate': 1 });
+
+// Full-text search index — replaces slow regex $or scan on search queries.
+// Covers: name, phone, origin, destination, mailId, product fields.
+// IMPORTANT: MongoDB text indexes are built asynchronously in Atlas the
+// first time the server connects after this change. This is safe and
+// non-blocking — existing queries will still work during index build.
+LeadSchema.index({
+  name: 'text',
+  phone: 'text',
+  origin: 'text',
+  destination: 'text',
+  mailId: 'text',
+  product: 'text'
+}, { name: 'lead_text_search', default_language: 'none' });
+
 const Lead = mongoose.model('Lead', LeadSchema);
 
 module.exports = {

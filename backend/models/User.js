@@ -122,6 +122,9 @@ const UserSchema = new mongoose.Schema({
   }
 });
 
+// Index for agent/admin queries — used by findAgents() on every app load
+UserSchema.index({ isAdmin: 1, status: 1 });
+
 const User = mongoose.model('User', UserSchema);
 
 module.exports = {
@@ -140,8 +143,14 @@ module.exports = {
     return { insertedId: user._id };
   },
   // Returns all non-admin users (agents + managers)
+  // Projection excludes password hash and OTP fields to reduce payload size
   findAgents: async () => {
-    return User.find({ isAdmin: false });
+    return User.find({ isAdmin: false }).select(
+      'name email isAdmin isManager isItinerary status isVerified managerId ' +
+      'monthlyTarget targetCompleted bookingCount targetBookingCount ' +
+      'attendance attendanceDate lastMetricsMonth historicalMetrics ' +
+      'statusChangedAt createdAt'
+    );
   },
   // Returns only users promoted to manager role
   findManagers: async () => {
