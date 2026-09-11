@@ -20,7 +20,17 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   // Search & Filter State (persisted in sessionStorage)
   const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
-  const [filterAgent, setFilterAgent] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || (isAdmin ? 'unassigned' : 'all'));
+  const [filterAgent, setFilterAgent] = useState(() => {
+    const savedStatus = sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all';
+    const savedAgent = sessionStorage.getItem(`dashboard_${userId}_filterAgent`);
+    if (savedAgent) {
+      if (isAdmin && savedStatus !== 'all' && savedAgent === 'unassigned') {
+        return 'all';
+      }
+      return savedAgent;
+    }
+    return (isAdmin && savedStatus === 'all') ? 'unassigned' : 'all';
+  });
   const [sortBy, setSortBy] = useState(() => sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
   const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
   const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
@@ -234,7 +244,15 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   };
 
   const handleFilterStatusChange = (e) => {
-    setFilterStatus(e.target.value);
+    const newStatus = e.target.value;
+    setFilterStatus(newStatus);
+    if (isAdmin) {
+      if (newStatus !== 'all' && filterAgent === 'unassigned') {
+        setFilterAgent('all');
+      } else if (newStatus === 'all' && filterAgent === 'all') {
+        setFilterAgent('unassigned');
+      }
+    }
     setPage(1);
   };
 

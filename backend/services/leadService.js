@@ -148,7 +148,13 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   // 2. Specific filterAgent from dashboard (for admins)
   if (filterAgent && filterAgent !== 'all') {
     if (filterAgent === 'unassigned') {
-      query.$or = [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }];
+      // If a specific non-fresh pipeline status was selected (e.g. Interested, Prospect, Booked, etc.),
+      // all of those leads are assigned to agents. Restricting to unassigned (which was just the dashboard
+      // default state) returns 0 results. Only enforce unassigned when viewing all/any or Fresh Leads.
+      const isSpecificNonFreshStatus = status && status !== 'all' && status !== 'any' && status !== 'Fresh Leads';
+      if (!isSpecificNonFreshStatus) {
+        query.$or = [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }];
+      }
     } else if (filterAgent === 'assigned') {
       query.agentIds = { $exists: true, $not: { $size: 0 } };
     } else {
@@ -181,7 +187,14 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
 
   // 4. Status filter
   if (status && status !== 'all' && status !== 'any') {
-    query.status = status;
+    const s = status.trim();
+    const withSuffix = s.endsWith(' Leads') ? s : `${s} Leads`;
+    const withoutSuffix = s.endsWith(' Leads') ? s.slice(0, -6).trim() : s;
+    if (withSuffix !== withoutSuffix) {
+      query.status = { $in: [withSuffix, withoutSuffix] };
+    } else {
+      query.status = s;
+    }
   } else if (status !== 'any' && !hasSearch) {
     // When viewing 'all' statuses without search, only show active pipeline leads
     // (excludes Booked, Rejected, Future, and Non Responding)
@@ -313,7 +326,12 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
 
   const statusCounts = {};
   (facetResult?.statusCounts || []).forEach(({ _id, count }) => {
-    statusCounts[_id || 'Fresh Leads'] = count;
+    const raw = _id || 'Fresh Leads';
+    const canonical = raw.endsWith(' Leads') ? raw : `${raw} Leads`;
+    statusCounts[canonical] = (statusCounts[canonical] || 0) + count;
+    if (canonical !== raw) {
+      statusCounts[raw] = (statusCounts[raw] || 0) + count;
+    }
   });
 
   const productCounts = {};
