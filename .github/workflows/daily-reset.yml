@@ -1,0 +1,27 @@
+name: Daily Dial Reset (00:00 IST)
+
+on:
+  schedule:
+    # 18:30 UTC = 00:00 IST (secondary backup — Atlas Trigger is primary)
+    - cron: "30 18 * * *"
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  reset-daily-dials:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger daily reset endpoint
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${{ secrets.BACKEND_URL }}/api/cron/reset-daily" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          echo "HTTP Status: $RESPONSE"
+
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "ERROR: Reset endpoint returned non-200 status: $RESPONSE"
+            exit 1
+          fi
+
+          echo "Daily reset triggered successfully."

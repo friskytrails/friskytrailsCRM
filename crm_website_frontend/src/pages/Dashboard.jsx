@@ -20,7 +20,20 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   // Search & Filter State (persisted in sessionStorage)
   const [searchQuery, setSearchQuery] = useState(() => sessionStorage.getItem(`dashboard_${userId}_searchQuery`) || '');
-  const [filterAgent, setFilterAgent] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterAgent`) || (isAdmin ? 'unassigned' : 'all'));
+  const [filterAgent, setFilterAgent] = useState(() => {
+    const savedStatus = sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all';
+    const savedAgent = sessionStorage.getItem(`dashboard_${userId}_filterAgent`);
+    if (savedAgent) {
+      // Preserve unassigned for 'all' and 'Fresh Leads' views — Fresh leads are
+      // unassigned by definition, so the unassigned filter should stay active.
+      const isFreshView = savedStatus === 'Fresh Leads' || savedStatus === 'Fresh';
+      if (isAdmin && savedStatus !== 'all' && !isFreshView && savedAgent === 'unassigned') {
+        return 'all';
+      }
+      return savedAgent;
+    }
+    return (isAdmin && savedStatus === 'all') ? 'unassigned' : 'all';
+  });
   const [sortBy, setSortBy] = useState(() => sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
   const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
   const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
@@ -234,7 +247,18 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   };
 
   const handleFilterStatusChange = (e) => {
-    setFilterStatus(e.target.value);
+    const newStatus = e.target.value;
+    setFilterStatus(newStatus);
+    if (isAdmin) {
+      // Preserve unassigned for 'all' and 'Fresh Leads' — Fresh leads are unassigned
+      // by definition, so switching to that view must keep the unassigned filter active.
+      const isFreshView = newStatus === 'Fresh Leads' || newStatus === 'Fresh';
+      if (newStatus !== 'all' && !isFreshView && filterAgent === 'unassigned') {
+        setFilterAgent('all');
+      } else if (newStatus === 'all' && filterAgent === 'all') {
+        setFilterAgent('unassigned');
+      }
+    }
     setPage(1);
   };
 
@@ -334,13 +358,21 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
       return;
     }
 
-    // Success: refresh counts and re-fetch the current page so pagination stays
-    // consistent. fetchLeads updates totalPages state; clamp page to the new
-    // value so an empty final page is never left on screen.
+    // Success: update counts. Only re-fetch the page when the lead was removed
+    // from the current filtered view (to clamp pagination). If the lead stays
+    // in view the optimistic update is already sufficient — no board flash needed.
     fetchCounts();
-    const data = await fetchLeads(page);
-    const returnedTotalPages = data?.totalPages || 1;
-    setPage(prev => Math.min(prev, Math.max(1, returnedTotalPages)));
+    const specialOptions = ['unassigned', 'assigned', 'all'];
+    const leadRemovedFromView =
+      (filterAgent === 'unassigned' && newIds && newIds.length > 0) ||
+      (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) ||
+      (!specialOptions.includes(filterAgent) && !(newIds || []).includes(filterAgent));
+
+    if (leadRemovedFromView) {
+      const data = await fetchLeads(page);
+      const returnedTotalPages = data?.totalPages || 1;
+      setPage(prev => Math.min(prev, Math.max(1, returnedTotalPages)));
+    }
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');

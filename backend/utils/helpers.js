@@ -36,6 +36,26 @@ function formatDoc(doc) {
     }
   }
 
+  // Lazy Reset pattern for daily call metrics (booking.dailyDial, booking.dailyTalkTime)
+  // If the last recorded call was NOT today (IST), zero out daily counters in the API response.
+  // This acts as a safety net so the frontend always sees correct values even when the
+  // Atlas Trigger (midnight reset) hasn't fired yet or is unavailable in local dev.
+  // NOTE: The DB document itself is NOT mutated — only the response payload is corrected.
+  if (rest.booking) {
+    const todayDate = getISTDateString();
+    const lastCallDate = rest.booking.lastCall
+      ? getISTDateString(new Date(rest.booking.lastCall))
+      : null;
+
+    if (!lastCallDate || lastCallDate !== todayDate) {
+      rest.booking = {
+        ...rest.booking,
+        dailyDial: 0,
+        dailyTalkTime: '0:0',
+      };
+    }
+  }
+
   // Deduplicate and sanitize callLogs by date if present
   if (Array.isArray(rest.callLogs) && rest.callLogs.length > 0) {
     const logMap = new Map();

@@ -156,10 +156,16 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     return [];
   });
 
-  // Memoized call log deduplication — only recomputes when lead.callLogs changes.
-  // Previously this ran inline in JSX on every render (every state change).
+  // Memoized call log deduplication — only recomputes when lead.callLogs or totalDial changes.
+  // Also applies compound cumulative disaggregation:
+  //   Signal A: Logs are monotonically non-decreasing oldest→newest (e.g. 3, 6, 9).
+  //   Signal B: The newest entry's dailyDial === booking.totalDial (definitive proof it is cumulative).
+  // Both signals must be true to disaggregate — prevents false positives (e.g. agent genuinely
+  // improving 3→5→7 dials/day with totalDial=15 won't trigger since 7 ≠ 15).
   const dedupedCallLogs = useMemo(() => {
     if (!lead || !lead.callLogs || lead.callLogs.length === 0) return [];
+
+    // Step 1: Deduplicate by date — keep the entry with the highest dailyDial per date
     const deduped = Object.values(
       lead.callLogs.reduce((acc, log) => {
         const key = log.date;
@@ -168,9 +174,34 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         }
         return acc;
       }, {})
-    ).sort((a, b) => (b.date > a.date ? 1 : -1)); // newest first
-    return deduped;
-  }, [lead?.callLogs]);
+    );
+
+    // Step 2: Sort chronologically (oldest first) to evaluate cumulative pattern
+    deduped.sort((a, b) => (a.date > b.date ? 1 : -1));
+
+    // Step 3: Compound cumulative signal check
+    const totalDial = lead?.booking?.totalDial || 0;
+    const lastEntry = deduped[deduped.length - 1];
+    const isNonDecreasing = deduped.every(
+      (log, i) => i === 0 || (log.dailyDial || 0) >= (deduped[i - 1].dailyDial || 0)
+    );
+    const isCumulative =
+      deduped.length > 1 &&
+      isNonDecreasing &&
+      totalDial > 0 &&
+      (lastEntry.dailyDial || 0) === totalDial;
+
+    // Step 4: If cumulative, convert each entry to its actual per-day count (difference)
+    const corrected = isCumulative
+      ? deduped.map((log, i) => {
+          const prevCumulative = i === 0 ? 0 : (deduped[i - 1].dailyDial || 0);
+          return { ...log, dailyDial: Math.max(0, (log.dailyDial || 0) - prevCumulative) };
+        })
+      : deduped;
+
+    // Step 5: Return newest-first for UI display
+    return corrected.sort((a, b) => (b.date > a.date ? 1 : -1));
+  }, [lead?.callLogs, lead?.booking?.totalDial]);
 
   const formatISTDateTime = (dateStr) => {
     if (!dateStr) return 'Not set';
