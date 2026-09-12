@@ -2,6 +2,7 @@ const Lead = require('../models/Lead');
 const User = require('../models/User');
 const GlobalConfig = require('../models/GlobalConfig');
 const Booking = require('../models/Booking');
+const { connectBookingDB } = require('../db/bookingDb');
 const { formatDoc } = require('../utils/helpers');
 const { ensureCurrentMonthMetrics, recordBookingForAgents } = require('./agentService');
 const mongoose = require('mongoose');
@@ -55,12 +56,22 @@ async function stitchBookingsForLeads(formattedLeads) {
   if (!formattedLeads || formattedLeads.length === 0) return;
 
   try {
+    // Ensure secondary booking database connection is ready before querying
+    await connectBookingDB();
+
     const leadIdSet = new Set();
     formattedLeads.forEach(l => {
       if (l._id) leadIdSet.add(l._id.toString());
-      if (l.id) leadIdSet.add(l.id.toString());
+      if (l.id) {
+        leadIdSet.add(l.id.toString());
+        // Also add numeric form so Booking.find matches both '1631' (string) and 1631 (number)
+        const numId = Number(l.id);
+        if (!isNaN(numId)) leadIdSet.add(numId);
+      }
       if (l.leadId !== undefined && l.leadId !== null) {
         leadIdSet.add(l.leadId.toString());
+        const numId = Number(l.leadId);
+        if (!isNaN(numId)) leadIdSet.add(numId);
       }
     });
 
@@ -151,7 +162,10 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
       // If a specific non-fresh pipeline status was selected (e.g. Interested, Prospect, Booked, etc.),
       // all of those leads are assigned to agents. Restricting to unassigned (which was just the dashboard
       // default state) returns 0 results. Only enforce unassigned when viewing all/any or Fresh Leads.
-      const isSpecificNonFreshStatus = status && status !== 'all' && status !== 'any' && status !== 'Fresh Leads';
+      // Normalize both "Fresh" and "Fresh Leads" to the same canonical Fresh check
+      // so the unassigned filter path stays active for either spelling.
+      const normalizedStatus = status === 'Fresh' ? 'Fresh Leads' : status;
+      const isSpecificNonFreshStatus = normalizedStatus && normalizedStatus !== 'all' && normalizedStatus !== 'any' && normalizedStatus !== 'Fresh Leads';
       if (!isSpecificNonFreshStatus) {
         query.$or = [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }];
       }
@@ -326,11 +340,12 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
 
   const statusCounts = {};
   (facetResult?.statusCounts || []).forEach(({ _id, count }) => {
-    const raw = _id || 'Fresh Leads';
+    const raw = (_id || 'Fresh Leads').trim();
     const canonical = raw.endsWith(' Leads') ? raw : `${raw} Leads`;
+    const shortAlias = raw.endsWith(' Leads') ? raw.slice(0, -6).trim() : raw;
     statusCounts[canonical] = (statusCounts[canonical] || 0) + count;
-    if (canonical !== raw) {
-      statusCounts[raw] = (statusCounts[raw] || 0) + count;
+    if (shortAlias && shortAlias !== canonical) {
+      statusCounts[shortAlias] = (statusCounts[shortAlias] || 0) + count;
     }
   });
 
@@ -1035,9 +1050,19 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     const incomingTotalDial = bookingData.totalDial !== undefined ? (Number(bookingData.totalDial) || 0) : undefined;
     let totalDial = incomingTotalDial !== undefined ? Math.max(incomingTotalDial, currentTotalDial) : currentTotalDial;
 
-    const currentDailyDial = Number(currentBooking.dailyDial) || 0;
+    // Day-scope: determine whether the last recorded call was today in IST.
+    // If the last call was yesterday (or earlier), today's dailyDial baseline MUST start
+    // at 0, not at yesterday's count. Without this, Math.max(incoming, current) would lock
+    // in yesterday's stale count and dailyDial would accumulate cumulatively across days.
+    const todayDateForReset = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+    const lastCallISTDate = currentBooking.lastCall
+      ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(currentBooking.lastCall))
+      : null;
+    const lastCallWasToday = lastCallISTDate === todayDateForReset;
+    const dayBaseDailyDial = lastCallWasToday ? (Number(currentBooking.dailyDial) || 0) : 0;
+
     const incomingDailyDial = bookingData.dailyDial !== undefined ? (Number(bookingData.dailyDial) || 0) : undefined;
-    let dailyDial = incomingDailyDial !== undefined ? Math.max(incomingDailyDial, currentDailyDial) : currentDailyDial;
+    let dailyDial = incomingDailyDial !== undefined ? Math.max(incomingDailyDial, dayBaseDailyDial) : dayBaseDailyDial;
 
     const currentConnected = Number(currentBooking.connected) || 0;
     const incomingConnected = bookingData.connected !== undefined ? (Number(bookingData.connected) || 0) : undefined;
