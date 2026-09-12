@@ -3,7 +3,7 @@ const User = require('../models/User');
 const GlobalConfig = require('../models/GlobalConfig');
 const Booking = require('../models/Booking');
 const { connectBookingDB } = require('../db/bookingDb');
-const { formatDoc } = require('../utils/helpers');
+const { formatDoc, isStrictObjectId } = require('../utils/helpers');
 const { ensureCurrentMonthMetrics, recordBookingForAgents } = require('./agentService');
 const mongoose = require('mongoose');
 const crypto = require('crypto');
@@ -887,9 +887,17 @@ async function bookLead(id, bookingDetails, agentIdCondition) {
     ? existingLead.agentIds
     : [];
 
-  const createdByUser = (agentIdCondition && !Array.isArray(agentIdCondition))
+  const rawCreatedByUser = (agentIdCondition && !Array.isArray(agentIdCondition))
     ? agentIdCondition
     : (Array.isArray(agentIdCondition) && agentIdCondition[0]) || (assignedAgents[0] || null);
+
+  let createdByUser = null;
+  if (rawCreatedByUser) {
+    if (!isStrictObjectId(rawCreatedByUser)) {
+      throw new Error("Invalid createdBy user ID");
+    }
+    createdByUser = new mongoose.Types.ObjectId(rawCreatedByUser);
+  }
 
   const newBooking = new Booking({
     bookingId,

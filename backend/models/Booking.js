@@ -65,7 +65,12 @@ const bookingSchema = new mongoose.Schema({
   travellerName: { type: String, required: true, trim: true },
   travellerEmail: { type: String, required: true, lowercase: true, trim: true },
   travellerPhone: { type: String, required: true, trim: true },
-  createdBy: { type: mongoose.Schema.Types.Mixed, required: false },
+  createdBy: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: false,
+    set: v => (v === '' ? null : v)
+  },
   status: {
     type: String,
     default: 'Pending'
