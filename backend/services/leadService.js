@@ -209,9 +209,10 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
     } else {
       query.status = s;
     }
-  } else if (status !== 'any' && !hasSearch) {
-    // When viewing 'all' statuses without search, only show active pipeline leads
-    // (excludes Booked, Rejected, Future, and Non Responding)
+  } else if (pagination === true && status !== 'any' && !hasSearch) {
+    // When viewing 'all' statuses on the paginated dashboard without search, only show active pipeline leads
+    // (excludes Booked, Rejected, Future, and Non Responding).
+    // When pagination is false (used by mobile app sync and full lead fetches), return all leads so the app can store and filter them locally.
     query.status = { $nin: INACTIVE_STATUSES };
   }
 
@@ -766,7 +767,11 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
 
 async function updateStatus(id, status, agentIdCondition) {
   _invalidateCountsCache();
-  let validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
+  let validStatuses = [
+    'Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 
+    'Booked', 'Rejected Leads', 'Future Leads', 'Non Responding Leads', 
+    'Itinerary Required', 'Itinerary Updated', 'B2B Leads'
+  ];
   try {
     const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
     if (config && Array.isArray(config.statuses) && config.statuses.length > 0) {
