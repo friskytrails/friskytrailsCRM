@@ -26,7 +26,12 @@ const GlobalConfigSchema = new mongoose.Schema({
       "Pre Prospect Leads",
       "Prospect Leads",
       "Booked",
-      "Rejected Leads"
+      "Rejected Leads",
+      "Future Leads",
+      "Non Responding Leads",
+      "Itinerary Required",
+      "Itinerary Updated",
+      "B2B Leads"
     ]
   }
 }, { timestamps: true });
