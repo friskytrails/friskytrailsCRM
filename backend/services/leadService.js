@@ -131,7 +131,7 @@ async function stitchBookingsForLeads(formattedLeads) {
   }
 }
 
-const INACTIVE_STATUSES = ['Booked', 'Rejected Leads', 'Rejected', 'Future Leads', 'Future', 'Non Responding Leads', 'Non Responding'];
+const INACTIVE_STATUSES = ['Booked', 'Booked Leads', 'Rejected Leads', 'Rejected', 'Future Leads', 'Future', 'Non Responding Leads', 'Non Responding'];
 
 async function getLeads(agentIdCondition = undefined, options = {}) {
   const {
@@ -201,13 +201,18 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
 
   // 4. Status filter
   if (status && status !== 'all' && status !== 'any') {
-    const s = status.trim();
-    const withSuffix = s.endsWith(' Leads') ? s : `${s} Leads`;
-    const withoutSuffix = s.endsWith(' Leads') ? s.slice(0, -6).trim() : s;
-    if (withSuffix !== withoutSuffix) {
-      query.status = { $in: [withSuffix, withoutSuffix] };
+    const rawStatuses = String(status).split(',').map(item => item.trim()).filter(Boolean);
+    const targetStatuses = [];
+    for (const s of rawStatuses) {
+      const withSuffix = s.endsWith(' Leads') ? s : `${s} Leads`;
+      const withoutSuffix = s.endsWith(' Leads') ? s.slice(0, -6).trim() : s;
+      targetStatuses.push(s, withSuffix, withoutSuffix);
+    }
+    const uniqueStatuses = Array.from(new Set(targetStatuses));
+    if (uniqueStatuses.length === 1) {
+      query.status = uniqueStatuses[0];
     } else {
-      query.status = s;
+      query.status = { $in: uniqueStatuses };
     }
   } else if (status !== 'any' && !hasSearch) {
     // When viewing 'all' statuses without search, only show active pipeline leads
@@ -233,14 +238,13 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   const parsedLimit = Math.max(1, Math.min(100, parseInt(limit) || 50));
   const skip = (parsedPage - 1) * parsedLimit;
 
-  // If pagination is disabled (used by mobile app), return full lead documents with callLogs, notes, booking & trips
+  // If pagination is disabled (used by mobile app), return lead documents without heavy secondary DB stitching
   if (pagination === false) {
     const rawLeads = await Lead.Model.find(query)
+      .select('-notes -trips -bookingDetails')
       .sort(sortOrder)
       .lean();
-    const formattedLeads = rawLeads.map(formatDoc);
-    await stitchBookingsForLeads(formattedLeads);
-    return formattedLeads;
+    return rawLeads.map(formatDoc);
   }
 
   const [leads, totalCount] = await Promise.all([
@@ -766,7 +770,11 @@ async function updateReminder(id, reminderDate, agentIdCondition) {
 
 async function updateStatus(id, status, agentIdCondition) {
   _invalidateCountsCache();
-  let validStatuses = ['Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 'Booked', 'Rejected Leads'];
+  let validStatuses = [
+    'Fresh Leads', 'Interested Leads', 'Pre Prospect Leads', 'Prospect Leads', 
+    'Booked', 'Rejected Leads', 'Future Leads', 'Non Responding Leads', 
+    'Itinerary Required', 'Itinerary Updated', 'B2B Leads'
+  ];
   try {
     const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
     if (config && Array.isArray(config.statuses) && config.statuses.length > 0) {
