@@ -29,3 +29,4 @@ lerna-debug.log*
 *.sln
 *.sw?
 .DS_Store
+.gemini/

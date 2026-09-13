@@ -94,7 +94,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
       setLoadingLeads(true);
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/leads?filterAgent=${targetAgentId}&pagination=false`, {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/leads?filterAgent=${targetAgentId}&pagination=false&status=any`, {
           headers: { 'Authorization': `Bearer ${token}` },
           signal: controller.signal
         });

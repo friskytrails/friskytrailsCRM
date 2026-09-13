@@ -13,6 +13,11 @@ const STATUS_OPTIONS = [
   { value: 'Prospect Leads', color: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800' },
   { value: 'Booked', color: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-900/60 dark:text-green-300 dark:border-green-700' },
   { value: 'Rejected Leads', color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-700' },
+  { value: 'Future Leads', color: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/40 dark:text-cyan-300 dark:border-cyan-800' },
+  { value: 'Non Responding Leads', color: 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' },
+  { value: 'Itinerary Required', color: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800' },
+  { value: 'Itinerary Updated', color: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/40 dark:text-teal-300 dark:border-teal-800' },
+  { value: 'B2B Leads', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-900/40 dark:text-fuchsia-300 dark:border-fuchsia-800' }
 ];
 
 export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], statuses = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI, createBookingAPI, editBookingAPI, getBookingAPI }) {
@@ -156,12 +161,33 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     return [];
   });
 
-  // Memoized call log deduplication — only recomputes when lead.callLogs or totalDial changes.
-  // Also applies compound cumulative disaggregation:
-  //   Signal A: Logs are monotonically non-decreasing oldest→newest (e.g. 3, 6, 9).
-  //   Signal B: The newest entry's dailyDial === booking.totalDial (definitive proof it is cumulative).
-  // Both signals must be true to disaggregate — prevents false positives (e.g. agent genuinely
-  // improving 3→5→7 dials/day with totalDial=15 won't trigger since 7 ≠ 15).
+  // Helper to parse time strings ('MM:SS' or 'HH:MM:SS') into seconds
+  const parseTimeToSeconds = (str) => {
+    if (!str || typeof str !== 'string') return 0;
+    const parts = str.trim().split(':').map(val => parseInt(val, 10));
+    if (parts.some(isNaN)) return 0;
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 1) return parts[0];
+    return 0;
+  };
+
+  // Helper to format seconds back into 'M:SS' or 'H:MM:SS'
+  const formatSecondsToTime = (totalSec) => {
+    if (!totalSec || isNaN(totalSec) || totalSec <= 0) return '0:00';
+    const hours = Math.floor(totalSec / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  // Memoized call log deduplication — only recomputes when lead.callLogs or totalDial/talkTime changes.
+  // Applies compound cumulative disaggregation:
+  //   Signal A: Logs are monotonically non-decreasing oldest→newest.
+  //   Signal B: The newest entry's dailyDial/dailyTalkTime === booking.totalDial/talkTime.
   const dedupedCallLogs = useMemo(() => {
     if (!lead || !lead.callLogs || lead.callLogs.length === 0) return [];
 
@@ -179,29 +205,51 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     // Step 2: Sort chronologically (oldest first) to evaluate cumulative pattern
     deduped.sort((a, b) => (a.date > b.date ? 1 : -1));
 
-    // Step 3: Compound cumulative signal check
+    // Step 3: Compound cumulative signal check for dial counts and talk time
     const totalDial = lead?.booking?.totalDial || 0;
     const lastEntry = deduped[deduped.length - 1];
-    const isNonDecreasing = deduped.every(
+    const isDialNonDecreasing = deduped.every(
       (log, i) => i === 0 || (log.dailyDial || 0) >= (deduped[i - 1].dailyDial || 0)
     );
-    const isCumulative =
+    const isDialCumulative =
       deduped.length > 1 &&
-      isNonDecreasing &&
+      isDialNonDecreasing &&
       totalDial > 0 &&
-      (lastEntry.dailyDial || 0) === totalDial;
+      (lastEntry?.dailyDial || 0) === totalDial;
 
-    // Step 4: If cumulative, convert each entry to its actual per-day count (difference)
-    const corrected = isCumulative
-      ? deduped.map((log, i) => {
-          const prevCumulative = i === 0 ? 0 : (deduped[i - 1].dailyDial || 0);
-          return { ...log, dailyDial: Math.max(0, (log.dailyDial || 0) - prevCumulative) };
-        })
-      : deduped;
+    const totalTalkSec = parseTimeToSeconds(lead?.booking?.talkTime);
+    const lastTalkSec = parseTimeToSeconds(lastEntry?.dailyTalkTime);
+    const isTalkNonDecreasing = deduped.every(
+      (log, i) => i === 0 || parseTimeToSeconds(log.dailyTalkTime) >= parseTimeToSeconds(deduped[i - 1].dailyTalkTime)
+    );
+    const isTalkCumulative =
+      isDialCumulative ||
+      (deduped.length > 1 && isTalkNonDecreasing && totalTalkSec > 0 && lastTalkSec === totalTalkSec);
 
-    // Step 5: Return newest-first for UI display
-    return corrected.sort((a, b) => (b.date > a.date ? 1 : -1));
-  }, [lead?.callLogs, lead?.booking?.totalDial]);
+    // Step 4: Disaggregate cumulative dials and talk times to per-day delta values
+    const corrected = deduped.map((log, i) => {
+      let dailyDial = log.dailyDial || 0;
+      if (isDialCumulative) {
+        const prevCumulative = i === 0 ? 0 : (deduped[i - 1].dailyDial || 0);
+        dailyDial = Math.max(0, dailyDial - prevCumulative);
+      }
+
+      let dailyTalkTime = log.dailyTalkTime || '0:00';
+      if (isTalkCumulative) {
+        const prevTalkSec = i === 0 ? 0 : parseTimeToSeconds(deduped[i - 1].dailyTalkTime);
+        const currTalkSec = parseTimeToSeconds(log.dailyTalkTime);
+        const deltaTalkSec = Math.max(0, currTalkSec - prevTalkSec);
+        dailyTalkTime = formatSecondsToTime(deltaTalkSec);
+      }
+
+      return { ...log, dailyDial, dailyTalkTime };
+    });
+
+    // Step 5: Filter out zero dials (days where no calls took place) and return newest-first for UI display
+    return corrected
+      .filter(log => (Number(log.dailyDial) || 0) > 0)
+      .sort((a, b) => (b.date > a.date ? 1 : -1));
+  }, [lead?.callLogs, lead?.booking?.totalDial, lead?.booking?.talkTime]);
 
   const formatISTDateTime = (dateStr) => {
     if (!dateStr) return 'Not set';
