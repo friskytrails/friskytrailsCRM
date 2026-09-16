@@ -252,40 +252,40 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
 
     return (
       <div key={agent.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white dark:bg-slate-800/50 hover:bg-gray-50/80 dark:hover:bg-slate-800 transition-colors rounded-xl border border-gray-200/80 dark:border-slate-700 gap-4 shadow-sm hover:shadow-md group">
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
           <div className="h-11 w-11 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900 text-gray-600 dark:text-slate-300 flex items-center justify-center font-bold text-sm border border-gray-300/50 dark:border-slate-700/50 shrink-0 shadow-inner group-hover:from-orange-100 group-hover:to-orange-50 group-hover:text-orange-600 dark:group-hover:from-orange-950 dark:group-hover:to-slate-900 dark:group-hover:text-orange-400 transition-colors">
             {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
           </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-              <Link to={`/agents/${getAgentSlug(agent) || agent.id || agent._id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">{agent.name}</Link>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+              <Link to={`/agents/${getAgentSlug(agent) || agent.id || agent._id}`} className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors truncate">{agent.name}</Link>
               {agent.isItinerary && (
-                <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-900/50">Itinerary Team</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-900/50 shrink-0">Itinerary Team</span>
               )}
               {status !== 'Active' && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold tracking-wide shrink-0 ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
               )}
             </p>
-            <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
-              <span className="font-mono">{agent.email}</span>
-              <span className="text-gray-300 dark:text-slate-600">&bull;</span>
+            <div className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <span className="font-mono truncate min-w-0 flex-1 sm:flex-initial" title={agent.email}>{agent.email}</span>
+              <span className="text-gray-300 dark:text-slate-600 shrink-0">&bull;</span>
               {agent.isVerified ? (
-                <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>Verified
+                <span className="text-green-600 dark:text-green-400 font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap">
+                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>Verified
                 </span>
               ) : (
-                <span className="text-red-500 font-semibold flex items-center gap-1">
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>Unverified
+                <span className="text-red-500 font-semibold flex items-center gap-1 shrink-0 whitespace-nowrap">
+                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>Unverified
                 </span>
               )}
-            </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 sm:ml-auto">
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
-            <svg className="w-3.5 h-3.5 mr-1.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-            {count} {count === 1 ? 'Lead' : 'Leads'}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 sm:ml-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-slate-700/60 w-full sm:w-auto">
+          <span className={`inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg text-[11px] font-bold border w-full sm:w-auto text-center ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
+            <svg className="w-3.5 h-3.5 mr-1.5 opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+            <span className="truncate">{count} {count === 1 ? 'Lead' : 'Leads'}</span>
           </span>
 
           {/* Toggle Itinerary Role */}
@@ -293,7 +293,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             onClick={() => handleToggleItinerary(agent)}
             disabled={!!loadingAction[`itin_${agent.id}`]}
             title={agent.isItinerary ? "Convert to standard Agent" : "Convert to Itinerary Team"}
-            className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-all disabled:opacity-50 ${agent.isItinerary ? 'bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300' : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400'}`}
+            className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-all disabled:opacity-50 shrink-0 cursor-pointer w-full sm:w-auto text-center justify-center truncate ${agent.isItinerary ? 'bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300' : 'bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400'}`}
           >
             {loadingAction[`itin_${agent.id}`] ? '...' : agent.isItinerary ? 'Itinerary Role' : '+ Itinerary'}
           </button>
@@ -303,18 +303,18 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
             onClick={() => handleToggleManager(agent)}
             disabled={!!loadingAction[`mgr_${agent.id}`] || agent.isItinerary}
             title={agent.isItinerary ? "Itinerary Team members cannot be promoted to Manager" : "Promote to Manager"}
-            className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-900/40 dark:hover:bg-violet-900/40"
+            className="text-[11px] font-bold px-2.5 sm:px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400 dark:border-violet-900/40 dark:hover:bg-violet-900/40 shrink-0 cursor-pointer w-full sm:w-auto text-center justify-center truncate"
           >
             {loadingAction[`mgr_${agent.id}`] ? '...' : '+ Manager'}
           </button>
 
-          <div className="flex items-center space-x-2 border-l pl-3 border-gray-200 dark:border-slate-700">
+          <div className="w-full sm:w-auto flex items-center border-l-0 sm:border-l pl-0 sm:pl-3 border-gray-200 dark:border-slate-700 shrink-0">
             <select
               id={`status-${agent.id}`}
               value={status}
               disabled={loadingAction[agent.id]}
               onChange={(e) => handleAction(agent.id, 'status', e.target.value)}
-              className="text-xs font-semibold bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer disabled:opacity-50 text-gray-700 dark:text-slate-200 shadow-sm"
+              className="w-full sm:w-auto text-xs font-semibold bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer disabled:opacity-50 text-gray-700 dark:text-slate-200 shadow-sm"
             >
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
@@ -354,34 +354,34 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                   const status = manager.status || 'Active';
                   return (
                     <div key={manager.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-violet-50/50 dark:bg-violet-950/20 rounded-xl border border-violet-200/60 dark:border-violet-900/40 gap-4 shadow-sm hover:shadow-md transition-all group">
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                         <div className="h-11 w-11 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-md shrink-0">
                           {(manager.name || '').split(' ').map(n => n?.[0] || '').join('')}
                         </div>
-                        <div>
-                          <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2">
-                            <Link to={`/agents/${getAgentSlug(manager) || manager.id || manager._id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{manager.name}</Link>
-                            <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-900/50">Manager</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
+                            <Link to={`/agents/${getAgentSlug(manager) || manager.id || manager._id}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors truncate">{manager.name}</Link>
+                            <span className="text-[10px] px-2 py-0.5 rounded-md border font-bold bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-400 dark:border-violet-900/50 shrink-0">Manager</span>
                             {status !== 'Active' && (
-                              <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-md border font-semibold shrink-0 ${statusColors[status] || statusColors['Inactive']}`}>{status}</span>
                             )}
                           </p>
-                          <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 font-mono">{manager.email}</p>
+                          <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5 font-mono truncate" title={manager.email}>{manager.email}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 sm:ml-auto">
+                      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-2.5 sm:ml-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-violet-100 dark:border-violet-900/40 w-full sm:w-auto">
                         <button 
                           onClick={() => setViewTeamManager(manager)}
-                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/60 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/40 transition-colors"
+                          className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-violet-100 hover:bg-violet-200 dark:bg-violet-950/40 dark:hover:bg-violet-900/60 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/40 transition-colors w-full sm:w-auto text-center justify-center cursor-pointer truncate"
                         >
                           {teamCount} agent{teamCount !== 1 ? 's' : ''} in team
                         </button>
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
+                        <span className={`inline-flex items-center justify-center px-2.5 py-1.5 rounded-lg text-[11px] font-bold border w-full sm:w-auto text-center ${count > 0 ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-900/50' : 'bg-white text-gray-500 border-gray-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}`}>
                           {count} {count === 1 ? 'Lead' : 'Leads'}
                         </span>
                         <button
                           onClick={() => openAssignModal(manager)}
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors shadow-sm"
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors shadow-sm w-full sm:w-auto text-center justify-center cursor-pointer"
                         >
                           Assign Agents
                         </button>
@@ -389,7 +389,7 @@ export default function AgentsList({ agents = [], leads = [], updateAgentStatus,
                           onClick={() => handleToggleManager(manager)}
                           disabled={!!loadingAction[`mgr_${manager.id}`]}
                           title="Remove Manager role"
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40"
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all disabled:opacity-50 bg-red-50 hover:bg-red-100 text-red-600 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/40 w-full sm:w-auto text-center justify-center cursor-pointer"
                         >
                           {loadingAction[`mgr_${manager.id}`] ? '...' : 'Remove Manager'}
                         </button>

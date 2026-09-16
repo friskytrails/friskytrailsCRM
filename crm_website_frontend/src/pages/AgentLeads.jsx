@@ -247,10 +247,10 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-2 mb-4 sm:mb-6 flex-wrap sm:flex-nowrap">
         <button
           onClick={() => navigate('/agents')}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer"
+          className="inline-flex items-center text-sm text-gray-500 hover:text-orange-600 dark:text-slate-400 dark:hover:text-orange-400 font-medium transition-colors cursor-pointer shrink-0"
         >
           <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -258,46 +258,48 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           Back
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => prevAgent && navigate(`/agents/${getAgentSlug(prevAgent) || prevAgent.id || prevAgent._id}`)}
             disabled={!prevAgent}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer whitespace-nowrap"
             title={prevAgent ? `Previous Agent: ${prevAgent.name}` : 'First agent'}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-            Previous Agent
+            <span className="hidden sm:inline">Previous Agent</span>
+            <span className="sm:hidden">Prev</span>
           </button>
           <button
             onClick={() => nextAgent && navigate(`/agents/${getAgentSlug(nextAgent) || nextAgent.id || nextAgent._id}`)}
             disabled={!nextAgent}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer whitespace-nowrap"
             title={nextAgent ? `Next Agent: ${nextAgent.name}` : 'Last agent'}
           >
-            Next Agent
+            <span className="hidden sm:inline">Next Agent</span>
+            <span className="sm:hidden">Next</span>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
           </button>
         </div>
       </div>
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-2xl border border-orange-200 dark:border-orange-800/50">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-4 sm:p-6 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xl sm:text-2xl border border-orange-200 dark:border-orange-800/50 shrink-0">
             {(agent.name || '').split(' ').map(n => n?.[0] || '').join('')}
           </div>
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white truncate">
               {agent.name}'s Board
             </h1>
-            <p className="text-lg font-bold text-orange-600 dark:text-orange-400 mt-1">
+            <p className="text-sm sm:text-lg font-bold text-orange-600 dark:text-orange-400 mt-0.5 sm:mt-1 truncate">
               Showing {filteredAgentLeads.length} of {activeScopeLeads.length} Assigned Leads
             </p>
           </div>
         </div>
-        <div className="w-full md:w-auto flex justify-start md:justify-end shrink-0">
+        <div className="w-full md:w-auto flex justify-start md:justify-end shrink-0 min-w-0">
           <AgentMetricsTable agent={agent} agentId={agent.id} agentName={agent.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
         </div>
       </div>
