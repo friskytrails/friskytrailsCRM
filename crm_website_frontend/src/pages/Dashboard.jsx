@@ -327,57 +327,85 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     }
   };
 
-  // Inline Agent Assignment (instant 0 ms state update + background save)
+  // Inline Agent Assignment (instant 0 ms state update + background save, no page reload)
   const handleInlineAssign = async (leadId, newIds) => {
-    // Optimistically update agentIds in local state
+    const targetLead = leads.find(l => (l.id || l._id) === leadId);
+    const prevAgentIds = (targetLead?.agentIds || []).map(String);
+    const nextAgentIds = (newIds || []).map(String);
+    const wasUnassigned = prevAgentIds.length === 0;
+    const isNowAssigned = nextAgentIds.length > 0;
+
+    const specialOptions = ['unassigned', 'assigned', 'all'];
+    const leadRemovedFromView =
+      (filterAgent === 'unassigned' && isNowAssigned) ||
+      (filterAgent === 'assigned' && !isNowAssigned) ||
+      (!specialOptions.includes(filterAgent) && !nextAgentIds.includes(String(filterAgent)));
+
+    // 1. Optimistically update leads in local view
     setLeads(prev => {
-      const updated = prev.map(lead => {
+      if (leadRemovedFromView) {
+        return prev.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+      return prev.map(lead => {
         if ((lead.id || lead._id) === leadId) {
           return { ...lead, agentIds: newIds };
         }
         return lead;
       });
-
-      // If viewing "unassigned only", remove the lead once it gets assigned
-      if (filterAgent === 'unassigned' && newIds && newIds.length > 0) {
-        return updated.filter(lead => (lead.id || lead._id) !== leadId);
-      }
-      // If viewing "assigned only", remove the lead once it gets unassigned
-      if (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) {
-        return updated.filter(lead => (lead.id || lead._id) !== leadId);
-      }
-      // If viewing a specific agent's leads and they were removed from that agent
-      const specialOptions = ['unassigned', 'assigned', 'all'];
-      if (!specialOptions.includes(filterAgent) && !newIds.includes(filterAgent)) {
-        return updated.filter(lead => (lead.id || lead._id) !== leadId);
-      }
-
-      return updated;
     });
 
+    // 2. Adjust view counts and pagination smoothly if removed from current view
+    if (leadRemovedFromView) {
+      setTotalCount(prev => Math.max(0, prev - 1));
+      if (page > 1 && leads.length <= 1) {
+        setPage(prev => Math.max(1, prev - 1));
+      }
+      const remainingIds = leads.filter(l => (l.id || l._id) !== leadId).map(l => l.id || l._id);
+      sessionStorage.setItem('activeLeadIds', JSON.stringify(remainingIds));
+    }
+
+    // 3. Optimistically update summary metrics (Unassigned vs Assigned cards & dropdown badges)
+    setSummaryCounts(prev => {
+      const nextCounts = { ...prev };
+      const nextAgentCounts = { ...(prev.agentCounts || {}) };
+
+      if (wasUnassigned && isNowAssigned) {
+        nextCounts.unassignedCount = Math.max(0, (prev.unassignedCount || 0) - 1);
+        nextCounts.assignedCount = (prev.assignedCount || 0) + 1;
+      } else if (!wasUnassigned && !isNowAssigned) {
+        nextCounts.unassignedCount = (prev.unassignedCount || 0) + 1;
+        nextCounts.assignedCount = Math.max(0, (prev.assignedCount || 0) - 1);
+      }
+
+      // Decrement agents no longer assigned
+      prevAgentIds.forEach(agId => {
+        if (!nextAgentIds.includes(agId)) {
+          nextAgentCounts[agId] = Math.max(0, (nextAgentCounts[agId] || 0) - 1);
+        }
+      });
+      // Increment newly assigned agents
+      nextAgentIds.forEach(agId => {
+        if (!prevAgentIds.includes(agId)) {
+          nextAgentCounts[agId] = (nextAgentCounts[agId] || 0) + 1;
+        }
+      });
+
+      nextCounts.agentCounts = nextAgentCounts;
+      return nextCounts;
+    });
+
+    // 4. Save to backend asynchronously
     const result = await assignAgent(leadId, newIds);
 
     if (result === null) {
-      // Assignment failed – roll back the optimistic update to match server state.
+      // Assignment failed on server – roll back local state to match server state
       fetchLeads(page);
+      fetchCounts();
       return;
     }
 
-    // Success: update counts. Only re-fetch the page when the lead was removed
-    // from the current filtered view (to clamp pagination). If the lead stays
-    // in view the optimistic update is already sufficient — no board flash needed.
+    // 5. Assignment succeeded – silently refresh counts in the background without refreshing leads/page
     fetchCounts();
-    const specialOptions = ['unassigned', 'assigned', 'all'];
-    const leadRemovedFromView =
-      (filterAgent === 'unassigned' && newIds && newIds.length > 0) ||
-      (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) ||
-      (!specialOptions.includes(filterAgent) && !(newIds || []).includes(filterAgent));
-
-    if (leadRemovedFromView) {
-      const data = await fetchLeads(page);
-      const returnedTotalPages = data?.totalPages || 1;
-      setPage(prev => Math.min(prev, Math.max(1, returnedTotalPages)));
-    }
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
