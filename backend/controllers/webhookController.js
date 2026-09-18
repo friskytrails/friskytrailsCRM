@@ -233,7 +233,7 @@ async function processSingleLead(data) {
     leadSource: leadSource ? String(leadSource).trim() : 'AdCampaign',
     product: resolvedProduct,
     travelDate: travelDate ? String(travelDate).trim() : '',
-    numberOfPersons: parsedPax,
+    numberOfPersons: null, // Kept empty per user request - pax preference is stored in notes
     agentIds: [],
     labels: [],
     status: 'Fresh Leads',
