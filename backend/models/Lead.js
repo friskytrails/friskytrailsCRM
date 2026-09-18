@@ -13,7 +13,7 @@ const NoteSchema = new mongoose.Schema({
   timestamp: {
     type: String,
     required: false,
-    default: () => new Date().toISOString()
+    default: () => new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })
   },
   author: {
     type: String,

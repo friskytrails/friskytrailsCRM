@@ -160,7 +160,7 @@ async function processSingleLead(data) {
   const existingLead = await Lead.Model.findOne({ phone: cleanPhone });
   if (existingLead) {
     // For duplicate leads, add new inquiry notes without overwriting anything
-    const dupNow = new Date().toISOString();
+    const dupNow = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
     const dupNotes = [];
     if (leavingWhen && String(leavingWhen).trim())
       dupNotes.push(`When are you planning to leave? ${String(leavingWhen).trim()}`);
@@ -194,7 +194,7 @@ async function processSingleLead(data) {
 
   // Create new lead
   const initialNotes = [];
-  const now = new Date().toISOString();
+  const now = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 
   // Merge the 3 travel preference fields into notes as 3 lines
   const travelLines = [];
