@@ -205,7 +205,7 @@ module.exports = {
       leadId: nextId
     });
     await lead.save();
-    return { insertedId: lead._id };
+    return { insertedId: lead._id, leadId: nextId, lead };
   },
   updateLead: async (id, data, agentIdCondition = undefined) => {
     let query = {};

@@ -1,8 +1,14 @@
 const express = require('express');
 const leadController = require('../controllers/leadController');
+const webhookController = require('../controllers/webhookController');
 const auth = require('../middleware/auth');
+const webhookAuth = require('../middleware/webhookAuth');
 
 const router = express.Router();
+
+// Public webhook endpoints for Google Sheets / integrations (authenticated via x-api-key)
+router.post('/webhook', webhookAuth, webhookController.handleLeadWebhook);
+router.all('/webhook/test', webhookAuth, webhookController.testWebhook);
 
 router.get('/', auth, leadController.getLeads);
 router.get('/counts', auth, leadController.getLeadCounts);
