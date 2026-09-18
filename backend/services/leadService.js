@@ -1210,5 +1210,6 @@ module.exports = {
   updateReminder,
   updateStatus,
   bookLead,
-  updateBooking
+  updateBooking,
+  invalidateCountsCache: _invalidateCountsCache
 };
