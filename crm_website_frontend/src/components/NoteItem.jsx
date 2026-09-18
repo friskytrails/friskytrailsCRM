@@ -2,6 +2,17 @@ import React, { useState } from 'react';
 
 const getNoteDisplayDate = (note) => {
   if (!note || !note.timestamp) return 'Unknown time';
+
+  // If timestamp is an ISO string or full date string (e.g. 2026-09-18T19:46:09.474Z)
+  if (typeof note.timestamp === 'string' && (note.timestamp.includes('T') || (note.timestamp.includes('-') && note.timestamp.length >= 10))) {
+    const d = new Date(note.timestamp);
+    if (!isNaN(d.getTime())) {
+      const dateStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return `${dateStr}, ${timeStr}`;
+    }
+  }
+
   if (note.timestamp.includes(',')) return note.timestamp;
   const idStr = note.id || note._id;
   if (idStr && idStr.length === 24) {

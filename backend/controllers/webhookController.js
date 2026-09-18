@@ -12,6 +12,19 @@ function sanitizePhone(rawPhone) {
   return digits.slice(-10);
 }
 
+// Safely parse passenger count from inputs like "3-4_people" -> 4, "solo_person" -> 1, "2_people" -> 2
+function parsePax(raw) {
+  if (!raw && raw !== 0) return null;
+  const str = String(raw).trim().toLowerCase();
+  if (str.includes('solo') || str.includes('single')) return 1;
+  const rangeMatch = str.match(/(\d+)\s*(?:[-–—]|to)\s*(\d+)/i);
+  if (rangeMatch) {
+    return Number(rangeMatch[2]); // Return upper bound of range (e.g. 4 for "3-4", 10 for "7-10")
+  }
+  const match = str.match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
 // Dynamically check and map product against products available in GlobalConfig
 async function resolveProductFromConfig(inputProduct, allowCreate = false) {
   let availableProducts = [
@@ -130,12 +143,8 @@ async function processSingleLead(data) {
   const resolvedProduct = productResult.resolved;
   const cleanEmail = (mailId || email || '').trim();
 
-  // Extract numeric pax if string like "2_people"
-  let parsedPax = numberOfPersons || pax;
-  if (typeof parsedPax === 'string') {
-    const match = parsedPax.match(/\d+/);
-    parsedPax = match ? Number(match[0]) : null;
-  }
+  // Extract numeric pax safely (e.g. "3-4_people" -> 4, "solo_person" -> 1, "2_people" -> 2)
+  let parsedPax = parsePax(numberOfPeople) || parsePax(numberOfPersons) || parsePax(pax);
 
   // Auto-detect destination if omitted and product/destination contains package keywords
   let finalDestination = destination ? String(destination).trim() : '';
@@ -151,7 +160,7 @@ async function processSingleLead(data) {
   const existingLead = await Lead.Model.findOne({ phone: cleanPhone });
   if (existingLead) {
     // For duplicate leads, add new inquiry notes without overwriting anything
-    const dupNow = new Date().toISOString();
+    const dupNow = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
     const dupNotes = [];
     if (leavingWhen && String(leavingWhen).trim())
       dupNotes.push(`When are you planning to leave? ${String(leavingWhen).trim()}`);
@@ -185,7 +194,7 @@ async function processSingleLead(data) {
 
   // Create new lead
   const initialNotes = [];
-  const now = new Date().toISOString();
+  const now = new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 
   // Merge the 3 travel preference fields into notes as 3 lines
   const travelLines = [];
@@ -224,7 +233,7 @@ async function processSingleLead(data) {
     leadSource: leadSource ? String(leadSource).trim() : 'AdCampaign',
     product: resolvedProduct,
     travelDate: travelDate ? String(travelDate).trim() : '',
-    numberOfPersons: parsedPax,
+    numberOfPersons: null, // Kept empty per user request - pax preference is stored in notes
     agentIds: [],
     labels: [],
     status: 'Fresh Leads',
