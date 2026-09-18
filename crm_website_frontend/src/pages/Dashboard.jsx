@@ -327,57 +327,85 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     }
   };
 
-  // Inline Agent Assignment (instant 0 ms state update + background save)
+  // Inline Agent Assignment (instant 0 ms state update + background save, no page reload)
   const handleInlineAssign = async (leadId, newIds) => {
-    // Optimistically update agentIds in local state
+    const targetLead = leads.find(l => (l.id || l._id) === leadId);
+    const prevAgentIds = (targetLead?.agentIds || []).map(String);
+    const nextAgentIds = (newIds || []).map(String);
+    const wasUnassigned = prevAgentIds.length === 0;
+    const isNowAssigned = nextAgentIds.length > 0;
+
+    const specialOptions = ['unassigned', 'assigned', 'all'];
+    const leadRemovedFromView =
+      (filterAgent === 'unassigned' && isNowAssigned) ||
+      (filterAgent === 'assigned' && !isNowAssigned) ||
+      (!specialOptions.includes(filterAgent) && !nextAgentIds.includes(String(filterAgent)));
+
+    // 1. Optimistically update leads in local view
     setLeads(prev => {
-      const updated = prev.map(lead => {
+      if (leadRemovedFromView) {
+        return prev.filter(lead => (lead.id || lead._id) !== leadId);
+      }
+      return prev.map(lead => {
         if ((lead.id || lead._id) === leadId) {
           return { ...lead, agentIds: newIds };
         }
         return lead;
       });
-
-      // If viewing "unassigned only", remove the lead once it gets assigned
-      if (filterAgent === 'unassigned' && newIds && newIds.length > 0) {
-        return updated.filter(lead => (lead.id || lead._id) !== leadId);
-      }
-      // If viewing "assigned only", remove the lead once it gets unassigned
-      if (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) {
-        return updated.filter(lead => (lead.id || lead._id) !== leadId);
-      }
-      // If viewing a specific agent's leads and they were removed from that agent
-      const specialOptions = ['unassigned', 'assigned', 'all'];
-      if (!specialOptions.includes(filterAgent) && !newIds.includes(filterAgent)) {
-        return updated.filter(lead => (lead.id || lead._id) !== leadId);
-      }
-
-      return updated;
     });
 
+    // 2. Adjust view counts and pagination smoothly if removed from current view
+    if (leadRemovedFromView) {
+      setTotalCount(prev => Math.max(0, prev - 1));
+      if (page > 1 && leads.length <= 1) {
+        setPage(prev => Math.max(1, prev - 1));
+      }
+      const remainingIds = leads.filter(l => (l.id || l._id) !== leadId).map(l => l.id || l._id);
+      sessionStorage.setItem('activeLeadIds', JSON.stringify(remainingIds));
+    }
+
+    // 3. Optimistically update summary metrics (Unassigned vs Assigned cards & dropdown badges)
+    setSummaryCounts(prev => {
+      const nextCounts = { ...prev };
+      const nextAgentCounts = { ...(prev.agentCounts || {}) };
+
+      if (wasUnassigned && isNowAssigned) {
+        nextCounts.unassignedCount = Math.max(0, (prev.unassignedCount || 0) - 1);
+        nextCounts.assignedCount = (prev.assignedCount || 0) + 1;
+      } else if (!wasUnassigned && !isNowAssigned) {
+        nextCounts.unassignedCount = (prev.unassignedCount || 0) + 1;
+        nextCounts.assignedCount = Math.max(0, (prev.assignedCount || 0) - 1);
+      }
+
+      // Decrement agents no longer assigned
+      prevAgentIds.forEach(agId => {
+        if (!nextAgentIds.includes(agId)) {
+          nextAgentCounts[agId] = Math.max(0, (nextAgentCounts[agId] || 0) - 1);
+        }
+      });
+      // Increment newly assigned agents
+      nextAgentIds.forEach(agId => {
+        if (!prevAgentIds.includes(agId)) {
+          nextAgentCounts[agId] = (nextAgentCounts[agId] || 0) + 1;
+        }
+      });
+
+      nextCounts.agentCounts = nextAgentCounts;
+      return nextCounts;
+    });
+
+    // 4. Save to backend asynchronously
     const result = await assignAgent(leadId, newIds);
 
     if (result === null) {
-      // Assignment failed – roll back the optimistic update to match server state.
+      // Assignment failed on server – roll back local state to match server state
       fetchLeads(page);
+      fetchCounts();
       return;
     }
 
-    // Success: update counts. Only re-fetch the page when the lead was removed
-    // from the current filtered view (to clamp pagination). If the lead stays
-    // in view the optimistic update is already sufficient — no board flash needed.
+    // 5. Assignment succeeded – silently refresh counts in the background without refreshing leads/page
     fetchCounts();
-    const specialOptions = ['unassigned', 'assigned', 'all'];
-    const leadRemovedFromView =
-      (filterAgent === 'unassigned' && newIds && newIds.length > 0) ||
-      (filterAgent === 'assigned' && (!newIds || newIds.length === 0)) ||
-      (!specialOptions.includes(filterAgent) && !(newIds || []).includes(filterAgent));
-
-    if (leadRemovedFromView) {
-      const data = await fetchLeads(page);
-      const returnedTotalPages = data?.totalPages || 1;
-      setPage(prev => Math.min(prev, Math.max(1, returnedTotalPages)));
-    }
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
@@ -481,15 +509,15 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         </div>
 
         {/* Filter Controls Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-slate-700/50">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-gray-100 dark:border-slate-700/50">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-4 w-full sm:w-auto">
             {isAdmin && (
-              <div className="flex items-center space-x-2">
-                <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Agent:</span>
+              <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
+                <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider shrink-0 w-16 sm:w-auto">Agent:</span>
                 <select
                   value={filterAgent}
                   onChange={handleFilterAgentChange}
-                  className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+                  className="flex-1 sm:flex-none min-w-0 max-w-full sm:max-w-[220px] pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all truncate"
                 >
                   <option value="unassigned">Unassigned Only (Default) ({summaryCounts.unassignedCount} leads)</option>
                   <option value="assigned">Assigned Only ({summaryCounts.assignedCount} leads)</option>
@@ -513,12 +541,12 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
               </div>
             )}
 
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Sort:</span>
+            <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider shrink-0 w-16 sm:w-auto">Sort:</span>
               <select
                 value={sortBy}
                 onChange={handleSortChange}
-                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+                className="flex-1 sm:flex-none min-w-0 max-w-full sm:max-w-[140px] pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all truncate"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
@@ -527,12 +555,12 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
               </select>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Package:</span>
+            <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider shrink-0 w-16 sm:w-auto">Package:</span>
               <select
                 value={filterProduct}
                 onChange={handleFilterProductChange}
-                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+                className="flex-1 sm:flex-none min-w-0 max-w-full sm:max-w-[180px] pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all truncate"
               >
                 <option value="all">All Packages</option>
                 {allAvailableProducts
@@ -553,12 +581,12 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
               </select>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider">Status:</span>
+            <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider shrink-0 w-16 sm:w-auto">Status:</span>
               <select
                 value={filterStatus}
                 onChange={handleFilterStatusChange}
-                className="pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all"
+                className="flex-1 sm:flex-none min-w-0 max-w-full sm:max-w-[220px] pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all truncate"
               >
                 <option value="all">All Active Statuses ({summaryCounts.allActiveCount} leads)</option>
                 <option value="any">All Statuses (Including Closed) ({summaryCounts.totalLeads} leads)</option>
@@ -575,7 +603,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
           {hasActiveFilters && (
             <button
               onClick={handleResetFilters}
-              className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors cursor-pointer py-1 px-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/50"
+              className="text-xs font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors cursor-pointer py-1.5 px-3 rounded-lg bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/50 self-start sm:self-auto shrink-0"
             >
               Reset Filters
             </button>
@@ -615,13 +643,13 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                 className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 hover:scale-[1.01] transition-all duration-300 overflow-visible flex flex-col justify-between border border-gray-100 dark:border-slate-700/50 p-6 relative group cursor-pointer"
               >
                 <div>
-                  <div className="flex items-start justify-between">
-                    <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center space-x-2">
-                        <h3 className="text-lg font-bold transition-colors relative z-20">
+                        <h3 className="text-lg font-bold transition-colors relative z-20 truncate">
                           <Link to={`/leads/${lead.id || lead._id}`} className="text-orange-600 hover:text-orange-800 underline decoration-orange-300/50 hover:decoration-orange-800 flex items-center gap-1.5 group">
-                            <span>{lead.name || 'Unnamed Lead'}</span>
-                            <svg className="w-4 h-4 text-orange-400 group-hover:text-orange-800 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <span className="truncate">{lead.name || 'Unnamed Lead'}</span>
+                            <svg className="w-4 h-4 text-orange-400 group-hover:text-orange-800 transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </Link>
@@ -629,7 +657,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                         {(isAdmin || (lead.agentIds || []).includes(user?.id || user?._id)) && (
                           <button
                             onClick={() => setEditingLead(lead)}
-                            className="text-gray-400 hover:text-orange-600 cursor-pointer p-1 rounded transition-colors relative z-20"
+                            className="text-gray-400 hover:text-orange-600 cursor-pointer p-1 rounded transition-colors relative z-20 shrink-0"
                             title="Edit Lead"
                           >
                             <svg style={{ width: '13px', height: '13px', stroke: 'currentColor' }} fill="none" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -650,13 +678,13 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                         )}
                       </div>
                       {lead.createdBy && lead.createdBy.name && (
-                        <div className="mt-1 text-xs text-gray-400">
+                        <div className="mt-1 text-xs text-gray-400 truncate">
                           Created by: {lead.createdBy.name}{lead.createdBy.email ? ` , ${lead.createdBy.email}` : ''}
                         </div>
                       )}
                     </div>
                     {/* Status Badge */}
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}>
+                    <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}>
                       {lead.status || 'Fresh Leads'}
                     </span>
                   </div>

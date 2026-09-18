@@ -109,23 +109,23 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
 
   return (
     <>
-      <div className={`flex items-start space-x-3 ${isMyNote ? '' : ''}`}>
+      <div className="flex items-start space-x-2.5 sm:space-x-3 min-w-0 w-full">
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isMyNote ? 'bg-blue-100 dark:bg-orange-950' : 'bg-gray-100 dark:bg-slate-800'}`}>
           <span className={`text-xs font-bold ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
             {note.author?.charAt(0)?.toUpperCase() || '?'}
           </span>
         </div>
-        <div className={`flex-1 p-3 rounded-lg border text-sm ${isMyNote ? 'bg-blue-50/60 border-blue-100/60 dark:bg-orange-950/40 dark:border-orange-900/50' : 'bg-gray-50 border-gray-100 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
-          <div className="flex justify-between items-center mb-1">
-            <span className={`text-xs font-semibold ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
+        <div className={`flex-1 min-w-0 p-3 rounded-lg border text-sm overflow-hidden ${isMyNote ? 'bg-blue-50/60 border-blue-100/60 dark:bg-orange-950/40 dark:border-orange-900/50' : 'bg-gray-50 border-gray-100 dark:bg-slate-800/50 dark:border-slate-700/50'}`}>
+          <div className="flex justify-between items-center mb-1 gap-1.5">
+            <span className={`text-xs font-semibold truncate ${isMyNote ? 'text-blue-600 dark:text-orange-400' : 'text-gray-500 dark:text-slate-400'}`}>
               {note.author} {isMyNote && '(You)'}
             </span>
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] text-gray-400">{getNoteDisplayDate(note)}</span>
+            <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+              <span className="text-[10px] text-gray-400 shrink-0">{getNoteDisplayDate(note)}</span>
               {(isMyNote || currentUser?.isAdmin) && deleteNote && (
                 <button
                   onClick={() => deleteNote(leadId, note.id || note._id)}
-                  className="text-red-400 hover:text-red-600 cursor-pointer p-0.5 rounded transition-colors"
+                  className="text-red-400 hover:text-red-600 cursor-pointer p-0.5 rounded transition-colors shrink-0"
                   title="Delete note"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -136,23 +136,23 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
               )}
             </div>
           </div>
-          {note.text && <p className="text-gray-700 dark:text-slate-200 mt-0.5 whitespace-pre-wrap break-words">{note.text}</p>}
+          {note.text && <p className="text-gray-700 dark:text-slate-200 mt-0.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden">{note.text}</p>}
           
           {secureUrl && (
-            <div className="mt-2 inline-block">
+            <div className="mt-2 w-full max-w-[260px] min-w-0">
               {isDoc ? (
                 <div
                   role="button"
                   tabIndex={0}
                   onClick={() => setIsPreviewOpen(true)}
                   onKeyDown={handleKeyDownTrigger}
-                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-sm font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 max-w-[260px] shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="p-2 sm:p-2.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-sm font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 w-full max-w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 min-w-0"
                   title="Click to preview file"
                 >
-                  <span className="text-lg">📄</span>
-                  <div className="min-w-0 flex-1">
+                  <span className="text-lg shrink-0">📄</span>
+                  <div className="min-w-0 flex-1 overflow-hidden">
                     <div className="truncate text-xs font-bold text-gray-800 dark:text-slate-200">{fileName}</div>
-                    <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium">Click to preview</div>
+                    <div className="text-[10px] text-orange-600 dark:text-orange-400 font-medium truncate">Click to preview</div>
                   </div>
                 </div>
               ) : imgError ? (
@@ -161,10 +161,10 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                   tabIndex={0}
                   onClick={() => setIsPreviewOpen(true)}
                   onKeyDown={handleKeyDownTrigger}
-                  className="p-3 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="p-2 sm:p-2.5 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-xs font-semibold flex items-center cursor-pointer transition-colors gap-2 rounded-lg border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 w-full max-w-full min-w-0"
                 >
-                  <span>🖼️</span>
-                  <span className="text-orange-600 dark:text-orange-400 font-bold">View Image Attachment</span>
+                  <span className="shrink-0">🖼️</span>
+                  <span className="text-orange-600 dark:text-orange-400 font-bold truncate">View Image Attachment</span>
                 </div>
               ) : (
                 <div
@@ -172,7 +172,7 @@ export default function NoteItem({ note, leadId, deleteNote, currentUser }) {
                   tabIndex={0}
                   onClick={() => setIsPreviewOpen(true)}
                   onKeyDown={handleKeyDownTrigger}
-                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 max-w-[240px] cursor-pointer group shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-slate-700 w-full max-w-[240px] cursor-pointer group shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                   title="Click to preview image"
                 >
                   <img

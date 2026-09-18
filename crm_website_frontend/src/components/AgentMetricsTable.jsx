@@ -123,45 +123,18 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   return (
     <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-800 shadow-sm w-full sm:w-[340px] md:w-[400px] lg:w-[420px] max-w-full">
-      {/* Header - Redesigned to use theme colors and prevent overlapping */}
-      <div className="bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 flex justify-between items-center px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-slate-700">
-        <div className="flex items-center gap-3">
-          <div>
-            <span className="font-bold text-base tracking-wide block">Monthly Metrics</span>
-            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-0.5 block">{currentDateDisplay}</span>
+      {/* Header - Redesigned to use two clean rows preventing clipping on mobile */}
+      <div className="bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-slate-100 px-4 sm:px-5 py-3.5 border-b border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="min-w-0 flex-1">
+            <span className="font-bold text-sm sm:text-base tracking-wide block truncate">Monthly Metrics</span>
           </div>
-          <input 
-            type="month" 
-            value={selectedMonth}
-            disabled={isEditing}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </div>
 
-        <div className="flex items-center gap-2">
-          {!isEditing ? (
-            <button
-              onClick={() => {
-                setIsEditing(true);
-                setForm({
-                  monthlyTarget: monthlyTarget,
-                  targetCompleted: targetCompleted,
-                  bookingCount: bookingCount,
-                  targetBookingCount: displayTargetBooking,
-                  attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
-                });
-              }}
-              className="text-xs bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-lg transition-all font-semibold flex items-center gap-1 border border-gray-200 dark:border-slate-600 shadow-sm"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-              Edit
-            </button>
-          ) : (
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {!isEditing ? (
               <button
                 onClick={() => {
-                  setIsEditing(false);
+                  setIsEditing(true);
                   setForm({
                     monthlyTarget: monthlyTarget,
                     targetCompleted: targetCompleted,
@@ -170,19 +143,49 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
                     attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
                   });
                 }}
-                className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg transition-all font-semibold"
+                className="text-xs bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-2.5 sm:px-3 py-1.5 rounded-lg transition-all font-semibold flex items-center gap-1 border border-gray-200 dark:border-slate-600 shadow-xs cursor-pointer shrink-0"
               >
-                Cancel
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                <span>Edit</span>
               </button>
-              <button
-                onClick={handleSave}
-                disabled={loading}
-                className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg transition-all font-semibold disabled:opacity-50 flex items-center gap-1 shadow-sm"
-              >
-                {loading ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setForm({
+                      monthlyTarget: monthlyTarget,
+                      targetCompleted: targetCompleted,
+                      bookingCount: bookingCount,
+                      targetBookingCount: displayTargetBooking,
+                      attendance: selectedMonth === currentMonthPrefix ? (agent?.attendance || '') : ''
+                    });
+                  }}
+                  className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 px-2.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={loading}
+                  className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg transition-all font-semibold disabled:opacity-50 flex items-center gap-1 shadow-sm cursor-pointer"
+                >
+                  {loading ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex items-center justify-between gap-2 pt-2 border-t border-gray-200/60 dark:border-slate-800/80">
+          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 shrink-0">Month:</span>
+          <input 
+            type="month" 
+            value={selectedMonth}
+            disabled={isEditing}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="text-xs bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed text-gray-800 dark:text-slate-200 shadow-xs cursor-pointer"
+          />
         </div>
       </div>
 
