@@ -76,17 +76,13 @@ async function processSingleLead(data) {
     if (!dupNotes.length && (tripDetails || notes))
       dupNotes.push(`Preferences: ${tripDetails || notes}`);
 
-    if (dupNotes.length || campaignName || adName) {
-      const summaryLines = [
-        ...dupNotes,
-        `Campaign: "${campaignName || 'N/A'}" | Ad: "${adName || 'N/A'}"`
-      ];
+    if (dupNotes.length) {
       try {
         await Lead.pushNote(existingLead._id, {
           id: crypto.randomUUID(),
-          text: `Re-inquiry via Meta Ads:\n${summaryLines.join('\n')}`,
+          text: dupNotes.join('\n'),
           timestamp: dupNow,
-          author: 'Meta Ads Sync'
+          author: 'Form Response'
         });
       } catch (err) {
         console.warn('Could not push note to existing lead:', err.message);
@@ -131,15 +127,6 @@ async function processSingleLead(data) {
       text: String(tripDetails || notes).replace(/\s*\|\s*/g, '\n'),
       timestamp: now,
       author: 'Form Response'
-    });
-  }
-
-  if (campaignName || adName || platform) {
-    initialNotes.push({
-      id: crypto.randomUUID(),
-      text: `Meta Ad Source: Campaign "${campaignName || 'N/A'}" | Ad "${adName || 'N/A'}"${platform ? ' | Platform: ' + platform : ''}`,
-      timestamp: now,
-      author: 'Meta Ads'
     });
   }
 
