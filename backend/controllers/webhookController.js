@@ -24,7 +24,11 @@ async function processSingleLead(data) {
     numberOfPersons,
     pax,
     notes,
-    tripDetails,
+    // Three separate travel-preference fields from Google Sheets form
+    leavingWhen,        // "When are you planning to leave?"
+    numberOfPeople,     // "How many people?"
+    daysInDestination,  // "How many days do you want to spend in Kerala/Meghalaya?"
+    tripDetails,        // Legacy merged field (kept for backward compat)
     platform,
     campaignName,
     adName
@@ -60,14 +64,28 @@ async function processSingleLead(data) {
   // Check if lead with this phone already exists
   const existingLead = await Lead.Model.findOne({ phone: cleanPhone });
   if (existingLead) {
-    if (campaignName || adName || notes || tripDetails) {
-      const details = tripDetails || notes || '';
-      const noteText = `Inquiry via Meta Ads / Sheet: ${details ? 'Preferences: ' + details + ' | ' : ''}Campaign: "${campaignName || 'N/A'}", Ad: "${adName || 'N/A'}"`.trim();
+    // For duplicate leads, add new inquiry notes without overwriting anything
+    const dupNow = new Date().toISOString();
+    const dupNotes = [];
+    if (leavingWhen && String(leavingWhen).trim())
+      dupNotes.push(`When are you planning to leave? ${String(leavingWhen).trim()}`);
+    if (numberOfPeople && String(numberOfPeople).trim())
+      dupNotes.push(`How many people? ${String(numberOfPeople).trim()}`);
+    if (daysInDestination && String(daysInDestination).trim())
+      dupNotes.push(`How many days? ${String(daysInDestination).trim()}`);
+    if (!dupNotes.length && (tripDetails || notes))
+      dupNotes.push(`Preferences: ${tripDetails || notes}`);
+
+    if (dupNotes.length || campaignName || adName) {
+      const summaryLines = [
+        ...dupNotes,
+        `Campaign: "${campaignName || 'N/A'}" | Ad: "${adName || 'N/A'}"`
+      ];
       try {
         await Lead.pushNote(existingLead._id, {
           id: crypto.randomUUID(),
-          text: noteText,
-          timestamp: new Date().toISOString(),
+          text: `Re-inquiry via Meta Ads:\n${summaryLines.join('\n')}`,
+          timestamp: dupNow,
           author: 'Meta Ads Sync'
         });
       } catch (err) {
@@ -85,19 +103,42 @@ async function processSingleLead(data) {
 
   // Create new lead
   const initialNotes = [];
-  if (tripDetails || notes) {
+  const now = new Date().toISOString();
+
+  // Merge the 3 travel preference fields into notes as 3 lines
+  const travelLines = [];
+  if (leavingWhen && String(leavingWhen).trim()) {
+    travelLines.push(`When are you planning to travel? ${String(leavingWhen).trim()}`);
+  }
+  if (numberOfPeople && String(numberOfPeople).trim()) {
+    travelLines.push(`How many people are travelling? ${String(numberOfPeople).trim()}`);
+  }
+  if (daysInDestination && String(daysInDestination).trim()) {
+    travelLines.push(`How many days do you want to spend? ${String(daysInDestination).trim()}`);
+  }
+
+  if (travelLines.length > 0) {
     initialNotes.push({
       id: crypto.randomUUID(),
-      text: `Customer Preferences: ${tripDetails || notes}`,
-      timestamp: new Date().toISOString(),
+      text: travelLines.join('\n'),
+      timestamp: now,
+      author: 'Form Response'
+    });
+  } else if (tripDetails || notes) {
+    // Fallback: legacy merged tripDetails string
+    initialNotes.push({
+      id: crypto.randomUUID(),
+      text: String(tripDetails || notes).replace(/\s*\|\s*/g, '\n'),
+      timestamp: now,
       author: 'Form Response'
     });
   }
+
   if (campaignName || adName || platform) {
     initialNotes.push({
       id: crypto.randomUUID(),
       text: `Meta Ad Source: Campaign "${campaignName || 'N/A'}" | Ad "${adName || 'N/A'}"${platform ? ' | Platform: ' + platform : ''}`,
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       author: 'Meta Ads'
     });
   }
@@ -107,7 +148,7 @@ async function processSingleLead(data) {
     phone: cleanPhone,
     origin: origin ? String(origin).trim() : '',
     destination: finalDestination,
-    leadSource: leadSource ? String(leadSource).trim() : 'Facebook Ads',
+    leadSource: leadSource ? String(leadSource).trim() : 'AdCampaign',
     product: product ? String(product).trim() : 'Kerala Trip',
     travelDate: travelDate ? String(travelDate).trim() : '',
     numberOfPersons: parsedPax,
