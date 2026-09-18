@@ -105,37 +105,30 @@ async function processSingleLead(data) {
   const initialNotes = [];
   const now = new Date().toISOString();
 
-  // Add each travel-preference field as its own note line (3 separate entries)
+  // Merge the 3 travel preference fields into notes as 3 lines
+  const travelLines = [];
   if (leavingWhen && String(leavingWhen).trim()) {
-    initialNotes.push({
-      id: crypto.randomUUID(),
-      text: `When are you planning to leave? ${String(leavingWhen).trim()}`,
-      timestamp: now,
-      author: 'Form Response'
-    });
+    travelLines.push(`When are you planning to travel? ${String(leavingWhen).trim()}`);
   }
   if (numberOfPeople && String(numberOfPeople).trim()) {
-    initialNotes.push({
-      id: crypto.randomUUID(),
-      text: `How many people? ${String(numberOfPeople).trim()}`,
-      timestamp: now,
-      author: 'Form Response'
-    });
+    travelLines.push(`How many people are travelling? ${String(numberOfPeople).trim()}`);
   }
   if (daysInDestination && String(daysInDestination).trim()) {
+    travelLines.push(`How many days do you want to spend? ${String(daysInDestination).trim()}`);
+  }
+
+  if (travelLines.length > 0) {
     initialNotes.push({
       id: crypto.randomUUID(),
-      text: `How many days? ${String(daysInDestination).trim()}`,
+      text: travelLines.join('\n'),
       timestamp: now,
       author: 'Form Response'
     });
-  }
-
-  // Fallback: legacy merged tripDetails string (older scripts or manual posts)
-  if (!leavingWhen && !numberOfPeople && !daysInDestination && (tripDetails || notes)) {
+  } else if (tripDetails || notes) {
+    // Fallback: legacy merged tripDetails string
     initialNotes.push({
       id: crypto.randomUUID(),
-      text: `Customer Preferences: ${tripDetails || notes}`,
+      text: String(tripDetails || notes).replace(/\s*\|\s*/g, '\n'),
       timestamp: now,
       author: 'Form Response'
     });
@@ -155,7 +148,7 @@ async function processSingleLead(data) {
     phone: cleanPhone,
     origin: origin ? String(origin).trim() : '',
     destination: finalDestination,
-    leadSource: leadSource ? String(leadSource).trim() : 'Facebook Ads',
+    leadSource: leadSource ? String(leadSource).trim() : 'AdCampaign',
     product: product ? String(product).trim() : 'Kerala Trip',
     travelDate: travelDate ? String(travelDate).trim() : '',
     numberOfPersons: parsedPax,
