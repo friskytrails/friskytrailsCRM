@@ -12,6 +12,19 @@ function sanitizePhone(rawPhone) {
   return digits.slice(-10);
 }
 
+// Safely parse passenger count from inputs like "3-4_people" -> 4, "solo_person" -> 1, "2_people" -> 2
+function parsePax(raw) {
+  if (!raw && raw !== 0) return null;
+  const str = String(raw).trim().toLowerCase();
+  if (str.includes('solo') || str.includes('single')) return 1;
+  const rangeMatch = str.match(/(\d+)\s*(?:[-–—]|to)\s*(\d+)/i);
+  if (rangeMatch) {
+    return Number(rangeMatch[2]); // Return upper bound of range (e.g. 4 for "3-4", 10 for "7-10")
+  }
+  const match = str.match(/\d+/);
+  return match ? Number(match[0]) : null;
+}
+
 // Dynamically check and map product against products available in GlobalConfig
 async function resolveProductFromConfig(inputProduct, allowCreate = false) {
   let availableProducts = [
@@ -130,12 +143,8 @@ async function processSingleLead(data) {
   const resolvedProduct = productResult.resolved;
   const cleanEmail = (mailId || email || '').trim();
 
-  // Extract numeric pax if string like "2_people"
-  let parsedPax = numberOfPersons || pax;
-  if (typeof parsedPax === 'string') {
-    const match = parsedPax.match(/\d+/);
-    parsedPax = match ? Number(match[0]) : null;
-  }
+  // Extract numeric pax safely (e.g. "3-4_people" -> 4, "solo_person" -> 1, "2_people" -> 2)
+  let parsedPax = parsePax(numberOfPeople) || parsePax(numberOfPersons) || parsePax(pax);
 
   // Auto-detect destination if omitted and product/destination contains package keywords
   let finalDestination = destination ? String(destination).trim() : '';
