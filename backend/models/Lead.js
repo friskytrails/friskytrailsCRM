@@ -293,16 +293,14 @@ module.exports = {
       }
     }
 
-    let noteObjectId;
-    try {
-      noteObjectId = new mongoose.Types.ObjectId(noteId);
-    } catch(e) {
-      noteObjectId = noteId;
-    }
+    const isObjectId = mongoose.Types.ObjectId.isValid(noteId) && String(noteId).length === 24;
+    const pullCondition = isObjectId
+      ? { $or: [{ id: String(noteId) }, { _id: new mongoose.Types.ObjectId(noteId) }] }
+      : { id: String(noteId) };
 
     return Lead.findOneAndUpdate(
       query,
-      { $pull: { notes: { $or: [{ id: noteId }, { _id: noteObjectId }] } } },
+      { $pull: { notes: pullCondition } },
       { new: true }
     );
   }

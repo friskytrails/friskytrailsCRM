@@ -9,6 +9,8 @@ const router = express.Router();
 // Public webhook endpoints for Google Sheets / integrations (authenticated via x-api-key)
 router.post('/webhook', webhookAuth, webhookController.handleLeadWebhook);
 router.all('/webhook/test', webhookAuth, webhookController.testWebhook);
+router.get('/webhook/products', webhookAuth, webhookController.getProductsWebhook);
+router.post('/webhook/products', webhookAuth, webhookController.createProductWebhook);
 
 router.get('/', auth, leadController.getLeads);
 router.get('/counts', auth, leadController.getLeadCounts);

@@ -1,5 +1,7 @@
 const Lead = require('../models/Lead');
+const GlobalConfig = require('../models/GlobalConfig');
 const { invalidateCountsCache } = require('../services/leadService');
+const mongoose = require('mongoose');
 const crypto = require('crypto');
 
 function sanitizePhone(rawPhone) {
@@ -8,6 +10,77 @@ function sanitizePhone(rawPhone) {
   const digits = String(rawPhone).replace(/\D/g, '');
   // Take last 10 digits
   return digits.slice(-10);
+}
+
+// Dynamically check and map product against products available in GlobalConfig
+async function resolveProductFromConfig(inputProduct, allowCreate = false) {
+  let availableProducts = [
+    "Meghalaya Package",
+    "Hampta Pass Trek",
+    "Rishikesh Activities",
+    "Spiti Package",
+    "Ladakh Package",
+    "Kerala Trip"
+  ];
+
+  try {
+    const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
+    if (config && Array.isArray(config.products) && config.products.length > 0) {
+      availableProducts = config.products;
+    }
+  } catch (err) {
+    console.warn('Error fetching GlobalConfig for products:', err.message);
+  }
+
+  if (!inputProduct) {
+    return { resolved: availableProducts[0] || 'Kerala Trip', matched: true };
+  }
+
+  const raw = String(inputProduct).trim();
+
+  // 1. Exact match (case-insensitive)
+  const exactMatch = availableProducts.find(p => p.toLowerCase() === raw.toLowerCase());
+  if (exactMatch) return { resolved: exactMatch, matched: true };
+
+  // 2. Substring match (e.g., "Kerala" -> "Kerala Trip", "Meghalaya" -> "Meghalaya Package")
+  const subMatch = availableProducts.find(p => {
+    const pLow = p.toLowerCase();
+    const rawLow = raw.toLowerCase();
+    return pLow.includes(rawLow) || rawLow.includes(pLow);
+  });
+  if (subMatch) return { resolved: subMatch, matched: true };
+
+  // 3. Keyword matching for common tour regions
+  for (const p of availableProducts) {
+    const pLow = p.toLowerCase();
+    const rawLow = raw.toLowerCase();
+    if (rawLow.includes('kerala') && pLow.includes('kerala')) return { resolved: p, matched: true };
+    if (rawLow.includes('meghalaya') && pLow.includes('meghalaya')) return { resolved: p, matched: true };
+    if (rawLow.includes('spiti') && pLow.includes('spiti')) return { resolved: p, matched: true };
+    if (rawLow.includes('ladakh') && pLow.includes('ladakh')) return { resolved: p, matched: true };
+    if (rawLow.includes('hampta') && pLow.includes('hampta')) return { resolved: p, matched: true };
+    if (rawLow.includes('rishikesh') && pLow.includes('rishikesh')) return { resolved: p, matched: true };
+  }
+
+  // 4. If user confirmed creating a new product
+  if (allowCreate) {
+    try {
+      await GlobalConfig.findOneAndUpdate(
+        { key: 'GLOBAL_SETTINGS' },
+        { 
+          $setOnInsert: { key: 'GLOBAL_SETTINGS' },
+          $addToSet: { products: raw }
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+      return { resolved: raw, matched: true, newlyCreated: true };
+    } catch (err) {
+      console.warn('Error adding new product to GlobalConfig:', err.message);
+    }
+  }
+
+  // Not found in GlobalConfig
+  return { resolved: raw, matched: false, availableProducts };
 }
 
 async function processSingleLead(data) {
@@ -20,6 +93,7 @@ async function processSingleLead(data) {
     destination,
     leadSource,
     product,
+    allowCreateProduct,
     travelDate,
     numberOfPersons,
     pax,
@@ -42,6 +116,18 @@ async function processSingleLead(data) {
     };
   }
 
+  // Resolve product against GlobalConfig products
+  const productResult = await resolveProductFromConfig(product, Boolean(allowCreateProduct));
+  if (!productResult.matched && !allowCreateProduct) {
+    return {
+      success: false,
+      productNotFound: true,
+      product: product ? String(product).trim() : '',
+      availableProducts: productResult.availableProducts,
+      error: `Product "${product || ''}" does not match any existing product in CRM Global Settings.`
+    };
+  }
+  const resolvedProduct = productResult.resolved;
   const cleanEmail = (mailId || email || '').trim();
 
   // Extract numeric pax if string like "2_people"
@@ -53,12 +139,12 @@ async function processSingleLead(data) {
 
   // Auto-detect destination if omitted and product/destination contains package keywords
   let finalDestination = destination ? String(destination).trim() : '';
-  if (!finalDestination && product) {
-    if (/kerala/i.test(product)) finalDestination = 'Kerala';
-    else if (/meghalaya/i.test(product)) finalDestination = 'Meghalaya';
-    else if (/spiti/i.test(product)) finalDestination = 'Spiti';
-    else if (/ladakh/i.test(product)) finalDestination = 'Ladakh';
-    else if (/goa/i.test(product)) finalDestination = 'Goa';
+  if (!finalDestination && resolvedProduct) {
+    if (/kerala/i.test(resolvedProduct)) finalDestination = 'Kerala';
+    else if (/meghalaya/i.test(resolvedProduct)) finalDestination = 'Meghalaya';
+    else if (/spiti/i.test(resolvedProduct)) finalDestination = 'Spiti';
+    else if (/ladakh/i.test(resolvedProduct)) finalDestination = 'Ladakh';
+    else if (/goa/i.test(resolvedProduct)) finalDestination = 'Goa';
   }
 
   // Check if lead with this phone already exists
@@ -76,17 +162,13 @@ async function processSingleLead(data) {
     if (!dupNotes.length && (tripDetails || notes))
       dupNotes.push(`Preferences: ${tripDetails || notes}`);
 
-    if (dupNotes.length || campaignName || adName) {
-      const summaryLines = [
-        ...dupNotes,
-        `Campaign: "${campaignName || 'N/A'}" | Ad: "${adName || 'N/A'}"`
-      ];
+    if (dupNotes.length) {
       try {
         await Lead.pushNote(existingLead._id, {
-          id: crypto.randomUUID(),
-          text: `Re-inquiry via Meta Ads:\n${summaryLines.join('\n')}`,
+          id: new mongoose.Types.ObjectId().toString(),
+          text: dupNotes.join('\n'),
           timestamp: dupNow,
-          author: 'Meta Ads Sync'
+          author: 'Form Response'
         });
       } catch (err) {
         console.warn('Could not push note to existing lead:', err.message);
@@ -119,7 +201,7 @@ async function processSingleLead(data) {
 
   if (travelLines.length > 0) {
     initialNotes.push({
-      id: crypto.randomUUID(),
+      id: new mongoose.Types.ObjectId().toString(),
       text: travelLines.join('\n'),
       timestamp: now,
       author: 'Form Response'
@@ -127,19 +209,10 @@ async function processSingleLead(data) {
   } else if (tripDetails || notes) {
     // Fallback: legacy merged tripDetails string
     initialNotes.push({
-      id: crypto.randomUUID(),
+      id: new mongoose.Types.ObjectId().toString(),
       text: String(tripDetails || notes).replace(/\s*\|\s*/g, '\n'),
       timestamp: now,
       author: 'Form Response'
-    });
-  }
-
-  if (campaignName || adName || platform) {
-    initialNotes.push({
-      id: crypto.randomUUID(),
-      text: `Meta Ad Source: Campaign "${campaignName || 'N/A'}" | Ad "${adName || 'N/A'}"${platform ? ' | Platform: ' + platform : ''}`,
-      timestamp: now,
-      author: 'Meta Ads'
     });
   }
 
@@ -149,7 +222,7 @@ async function processSingleLead(data) {
     origin: origin ? String(origin).trim() : '',
     destination: finalDestination,
     leadSource: leadSource ? String(leadSource).trim() : 'AdCampaign',
-    product: product ? String(product).trim() : 'Kerala Trip',
+    product: resolvedProduct,
     travelDate: travelDate ? String(travelDate).trim() : '',
     numberOfPersons: parsedPax,
     agentIds: [],
@@ -230,7 +303,74 @@ async function testWebhook(req, res) {
   });
 }
 
+// GET /api/leads/webhook/products
+async function getProductsWebhook(req, res) {
+  try {
+    const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
+    const products = (config && Array.isArray(config.products) && config.products.length > 0)
+      ? config.products
+      : [
+          "Meghalaya Package",
+          "Hampta Pass Trek",
+          "Rishikesh Activities",
+          "Spiti Package",
+          "Ladakh Package",
+          "Kerala Trip"
+        ];
+    return res.json({ success: true, products });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+// POST /api/leads/webhook/products
+async function createProductWebhook(req, res) {
+  try {
+    const { product } = req.body;
+    if (!product || !String(product).trim()) {
+      return res.status(400).json({ success: false, error: 'Product name is required' });
+    }
+    const cleanProduct = String(product).trim();
+
+    const config = await GlobalConfig.findOne({ key: 'GLOBAL_SETTINGS' });
+    const currentProducts = (config && Array.isArray(config.products)) ? config.products : [];
+
+    const existingMatch = currentProducts.find(p => p.toLowerCase() === cleanProduct.toLowerCase());
+    if (existingMatch) {
+      return res.json({
+        success: true,
+        alreadyExists: true,
+        product: existingMatch,
+        message: `Product "${existingMatch}" already exists in CRM Global Settings.`,
+        products: currentProducts
+      });
+    }
+
+    const updatedConfig = await GlobalConfig.findOneAndUpdate(
+      { key: 'GLOBAL_SETTINGS' },
+      { 
+        $setOnInsert: { key: 'GLOBAL_SETTINGS' },
+        $addToSet: { products: cleanProduct }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(201).json({
+      success: true,
+      created: true,
+      product: cleanProduct,
+      message: `Product "${cleanProduct}" successfully created in CRM Global Settings.`,
+      products: updatedConfig.products
+    });
+  } catch (error) {
+    console.error('Error creating product via webhook:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 module.exports = {
   handleLeadWebhook,
-  testWebhook
+  testWebhook,
+  getProductsWebhook,
+  createProductWebhook
 };
