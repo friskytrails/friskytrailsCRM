@@ -25,6 +25,25 @@ function parsePax(raw) {
   return match ? Number(match[0]) : null;
 }
 
+// Dynamically extract destination from product or package name by stripping package suffixes
+function extractDestination(productOrRawDestination) {
+  if (!productOrRawDestination) return '';
+  const str = String(productOrRawDestination).trim();
+  const lower = str.toLowerCase();
+
+  if (lower === 'others') return 'Others';
+  if (lower === 'adventure activities') return 'Rishikesh';
+
+  // Automatically strips package words like Package, Trek, Trip, Tour, Activities
+  const cleaned = str
+    .replace(/\b(package|trip|tour|trek|activities|expedition|backpacking|getaway|holiday|vacation|itinerary|explorer)\b/gi, '')
+    .replace(/[-_–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return cleaned || str;
+}
+
 // Dynamically check and map product against products available in GlobalConfig
 async function resolveProductFromConfig(inputProduct, allowCreate = false) {
   let availableProducts = [
@@ -63,16 +82,13 @@ async function resolveProductFromConfig(inputProduct, allowCreate = false) {
   });
   if (subMatch) return { resolved: subMatch, matched: true };
 
-  // 3. Keyword matching for common tour regions
+  // 3. Dynamic root keyword matching for any tour package
   for (const p of availableProducts) {
-    const pLow = p.toLowerCase();
-    const rawLow = raw.toLowerCase();
-    if (rawLow.includes('kerala') && pLow.includes('kerala')) return { resolved: p, matched: true };
-    if (rawLow.includes('meghalaya') && pLow.includes('meghalaya')) return { resolved: p, matched: true };
-    if (rawLow.includes('spiti') && pLow.includes('spiti')) return { resolved: p, matched: true };
-    if (rawLow.includes('ladakh') && pLow.includes('ladakh')) return { resolved: p, matched: true };
-    if (rawLow.includes('hampta') && pLow.includes('hampta')) return { resolved: p, matched: true };
-    if (rawLow.includes('rishikesh') && pLow.includes('rishikesh')) return { resolved: p, matched: true };
+    const cleanP = extractDestination(p).toLowerCase();
+    const cleanRaw = extractDestination(raw).toLowerCase();
+    if (cleanP && cleanRaw && (cleanP.includes(cleanRaw) || cleanRaw.includes(cleanP))) {
+      return { resolved: p, matched: true };
+    }
   }
 
   // 4. If user confirmed creating a new product
@@ -146,14 +162,12 @@ async function processSingleLead(data) {
   // Extract numeric pax safely (e.g. "3-4_people" -> 4, "solo_person" -> 1, "2_people" -> 2)
   let parsedPax = parsePax(numberOfPeople) || parsePax(numberOfPersons) || parsePax(pax);
 
-  // Auto-detect destination if omitted and product/destination contains package keywords
+  // Auto-detect destination dynamically if omitted, or clean up any full package name passed as destination
   let finalDestination = destination ? String(destination).trim() : '';
   if (!finalDestination && resolvedProduct) {
-    if (/kerala/i.test(resolvedProduct)) finalDestination = 'Kerala';
-    else if (/meghalaya/i.test(resolvedProduct)) finalDestination = 'Meghalaya';
-    else if (/spiti/i.test(resolvedProduct)) finalDestination = 'Spiti';
-    else if (/ladakh/i.test(resolvedProduct)) finalDestination = 'Ladakh';
-    else if (/goa/i.test(resolvedProduct)) finalDestination = 'Goa';
+    finalDestination = extractDestination(resolvedProduct);
+  } else if (finalDestination) {
+    finalDestination = extractDestination(finalDestination);
   }
 
   // Check if lead with this phone already exists
