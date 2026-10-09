@@ -167,7 +167,7 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
       const normalizedStatus = status === 'Fresh' ? 'Fresh Leads' : status;
       const isSpecificNonFreshStatus = normalizedStatus && normalizedStatus !== 'all' && normalizedStatus !== 'any' && normalizedStatus !== 'Fresh Leads';
       if (!isSpecificNonFreshStatus) {
-        query.$or = [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }];
+        query.$or = [{ agentIds: { $exists: false } }, { agentIds: [] }, { agentIds: null }];
       }
     } else if (filterAgent === 'assigned') {
       query.agentIds = { $exists: true, $not: { $size: 0 } };
@@ -292,7 +292,7 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
   if (scopedAgentFilter && scopedAgentFilter !== 'all') {
     if (scopedAgentFilter === 'unassigned') {
       scopedAgentMatch = {
-        $or: [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }]
+        $or: [{ agentIds: { $exists: false } }, { agentIds: [] }, { agentIds: null }]
       };
     } else if (scopedAgentFilter === 'assigned') {
       scopedAgentMatch = {
@@ -334,7 +334,7 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
           {
             $match: {
               status: { $nin: inactiveStatuses },
-              $or: [{ agentIds: { $exists: false } }, { agentIds: { $size: 0 } }, { agentIds: null }]
+              $or: [{ agentIds: { $exists: false } }, { agentIds: [] }, { agentIds: null }]
             }
           },
           { $count: 'count' }

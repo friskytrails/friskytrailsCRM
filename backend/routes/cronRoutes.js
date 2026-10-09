@@ -2,6 +2,12 @@ const express = require('express');
 const Lead = require('../models/Lead').Model;
 const router = express.Router();
 
+// GET /cron/ping
+// Lightweight warm-up ping route (zero DB overhead)
+router.get('/ping', (req, res) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
 // GET /cron/reset-daily
 // Vercel cron triggers this via HTTP GET
 router.get('/reset-daily', async (req, res) => {

@@ -242,7 +242,29 @@ export default function LiveActivity({ agents = [] }) {
     if (!isoString) return '—';
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return '—';
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const now = new Date(currentTime);
+    const isSameYear = d.getFullYear() === now.getFullYear();
+
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const callDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((today - callDay) / (1000 * 60 * 60 * 24));
+
+    let datePrefix = '';
+    if (diffDays === 0) {
+      datePrefix = 'Today';
+    } else if (diffDays === 1) {
+      datePrefix = 'Yesterday';
+    } else {
+      datePrefix = d.toLocaleDateString([], {
+        day: 'numeric',
+        month: 'short',
+        ...(isSameYear ? {} : { year: 'numeric' })
+      });
+    }
+
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${datePrefix}, ${timeStr}`;
   };
 
   // Metrics summary calculation
@@ -484,7 +506,9 @@ export default function LiveActivity({ agents = [] }) {
                   const idleMins = idleMs ? Math.floor(idleMs / (1000 * 60)) : null;
 
                   const formattedIdle = idleHours !== null
-                    ? (idleHours >= 1 ? `${Math.floor(idleHours)}h ${idleMins % 60}m` : `${idleMins}m`)
+                    ? (idleHours >= 24
+                        ? `${Math.floor(idleHours / 24)}d ${Math.floor(idleHours % 24)}h`
+                        : (idleHours >= 1 ? `${Math.floor(idleHours)}h ${idleMins % 60}m` : `${idleMins}m`))
                     : '—';
 
                   const agentLink = item.slug ? `/agents/${item.slug}` : `/agents/${item.agentId}`;
@@ -517,12 +541,12 @@ export default function LiveActivity({ agents = [] }) {
                       </td>
 
                       {/* First Call */}
-                      <td className="px-6 py-4 font-medium text-gray-600 dark:text-slate-300">
+                      <td className="px-6 py-4 font-medium text-gray-600 dark:text-slate-300 whitespace-nowrap">
                         {formatCallTime(item.firstCall)}
                       </td>
 
                       {/* Last Call */}
-                      <td className="px-6 py-4 font-medium text-gray-600 dark:text-slate-300">
+                      <td className="px-6 py-4 font-medium text-gray-600 dark:text-slate-300 whitespace-nowrap">
                         {formatCallTime(effectiveLastCall)}
                       </td>
 

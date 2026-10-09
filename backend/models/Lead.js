@@ -154,6 +154,19 @@ LeadSchema.index({ agentIds: 1, createdAt: -1 });
 LeadSchema.index({ status: 1, createdAt: -1 });
 LeadSchema.index({ agentIds: 1, status: 1, createdAt: -1 });
 
+// Partial index for unassigned leads — speeds up filterAgent=unassigned queries.
+// Only indexes documents where agentIds is [] (empty array).
+// Note: MongoDB partialFilterExpression does not support $nin or $ne negation operators.
+LeadSchema.index(
+  { createdAt: -1 },
+  {
+    name: 'unassigned_active_sort',
+    partialFilterExpression: {
+      agentIds: []
+    }
+  }
+);
+
 // Product filter index — used in getLeads product filter
 LeadSchema.index({ product: 1 });
 LeadSchema.index({ product: 1, status: 1 });
