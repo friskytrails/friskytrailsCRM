@@ -17,6 +17,19 @@ const STATUS_OPTIONS = [
   { value: 'B2B Leads', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-900/40 dark:text-fuchsia-300 dark:border-fuchsia-800' }
 ];
 
+// Lead Level / Travel Timeline — shared with LeadDetail
+const LEAD_LEVEL_OPTIONS = [
+  { value: 'L1', label: 'L1 - Within 7 Days',    color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' },
+  { value: 'L2', label: 'L2 - Within 15 Days',   color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
+  { value: 'L3', label: 'L3 - Within 30 Days',   color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' },
+  { value: 'L4', label: 'L4 - 1-3 Months Later', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
+];
+
+const getLeadLevelDef = (level) =>
+  LEAD_LEVEL_OPTIONS.find(o => o.value === level) || null;
+
+
 export default function Dashboard({ agents = [], products = [], statuses = [], assignAgent, updateLead, user }) {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
@@ -285,7 +298,8 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     destination: '',
     leadSource: '',
     product: '',
-    mailId: ''
+    mailId: '',
+    leadLevel: ''
   });
 
   useEffect(() => {
@@ -297,7 +311,8 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         destination: editingLead.destination || '',
         leadSource: editingLead.leadSource || '',
         product: editingLead.product || '',
-        mailId: editingLead.mailId || ''
+        mailId: editingLead.mailId || '',
+        leadLevel: editingLead.leadLevel || ''
       });
     }
   }, [editingLead]);
@@ -683,10 +698,18 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                         </div>
                       )}
                     </div>
-                    {/* Status Badge */}
-                    <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}>
-                      {lead.status || 'Fresh Leads'}
-                    </span>
+                    {/* Status + Level Badges */}
+                    <div className="shrink-0 flex items-center gap-1.5 flex-wrap justify-end">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}>
+                        {lead.status || 'Fresh Leads'}
+                      </span>
+                      {lead.leadLevel && getLeadLevelDef(lead.leadLevel) && (
+                        <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold border ${getLeadLevelDef(lead.leadLevel).color}`}
+                          title={getLeadLevelDef(lead.leadLevel).label}>
+                          ⚡ {lead.leadLevel}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-4">
@@ -806,6 +829,12 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${(STATUS_OPTIONS.find(s => s.value === (lead.status || 'Fresh Leads')) || STATUS_OPTIONS[0]).color}`}>
                       {lead.status || 'Fresh Leads'}
                     </span>
+                    {lead.leadLevel && getLeadLevelDef(lead.leadLevel) && (
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${getLeadLevelDef(lead.leadLevel).color}`}
+                        title={getLeadLevelDef(lead.leadLevel).label}>
+                        ⚡ {lead.leadLevel}
+                      </span>
+                    )}
                   </div>
 
                   <div className="lg:col-span-3 flex items-center space-x-2 justify-end w-full">
@@ -975,6 +1004,20 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                     className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Travel Timeline (Level)</label>
+                <select
+                  value={modalData.leadLevel || ''}
+                  onChange={(e) => setModalData({ ...modalData, leadLevel: e.target.value })}
+                  className="w-full text-sm py-2 px-3 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-700 bg-white dark:bg-slate-900 dark:text-gray-100 cursor-pointer"
+                >
+                  <option value="">None / Not Specified</option>
+                  {LEAD_LEVEL_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-4 flex justify-end space-x-2">

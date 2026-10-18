@@ -22,6 +22,8 @@ router.put('/:id/labels', auth, leadController.updateLabels);
 router.put('/:id/dates', auth, leadController.updateDates);
 router.put('/:id/reminder', auth, leadController.updateReminder);
 router.put('/:id/status', auth, leadController.updateStatus);
+router.put('/:id/level', auth, leadController.updateLeadLevel);
+
 router.put('/:id/book', auth, leadController.bookLead);
 router.put('/:id/booking', auth, leadController.updateBooking);
 router.post('/:id/notes', auth, leadController.addNote);
