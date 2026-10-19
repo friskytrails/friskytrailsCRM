@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const AttendanceSchema = new mongoose.Schema({
   agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  date: { 
-    type: String, 
+  date: {
+    type: String,
     required: true,
     validate: {
       validator: function(v) {
@@ -12,7 +12,8 @@ const AttendanceSchema = new mongoose.Schema({
       message: props => `${props.value} is not a valid date format! Use YYYY-MM-DD.`
     }
   }, // Format: 'YYYY-MM-DD'
-  status: { type: String, enum: ['P', 'A'], required: true }
+  status: { type: String, enum: ['A', 'H', 'P', 'WO'], required: true },
+  talkTimeSeconds: { type: Number, default: 0, min: 0 }
 }, { timestamps: true });
 
 // Compound unique index so an agent can only have one log entry per day
