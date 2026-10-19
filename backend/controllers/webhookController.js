@@ -25,6 +25,43 @@ function parsePax(raw) {
   return match ? Number(match[0]) : null;
 }
 
+// Parse travel timeline from Google Sheets form answers into CRM lead levels:
+// L1 = within 7 days, L2 = within 15 days, L3 = within 30 days, L4 = 1-3 months later, L5 = just exploring
+function parseLeadLevel(raw) {
+  if (!raw) return null;
+  // Normalize Unicode dashes (en-dash \u2013, em-dash \u2014, minus \u2212, hyphen) to standard '-'
+  // and underscores/whitespace to single space
+  const str = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212\-]+/g, '-')
+    .replace(/[_\s]+/g, ' ');
+
+  // Direct level values (case-insensitive)
+  if (/^l1$/.test(str)) return 'L1';
+  if (/^l2$/.test(str)) return 'L2';
+  if (/^l3$/.test(str)) return 'L3';
+  if (/^l4$/.test(str)) return 'L4';
+  if (/^l5$/.test(str)) return 'L5';
+
+  // L1: within 7 days
+  if (/7\s*days?|within\s*7|one\s*week|this\s*week/.test(str)) return 'L1';
+
+  // L2: within 15 days
+  if (/15\s*days?|within\s*15|two\s*weeks?/.test(str)) return 'L2';
+
+  // L3: within 30 days / 1 month
+  if (/30\s*days?|within\s*30|within\s*1?\s*month|this\s*month/.test(str)) return 'L3';
+
+  // L4: 1-3 months later / 1 to 3 months / within months / months later
+  if (/1\s*[-to\s]+\s*3\s*months?|months?\s*later|few\s*months?|next\s*(?:few\s*)?months?|within\s*(?:2|3)\s*months?/.test(str)) return 'L4';
+
+  // L5: just exploring / not sure yet
+  if (/just\s*explor|only\s*explor|explor|not\s*sure|no\s*plan|researching|maybe|someday/.test(str)) return 'L5';
+
+  return null;
+}
+
 // Dynamically extract destination from product or package name by stripping package suffixes
 function extractDestination(productOrRawDestination) {
   if (!productOrRawDestination) return '';
@@ -134,7 +171,8 @@ async function processSingleLead(data) {
     tripDetails,        // Legacy merged field (kept for backward compat)
     platform,
     campaignName,
-    adName
+    adName,
+    leadLevel           // Direct level value (L1/L2/L3/L4) — or auto-parsed from leavingWhen
   } = data;
 
   const cleanPhone = sanitizePhone(phone);
@@ -198,6 +236,16 @@ async function processSingleLead(data) {
       }
     }
 
+    // If existing lead has no level set yet, try to auto-populate from this new inquiry
+    const parsedLevel = parseLeadLevel(leadLevel) || parseLeadLevel(leavingWhen);
+    if (parsedLevel && !existingLead.leadLevel) {
+      try {
+        await Lead.Model.findByIdAndUpdate(existingLead._id, { leadLevel: parsedLevel });
+      } catch (err) {
+        console.warn('Could not update leadLevel on existing lead:', err.message);
+      }
+    }
+
     return {
       success: true,
       duplicate: true,
@@ -251,6 +299,7 @@ async function processSingleLead(data) {
     agentIds: [],
     labels: [],
     status: 'Fresh Leads',
+    leadLevel: parseLeadLevel(leadLevel) || parseLeadLevel(leavingWhen) || null,
     notes: initialNotes,
     createdBy: {
       name: 'Google Sheets Webhook',

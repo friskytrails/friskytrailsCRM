@@ -13,6 +13,7 @@ function sanitizeLeadForItinerary(leadDoc) {
     name: leadObj.name || 'Unnamed Lead',
     notes: leadObj.notes || [],
     status: leadObj.status || 'Fresh Leads',
+    leadLevel: leadObj.leadLevel || null,
     origin: leadObj.origin || '',
     destination: leadObj.destination || '',
     product: leadObj.product || '',
@@ -90,8 +91,8 @@ async function createLead(req, res) {
     if (req.user.isItinerary) {
       return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot create leads" });
     }
-    const { name, phone, age, origin, destination, leadSource, mailId, product } = req.body;
-    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product, req.user);
+    const { name, phone, age, origin, destination, leadSource, mailId, product, leadLevel } = req.body;
+    const result = await leadService.createLead(name, phone, age, origin, destination, leadSource, mailId, product, req.user, leadLevel);
     
     res.status(201).json(result);
   } catch (error) {
@@ -105,10 +106,10 @@ async function updateLead(req, res) {
       return res.status(403).json({ error: "Forbidden: Itinerary Team members cannot update lead details" });
     }
     const { id } = req.params;
-    const { name, phone, age, origin, destination, leadSource, mailId, product, travelDate, numberOfPersons, noOfPax } = req.body;
+    const { name, phone, age, origin, destination, leadSource, mailId, product, travelDate, numberOfPersons, noOfPax, leadLevel } = req.body;
     const agentIdCondition = await getAgentIdCondition(req.user);
     const numPersons = numberOfPersons !== undefined ? numberOfPersons : noOfPax;
-    const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numPersons);
+    const result = await leadService.updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numPersons, leadLevel);
     res.json(result);
   } catch (error) {
     if (error.message === "Lead not found or unauthorized") {
@@ -296,6 +297,24 @@ async function updateBooking(req, res) {
   }
 }
 
+async function updateLeadLevel(req, res) {
+  try {
+    if (req.user.isItinerary) {
+      return res.status(403).json({ error: 'Forbidden: Itinerary Team members cannot modify lead level' });
+    }
+    const { id } = req.params;
+    const { leadLevel } = req.body;
+    const agentIdCondition = await getAgentIdCondition(req.user);
+    const result = await leadService.updateLeadLevel(id, leadLevel, agentIdCondition);
+    res.json(result);
+  } catch (error) {
+    if (error.message === 'Lead not found or unauthorized') {
+      return res.status(403).json({ error: 'Forbidden: Not assigned to you' });
+    }
+    res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getLeads,
   getLeadCounts,
@@ -309,6 +328,7 @@ module.exports = {
   updateDates,
   updateReminder,
   updateStatus,
+  updateLeadLevel,
   bookLead,
   updateBooking
 };

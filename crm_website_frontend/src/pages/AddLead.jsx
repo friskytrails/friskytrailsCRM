@@ -12,7 +12,8 @@ export default function AddLead({ addLead, user, products = [] }) {
     destination: '',
     leadSource: '',
     product: '',
-    mailId: ''
+    mailId: '',
+    leadLevel: ''
   });
 
   const defaultProducts = [
@@ -63,7 +64,8 @@ export default function AddLead({ addLead, user, products = [] }) {
           destination: '',
           leadSource: '',
           product: '',
-          mailId: ''
+          mailId: '',
+          leadLevel: ''
         });
       }
     } finally {
@@ -207,6 +209,29 @@ export default function AddLead({ addLead, user, products = [] }) {
                     placeholder="Paris, France"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Row 5: Travel Timeline (Level) */}
+            <div>
+              <label htmlFor="leadLevel" className="block text-sm font-semibold text-gray-700 dark:text-slate-300">
+                Travel Timeline (Level)
+              </label>
+              <div className="mt-1">
+                <select
+                  name="leadLevel"
+                  id="leadLevel"
+                  value={formData.leadLevel}
+                  onChange={handleChange}
+                  className="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-gray-100 rounded-md py-2 px-3 border cursor-pointer focus:outline-none"
+                >
+                  <option value="">Select travel timeline (optional)...</option>
+                  <option value="L1">L1 - Within 7 Days</option>
+                  <option value="L2">L2 - Within 15 Days</option>
+                  <option value="L3">L3 - Within 30 Days</option>
+                  <option value="L4">L4 - 1-3 Months Later</option>
+                  <option value="L5">L5 - Just Exploring</option>
+                </select>
               </div>
             </div>
 

@@ -15,6 +15,9 @@ const { generateBookingId, generatePaymentId } = require('../controllers/booking
 // only change when leads are created, assigned, or status-changed, a 30-second
 // cache is safe and reduces Atlas load significantly.
 // ---------------------------------------------------------------------------
+// Valid lead level values (L1 = within 7d, L2 = within 15d, L3 = within 30d, L4 = 1-3mo, L5 = exploring)
+const VALID_LEAD_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'];
+
 const _countsCache = new Map(); // key: JSON string → { data, expiresAt }
 const COUNTS_CACHE_TTL_MS = 30_000; // 30 seconds
 const COUNTS_CACHE_MAX_ENTRIES = 1_000;
@@ -390,7 +393,7 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
   return result;
 }
 
-async function createLead(name, phone, age, origin, destination, leadSource, mailId, product, createdByUser) {
+async function createLead(name, phone, age, origin, destination, leadSource, mailId, product, createdByUser, leadLevel) {
   _invalidateCountsCache();
   if (!phone) {
     throw new Error("Phone number is required");
@@ -399,6 +402,15 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   const cleanPhone = phone.replace(/\s+/g, '');
   if (!/^\d{10}$/.test(cleanPhone)) {
     throw new Error("Phone number must be exactly 10 digits with no spaces");
+  }
+
+  // Validate and normalize leadLevel if provided
+  let normalizedLevel = null;
+  if (leadLevel !== undefined && leadLevel !== null && String(leadLevel).trim() !== '') {
+    normalizedLevel = String(leadLevel).trim().toUpperCase();
+    if (!VALID_LEAD_LEVELS.includes(normalizedLevel)) {
+      throw new Error(`Invalid lead level. Must be one of: ${VALID_LEAD_LEVELS.join(', ')}`);
+    }
   }
 
   // Run all pre-flight reads in parallel instead of sequentially
@@ -432,6 +444,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
     destination: destination || '',
     leadSource: leadSource || '',
     product: product || '',
+    leadLevel: normalizedLevel,
     agentIds: [],
     notes: [],
     createdBy
@@ -459,7 +472,7 @@ async function createLead(name, phone, age, origin, destination, leadSource, mai
   return formatDoc(newLead);
 }
 
-async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numberOfPersons) {
+async function updateLead(id, name, phone, age, origin, destination, leadSource, mailId, product, agentIdCondition, travelDate, numberOfPersons, leadLevel) {
   const existingLead = await Lead.findById(id);
   if (!existingLead) {
     throw new Error("Lead not found or unauthorized");
@@ -510,6 +523,18 @@ async function updateLead(id, name, phone, age, origin, destination, leadSource,
         throw new Error("Number of persons must be a positive integer (at least 1).");
       }
       updatePayload.numberOfPersons = numVal;
+    }
+  }
+
+  if (leadLevel !== undefined) {
+    if (leadLevel === null || String(leadLevel).trim() === '') {
+      updatePayload.leadLevel = null;
+    } else {
+      const normalizedLevel = String(leadLevel).trim().toUpperCase();
+      if (!VALID_LEAD_LEVELS.includes(normalizedLevel)) {
+        throw new Error(`Invalid lead level. Must be one of: ${VALID_LEAD_LEVELS.join(', ')} (or empty to clear)`);
+      }
+      updatePayload.leadLevel = normalizedLevel;
     }
   }
 
@@ -1196,6 +1221,23 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   return await getLeadById(id, agentIdCondition);
 }
 
+async function updateLeadLevel(id, level, agentIdCondition) {
+  // Normalize: allow lowercase (l1 -> L1) or empty string to clear
+  let normalizedLevel = null;
+  if (level !== undefined && level !== null && String(level).trim() !== '') {
+    normalizedLevel = String(level).trim().toUpperCase();
+    if (!VALID_LEAD_LEVELS.includes(normalizedLevel)) {
+      throw new Error(`Invalid lead level. Must be one of: ${VALID_LEAD_LEVELS.join(', ')} (or empty to clear)`);
+    }
+  }
+
+  const result = await Lead.updateLead(id, { leadLevel: normalizedLevel }, agentIdCondition);
+  if (!result) {
+    throw new Error('Lead not found or unauthorized');
+  }
+  return await getLeadById(id, agentIdCondition);
+}
+
 module.exports = {
   getLeads,
   getLeadCounts,
@@ -1209,6 +1251,7 @@ module.exports = {
   updateDates,
   updateReminder,
   updateStatus,
+  updateLeadLevel,
   bookLead,
   updateBooking,
   invalidateCountsCache: _invalidateCountsCache

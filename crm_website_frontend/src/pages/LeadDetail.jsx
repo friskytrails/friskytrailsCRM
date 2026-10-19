@@ -20,6 +20,20 @@ const STATUS_OPTIONS = [
   { value: 'B2B Leads', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-900/40 dark:text-fuchsia-300 dark:border-fuchsia-800' }
 ];
 
+// Lead Level / Travel Timeline options
+// L1 = within 7 days, L2 = within 15 days, L3 = within 30 days, L4 = 1-3 months later, L5 = just exploring
+const LEAD_LEVEL_OPTIONS = [
+  { value: 'L1', label: 'L1 - Within 7 Days',    color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' },
+  { value: 'L2', label: 'L2 - Within 15 Days',   color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
+  { value: 'L3', label: 'L3 - Within 30 Days',   color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' },
+  { value: 'L4', label: 'L4 - 1-3 Months Later', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
+];
+
+const getLeadLevelDef = (level) =>
+  LEAD_LEVEL_OPTIONS.find(o => o.value === level) ||
+  { value: '', label: 'Set Level', color: 'bg-gray-50 text-gray-400 border-gray-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700' };
+
 export default function LeadDetail({ API_URL, token, user, setLeads, leads, agents, products = [], statuses = [], updateLeadStatus, updateLeadBooking, assignAgent, bookLeadAPI, createBookingAPI, editBookingAPI, getBookingAPI }) {
   const defaultProducts = ["Meghalaya Package", "Hampta Pass Trek", "Rishikesh Activities", "Spiti Package", "Ladakh Package", "Kerala Trip"];
   const availableProducts = (products && products.length > 0) ? products : defaultProducts;
@@ -676,8 +690,41 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     }
   };
 
+  const handleLeadLevelChange = async (newLevel) => {
+    if (!lead) return;
+    // Allow clearing the level (empty string) or setting a new one
+    const normalizedNew = newLevel || null;
+    if (lead.leadLevel === normalizedNew) return;
+
+    const previousLead = { ...lead };
+    // Optimistic update
+    setLead({ ...lead, leadLevel: normalizedNew });
+
+    try {
+      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}/level`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ leadLevel: normalizedNew })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        updateLocalLead(updated);
+        toast.success(normalizedNew ? `Level updated to ${normalizedNew}` : 'Level cleared');
+      } else {
+        setLead(previousLead);
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || 'Failed to update level');
+      }
+    } catch (err) {
+      console.error(err);
+      setLead(previousLead);
+      toast.error('Server connection error');
+    }
+  };
+
   const submitBooking = async (e) => {
     e.preventDefault();
+
 
     if (!bookingForm.travellerName || !bookingForm.travellerName.trim()) {
       toast.error("Full Name is required.");
@@ -941,6 +988,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       lead.product ? `📦 Package: ${lead.product}` : null,
       lead.travelDate ? `📅 Travel Date: ${lead.travelDate}` : null,
       lead.numberOfPersons ? `👥 Pax: ${lead.numberOfPersons}` : null,
+      lead.leadLevel && getLeadLevelDef(lead.leadLevel)?.value ? `⚡ Level: ${getLeadLevelDef(lead.leadLevel).label}` : null,
       `📊 Status: ${lead.status || 'Fresh Leads'}`,
       `🔗 Link: ${window.location.href}`
     ].filter(Boolean).join('\n');
@@ -960,6 +1008,7 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       lead.product ? `*Package:* ${lead.product}` : null,
       lead.travelDate ? `*Travel Date:* ${lead.travelDate}` : null,
       lead.numberOfPersons ? `*Pax:* ${lead.numberOfPersons}` : null,
+      lead.leadLevel && getLeadLevelDef(lead.leadLevel)?.value ? `*Level / Timeline:* ${getLeadLevelDef(lead.leadLevel).label}` : null,
       `*Status:* ${lead.status || 'Fresh Leads'}`,
       `*CRM Link:* ${window.location.href}`
     ].filter(Boolean).join('\n');
@@ -1087,6 +1136,12 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
                   <option key={st} value={st}>{st}</option>
                 ))}
               </select>
+              {lead.leadLevel && (
+                <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-bold border ${getLeadLevelDef(lead.leadLevel).color}`}
+                  title="Travel timeline level">
+                  ⚡ {lead.leadLevel}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1482,6 +1537,28 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             >
               {availableStatuses.map(st => (
                 <option key={st} value={st}>{st}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Level / Travel Timeline Block — displayed right beside Status */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Level:
+            </span>
+            <select
+              value={lead.leadLevel || ''}
+              onChange={(e) => handleLeadLevelChange(e.target.value)}
+              disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id) || (lead.agentIds || []).includes(user?.userId))}
+              className={`text-xs font-bold py-1.5 px-3 rounded-lg border cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors shadow-sm ${getLeadLevelDef(lead.leadLevel).color} ${!(user?.isAdmin || (lead.agentIds || []).includes(user?.id) || (lead.agentIds || []).includes(user?.userId)) ? 'opacity-70 cursor-not-allowed' : ''}`}
+              title="Travel timeline: how soon the lead is planning to travel"
+            >
+              <option value="">Set Level</option>
+              {LEAD_LEVEL_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </div>

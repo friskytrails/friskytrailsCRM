@@ -126,6 +126,11 @@ const LeadSchema = new mongoose.Schema({
     type: String,
     default: 'Fresh Leads'
   },
+  leadLevel: {
+    type: String,
+    enum: ['L1', 'L2', 'L3', 'L4', 'L5', null, ''],
+    default: null
+  },
   booking: {
     totalDial: { type: Number, default: 0 },
     dailyDial: { type: Number, default: 0 },
@@ -153,6 +158,10 @@ LeadSchema.index({ agentIds: 1, status: 1 });
 LeadSchema.index({ agentIds: 1, createdAt: -1 });
 LeadSchema.index({ status: 1, createdAt: -1 });
 LeadSchema.index({ agentIds: 1, status: 1, createdAt: -1 });
+
+// Lead level / travel timeline index — for filtering and analytics
+LeadSchema.index({ leadLevel: 1 });
+LeadSchema.index({ leadLevel: 1, status: 1 });
 
 // Partial index for unassigned leads — speeds up filterAgent=unassigned queries.
 // Only indexes documents where agentIds is [] (empty array).
