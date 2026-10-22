@@ -55,6 +55,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   const [sortBy, setSortBy] = useState(() => sessionStorage.getItem(`dashboard_${userId}_sortBy`) || 'newest');
   const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
   const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
+  const [filterLevel, setFilterLevel] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterLevel`) || 'all');
 
   // Server-side Pagination & Leads State
   const [leads, setLeads] = useState([]);
@@ -71,6 +72,8 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     assignedCount: 0,
     statusCounts: {},
     productCounts: {},
+    levelCounts: {},
+    scopedLevelCounts: {},
     agentCounts: {}
   });
 
@@ -107,7 +110,8 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     sessionStorage.setItem(`${prefix}sortBy`, sortBy);
     sessionStorage.setItem(`${prefix}filterStatus`, filterStatus);
     sessionStorage.setItem(`${prefix}filterProduct`, filterProduct);
-  }, [searchQuery, filterAgent, sortBy, filterStatus, filterProduct, userId]);
+    sessionStorage.setItem(`${prefix}filterLevel`, filterLevel);
+  }, [searchQuery, filterAgent, sortBy, filterStatus, filterProduct, filterLevel, userId]);
 
   // Validate agent selection from dropdown
   useEffect(() => {
@@ -185,6 +189,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         search: searchQuery.trim(),
         status: filterStatus,
         product: filterProduct,
+        leadLevel: filterLevel,
         sortBy: sortBy,
         filterAgent: filterAgent,
         pagination: 'true'
@@ -228,7 +233,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         setIsLoadingLeads(false);
       }
     }
-  }, [page, searchQuery, filterStatus, filterProduct, sortBy, filterAgent]);
+  }, [page, searchQuery, filterStatus, filterProduct, filterLevel, sortBy, filterAgent]);
 
   // Debounced search / filter trigger
   useEffect(() => {
@@ -280,11 +285,17 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     setPage(1);
   };
 
+  const handleFilterLevelChange = (e) => {
+    setFilterLevel(e.target.value);
+    setPage(1);
+  };
+
   const handleResetFilters = () => {
     setSearchQuery('');
     setFilterAgent(isAdmin ? 'unassigned' : 'all');
     setFilterProduct('all');
     setFilterStatus('all');
+    setFilterLevel('all');
     setSortBy('newest');
     setPage(1);
   };
@@ -425,7 +436,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
 
-  const hasActiveFilters = searchQuery || (isAdmin ? filterAgent !== 'unassigned' : filterAgent !== 'all') || filterProduct !== 'all' || filterStatus !== 'all' || sortBy !== 'newest';
+  const hasActiveFilters = searchQuery || (isAdmin ? filterAgent !== 'unassigned' : filterAgent !== 'all') || filterProduct !== 'all' || filterStatus !== 'all' || filterLevel !== 'all' || sortBy !== 'newest';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -611,6 +622,28 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                     <option key={st} value={st}>{st} ({count})</option>
                   );
                 })}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider shrink-0 w-16 sm:w-auto">Level:</span>
+              <select
+                value={filterLevel}
+                onChange={handleFilterLevelChange}
+                className="flex-1 sm:flex-none min-w-0 max-w-full sm:max-w-[200px] pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all truncate"
+              >
+                <option value="all">All Levels</option>
+                {LEAD_LEVEL_OPTIONS.map((opt) => {
+                  const count = (summaryCounts.scopedLevelCounts || summaryCounts.levelCounts)?.[opt.value] || 0;
+                  return (
+                    <option key={opt.value} value={opt.value}>
+                      ⚡ {opt.label} {count > 0 ? `(${count})` : ''}
+                    </option>
+                  );
+                })}
+                <option value="none">
+                  No Level {((summaryCounts.scopedLevelCounts || summaryCounts.levelCounts)?.none > 0) ? `(${((summaryCounts.scopedLevelCounts || summaryCounts.levelCounts)?.none)})` : ''}
+                </option>
               </select>
             </div>
           </div>
