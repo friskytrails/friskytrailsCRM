@@ -8,7 +8,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --forceExit --runInBand"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/__tests__/**/*.test.js"],
+    "testTimeout": 60000
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -24,5 +29,10 @@
     "multer": "^2.1.1",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^9.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "mongodb-memory-server": "^10.1.4",
+    "supertest": "^7.3.1"
   }
 }
