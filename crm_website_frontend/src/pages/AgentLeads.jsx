@@ -17,6 +17,17 @@ export const getAgentSlug = (ag) => {
   return raw ? encodeURIComponent(raw) : String(ag.id || ag._id || '');
 };
 
+const LEAD_LEVEL_OPTIONS = [
+  { value: 'L1', label: 'L1 - Within 7 Days',    color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800' },
+  { value: 'L2', label: 'L2 - Within 15 Days',   color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800' },
+  { value: 'L3', label: 'L3 - Within 30 Days',   color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800' },
+  { value: 'L4', label: 'L4 - 1-3 Months Later', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-800' },
+  { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
+];
+
+const getLeadLevelDef = (level) =>
+  LEAD_LEVEL_OPTIONS.find(o => o.value === level) || null;
+
 export default function AgentLeads({ leads, agents, statuses = [], updateAgentMetrics, refreshAgents, loading }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -63,6 +74,9 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const [filterAge, setFilterAge] = useState(() => {
     return sessionStorage.getItem(`agentLeads_${agentKey}_filterAge`) || 'all';
   });
+  const [filterLevel, setFilterLevel] = useState(() => {
+    return sessionStorage.getItem(`agentLeads_${agentKey}_filterLevel`) || 'all';
+  });
 
   // When switching agents (agentKey changes), load that agent's saved filters or default to 'all'
   useEffect(() => {
@@ -70,6 +84,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     setFilterStatus(sessionStorage.getItem(`agentLeads_${agentKey}_filterStatus`) || 'all');
     setFilterProduct(sessionStorage.getItem(`agentLeads_${agentKey}_filterProduct`) || 'all');
     setFilterAge(sessionStorage.getItem(`agentLeads_${agentKey}_filterAge`) || 'all');
+    setFilterLevel(sessionStorage.getItem(`agentLeads_${agentKey}_filterLevel`) || 'all');
     setSearchQuery('');
   }, [agentKey]);
 
@@ -79,7 +94,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     sessionStorage.setItem(`agentLeads_${agentKey}_filterStatus`, filterStatus);
     sessionStorage.setItem(`agentLeads_${agentKey}_filterProduct`, filterProduct);
     sessionStorage.setItem(`agentLeads_${agentKey}_filterAge`, filterAge);
-  }, [filterStatus, filterProduct, filterAge, agentKey]);
+    sessionStorage.setItem(`agentLeads_${agentKey}_filterLevel`, filterLevel);
+  }, [filterStatus, filterProduct, filterAge, filterLevel, agentKey]);
 
   const [agentLeadsData, setAgentLeadsData] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -180,8 +196,9 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     const matchesStatus = filterStatus === 'all' || st === filterStatus;
     const matchesProduct = filterProduct === 'all' || (lead.product || 'Other') === filterProduct;
     const matchesAge = checkAgeFilter(age, filterAge);
+    const matchesLevel = filterLevel === 'all' || (filterLevel === 'none' ? (!lead.leadLevel) : lead.leadLevel === filterLevel);
 
-    return matchesSearch && matchesStatus && matchesProduct && matchesAge;
+    return matchesSearch && matchesStatus && matchesProduct && matchesAge && matchesLevel;
   });
 
   // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
@@ -368,13 +385,27 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
               );
             })}
           </select>
+          <select
+            value={filterLevel}
+            onChange={(e) => setFilterLevel(e.target.value)}
+            className="text-xs font-medium bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
+          >
+            <option value="all">All Levels ({statusScopedLeads.length})</option>
+            {LEAD_LEVEL_OPTIONS.map(opt => {
+              const count = statusScopedLeads.filter(l => l.leadLevel === opt.value).length;
+              return (
+                <option key={opt.value} value={opt.value}>⚡ {opt.value} ({count})</option>
+              );
+            })}
+            <option value="none">No Level ({statusScopedLeads.filter(l => !l.leadLevel).length})</option>
+          </select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAgentLeads.length === 0 ? (
           <div className="col-span-full py-12 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-gray-300 dark:border-slate-600">
-            No leads matching the selected status.
+            No leads matching the selected filters.
           </div>
         ) : (
           filteredAgentLeads.map(lead => (
@@ -383,9 +414,19 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
                 <h3 className="font-bold text-lg text-gray-900 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">
                   {lead.name || 'Unnamed Lead'}
                 </h3>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300">
-                  {lead.status || 'Fresh Leads'}
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-gray-300">
+                    {lead.status || 'Fresh Leads'}
+                  </span>
+                  {lead.leadLevel && getLeadLevelDef(lead.leadLevel) && (
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border whitespace-nowrap ${getLeadLevelDef(lead.leadLevel).color}`}
+                      title={getLeadLevelDef(lead.leadLevel).label}
+                    >
+                      ⚡ {lead.leadLevel}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">

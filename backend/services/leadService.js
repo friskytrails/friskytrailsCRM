@@ -143,6 +143,7 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
     search = '',
     status = '',
     product = '',
+    leadLevel = '',
     sortBy = 'newest',
     filterAgent = '',
     pagination = true
@@ -227,6 +228,16 @@ async function getLeads(agentIdCondition = undefined, options = {}) {
   // 5. Product filter
   if (product && product !== 'all') {
     query.product = product;
+  }
+
+  // 5b. Lead Level filter (L1, L2, L3, L4, L5, or none)
+  const targetLeadLevel = (leadLevel || '').trim().toUpperCase();
+  if (targetLeadLevel && targetLeadLevel !== 'ALL') {
+    if (targetLeadLevel === 'NONE' || targetLeadLevel === 'UNSPECIFIED') {
+      query.leadLevel = { $in: [null, ''] };
+    } else {
+      query.leadLevel = targetLeadLevel;
+    }
   }
 
   // 6. Sort mapping
@@ -326,6 +337,14 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
           { $unwind: '$agentIds' },
           { $group: { _id: '$agentIds', count: { $sum: 1 } } }
         ],
+        levelCounts: [
+          { $match: { status: { $nin: inactiveStatuses } } },
+          { $group: { _id: '$leadLevel', count: { $sum: 1 } } }
+        ],
+        scopedLevelCounts: [
+          { $match: { status: { $nin: inactiveStatuses }, ...scopedAgentMatch } },
+          { $group: { _id: '$leadLevel', count: { $sum: 1 } } }
+        ],
         totalCount: [
           { $count: 'count' }
         ],
@@ -367,6 +386,18 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
     if (_id) scopedProductCounts[_id] = count;
   });
 
+  const levelCounts = {};
+  (facetResult?.levelCounts || []).forEach(({ _id, count }) => {
+    if (_id) levelCounts[_id] = count;
+    else levelCounts['none'] = count;
+  });
+
+  const scopedLevelCounts = {};
+  (facetResult?.scopedLevelCounts || []).forEach(({ _id, count }) => {
+    if (_id) scopedLevelCounts[_id] = count;
+    else scopedLevelCounts['none'] = count;
+  });
+
   const agentCounts = {};
   (facetResult?.agentCounts || []).forEach(({ _id, count }) => {
     if (_id !== null && _id !== undefined) {
@@ -386,6 +417,8 @@ async function getLeadCounts(agentIdCondition = undefined, options = {}) {
     statusCounts,
     productCounts,
     scopedProductCounts,
+    levelCounts,
+    scopedLevelCounts,
     agentCounts
   };
 
@@ -1235,6 +1268,7 @@ async function updateLeadLevel(id, level, agentIdCondition) {
   if (!result) {
     throw new Error('Lead not found or unauthorized');
   }
+  _invalidateCountsCache();
   return await getLeadById(id, agentIdCondition);
 }
 
