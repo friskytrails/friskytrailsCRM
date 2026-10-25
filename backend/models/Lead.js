@@ -162,6 +162,8 @@ LeadSchema.index({ agentIds: 1, status: 1, createdAt: -1 });
 // Lead level / travel timeline index — for filtering and analytics
 LeadSchema.index({ leadLevel: 1 });
 LeadSchema.index({ leadLevel: 1, status: 1 });
+LeadSchema.index({ leadLevel: 1, createdAt: -1 });
+LeadSchema.index({ leadLevel: 1, status: 1, createdAt: -1 });
 
 // Partial index for unassigned leads — speeds up filterAgent=unassigned queries.
 // Only indexes documents where agentIds is [] (empty array).
