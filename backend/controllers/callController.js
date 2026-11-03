@@ -66,6 +66,10 @@ const getLiveStatus = async (req, res) => {
   try {
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
     const liveStatus = await callService.getLiveStatus(agentIdCondition);
+    // Cache privately in the browser for 30s; serve stale for 60s while revalidating.
+    // Prevents back-to-back tab switches from firing a new Vercel function invocation.
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(liveStatus);
   } catch (error) {
     console.error("Error generating live status:", error);
@@ -86,6 +90,10 @@ const getLiveActivity = async (req, res) => {
   try {
     const agentIdCondition = req.user.isAdmin ? undefined : req.user.userId;
     const activity = await callService.getLiveActivity(agentIdCondition);
+    // Cache privately in the browser for 30s; serve stale for 60s while revalidating.
+    // Prevents back-to-back tab switches from firing a new Vercel function invocation.
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(activity);
   } catch (error) {
     console.error("Error generating live activity:", error);

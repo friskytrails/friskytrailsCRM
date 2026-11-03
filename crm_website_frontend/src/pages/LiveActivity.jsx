@@ -73,18 +73,42 @@ export default function LiveActivity({ agents = [] }) {
   useEffect(() => {
     fetchData();
 
+    // Track last fetch time and last reporting date to prevent redundant API calls
+    // while detecting day rollovers.
+    let lastFetchMs = Date.now();
+    let lastFetchedDate = new Date().toDateString();
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchData();
+        const now = Date.now();
+        const currentDateStr = new Date().toDateString();
+        const isDayRollover = currentDateStr !== lastFetchedDate;
+        // Re-fetch if it has been >5 minutes since last fetch OR if the reporting day rolled over
+        if (now - lastFetchMs > 300_000 || isDayRollover) {
+          lastFetchedDate = currentDateStr;
+          lastFetchMs = now;
+          fetchData();
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Poll every 5 minutes (was 1 min) during business hours (7am-10pm local), or trigger
+    // a one-time refresh at midnight when the reporting day rolls over so previous day's
+    // calls are not displayed as current.
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      const now = new Date();
+      const currentDateStr = now.toDateString();
+      const isDayRollover = currentDateStr !== lastFetchedDate;
+      const hour = now.getHours();
+      const isBusinessHours = hour >= 7 && hour < 22;
+
+      if (document.visibilityState === 'visible' && (isBusinessHours || isDayRollover)) {
+        lastFetchedDate = currentDateStr;
+        lastFetchMs = Date.now();
         fetchData();
       }
-    }, 60000);
+    }, 300_000); // 5 minutes
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);

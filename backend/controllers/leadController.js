@@ -81,6 +81,11 @@ async function getLeadCounts(req, res) {
     const counts = await leadService.getLeadCounts(agentIdCondition, {
       scopedAgentFilter: scopedAgentFilter || filterAgent || ''
     });
+    // Cache privately in the browser for 10s; serve stale for 30s while revalidating.
+    // The Dashboard calls this endpoint on every filter change and after every assignment,
+    // so short-lived caching prevents duplicate invocations within the same user session.
+    res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+    res.set('Vary', 'Authorization');
     res.json(counts);
   } catch (error) {
     res.status(500).json({ error: error.message });
