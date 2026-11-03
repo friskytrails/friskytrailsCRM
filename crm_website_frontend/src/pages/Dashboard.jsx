@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AgentMultiSelect from '../components/AgentMultiSelect';
@@ -235,18 +235,18 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     }
   }, [page, searchQuery, filterStatus, filterProduct, filterLevel, sortBy, filterAgent]);
 
-  // Debounced search / filter trigger
+  // Debounced filter/search trigger — applies a uniform 300ms debounce to ALL changes
+  // (search text, status, agent, product, level, sort). Previously, only search input was
+  // debounced; all other filter changes fired fetchLeads() immediately with zero delay,
+  // generating back-to-back Vercel function invocations on every dropdown interaction.
+  // fetchLeads already captures all filter state via its useCallback closure, so
+  // searchQuery does not need to be in this dependency array.
   useEffect(() => {
-    // If search text is present, debounce 300ms so we don't spam the server on every keystroke
-    if (searchQuery.trim().length > 0) {
-      const timer = setTimeout(() => {
-        fetchLeads(page);
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
+    const timer = setTimeout(() => {
       fetchLeads(page);
-    }
-  }, [fetchLeads, page, searchQuery]);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchLeads, page]);
 
   // When filters change (search, agent, status, product, sort), reset page back to 1
   const handleSearchChange = (e) => {

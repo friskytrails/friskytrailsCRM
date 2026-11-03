@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -73,18 +73,33 @@ export default function LiveActivity({ agents = [] }) {
   useEffect(() => {
     fetchData();
 
+    // Track last fetch time to prevent redundant API calls when switching tabs.
+    // Without this cooldown, every tab-switch fires 2 Vercel function invocations
+    // (/calls/live-status + /calls/live-activity) even if data is still fresh.
+    let lastFetchMs = Date.now();
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchData();
+        const now = Date.now();
+        // Only re-fetch if it has been >5 minutes since the last fetch
+        if (now - lastFetchMs > 300_000) {
+          lastFetchMs = now;
+          fetchData();
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Poll every 5 minutes (was 1 min) and only during business hours (7am-10pm local).
+    // Prevents open overnight tabs from generating thousands of Vercel invocations.
     const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
+      const hour = new Date().getHours();
+      const isBusinessHours = hour >= 7 && hour < 22;
+      if (document.visibilityState === 'visible' && isBusinessHours) {
+        lastFetchMs = Date.now();
         fetchData();
       }
-    }, 60000);
+    }, 300_000); // 5 minutes
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
