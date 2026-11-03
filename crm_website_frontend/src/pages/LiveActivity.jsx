@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -73,16 +73,19 @@ export default function LiveActivity({ agents = [] }) {
   useEffect(() => {
     fetchData();
 
-    // Track last fetch time to prevent redundant API calls when switching tabs.
-    // Without this cooldown, every tab-switch fires 2 Vercel function invocations
-    // (/calls/live-status + /calls/live-activity) even if data is still fresh.
+    // Track last fetch time and last reporting date to prevent redundant API calls
+    // while detecting day rollovers.
     let lastFetchMs = Date.now();
+    let lastFetchedDate = new Date().toDateString();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
-        // Only re-fetch if it has been >5 minutes since the last fetch
-        if (now - lastFetchMs > 300_000) {
+        const currentDateStr = new Date().toDateString();
+        const isDayRollover = currentDateStr !== lastFetchedDate;
+        // Re-fetch if it has been >5 minutes since last fetch OR if the reporting day rolled over
+        if (now - lastFetchMs > 300_000 || isDayRollover) {
+          lastFetchedDate = currentDateStr;
           lastFetchMs = now;
           fetchData();
         }
@@ -90,12 +93,18 @@ export default function LiveActivity({ agents = [] }) {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Poll every 5 minutes (was 1 min) and only during business hours (7am-10pm local).
-    // Prevents open overnight tabs from generating thousands of Vercel invocations.
+    // Poll every 5 minutes (was 1 min) during business hours (7am-10pm local), or trigger
+    // a one-time refresh at midnight when the reporting day rolls over so previous day's
+    // calls are not displayed as current.
     const interval = setInterval(() => {
-      const hour = new Date().getHours();
+      const now = new Date();
+      const currentDateStr = now.toDateString();
+      const isDayRollover = currentDateStr !== lastFetchedDate;
+      const hour = now.getHours();
       const isBusinessHours = hour >= 7 && hour < 22;
-      if (document.visibilityState === 'visible' && isBusinessHours) {
+
+      if (document.visibilityState === 'visible' && (isBusinessHours || isDayRollover)) {
+        lastFetchedDate = currentDateStr;
         lastFetchMs = Date.now();
         fetchData();
       }

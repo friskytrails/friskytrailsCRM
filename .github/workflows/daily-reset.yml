@@ -1,4 +1,4 @@
-﻿name: Daily Dial Reset (00:00 IST)
+name: Daily Dial Reset (00:00 IST)
 
 on:
   # The Vercel cron in backend/vercel.json handles the daily schedule (30 18 * * *).

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AgentMultiSelect from '../components/AgentMultiSelect';
@@ -136,7 +136,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   const abortLeadsRef = useRef(null);
 
   // Fetch summary badge counts (once on mount, and whenever assignments or filterAgent update)
-  const fetchCounts = useCallback(async () => {
+  const fetchCounts = useCallback(async (options = {}) => {
     if (abortCountsRef.current) {
       abortCountsRef.current.abort();
     }
@@ -149,10 +149,14 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
       const params = new URLSearchParams({
         scopedAgentFilter: filterAgent || ''
       });
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts?${params.toString()}`, {
+      const fetchOptions = {
         headers: { 'Authorization': `Bearer ${token}` },
         signal: controller.signal
-      });
+      };
+      if (options?.cache) {
+        fetchOptions.cache = options.cache;
+      }
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/leads/counts?${params.toString()}`, fetchOptions);
       if (res.ok) {
         const data = await res.json();
         if (abortCountsRef.current === controller) {
@@ -242,6 +246,11 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   // fetchLeads already captures all filter state via its useCallback closure, so
   // searchQuery does not need to be in this dependency array.
   useEffect(() => {
+    if (abortLeadsRef.current) {
+      abortLeadsRef.current.abort();
+    }
+    setIsLoadingLeads(true);
+
     const timer = setTimeout(() => {
       fetchLeads(page);
     }, 300);
@@ -349,7 +358,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
       // Optimistically update card in view
       setLeads(prev => prev.map(l => (l.id === editingLead.id ? { ...l, ...modalData } : l)));
       setEditingLead(null);
-      fetchCounts();
+      fetchCounts({ cache: 'reload' });
     }
   };
 
@@ -426,12 +435,12 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     if (result === null) {
       // Assignment failed on server – roll back local state to match server state
       fetchLeads(page);
-      fetchCounts();
+      fetchCounts({ cache: 'reload' });
       return;
     }
 
     // 5. Assignment succeeded – silently refresh counts in the background without refreshing leads/page
-    fetchCounts();
+    fetchCounts({ cache: 'reload' });
   };
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');

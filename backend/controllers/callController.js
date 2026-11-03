@@ -1,4 +1,4 @@
-﻿const callService = require('../services/callService');
+const callService = require('../services/callService');
 
 // @desc    Log a call from the app / CRM
 // @route   POST /api/calls
@@ -69,6 +69,7 @@ const getLiveStatus = async (req, res) => {
     // Cache privately in the browser for 30s; serve stale for 60s while revalidating.
     // Prevents back-to-back tab switches from firing a new Vercel function invocation.
     res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(liveStatus);
   } catch (error) {
     console.error("Error generating live status:", error);
@@ -92,6 +93,7 @@ const getLiveActivity = async (req, res) => {
     // Cache privately in the browser for 30s; serve stale for 60s while revalidating.
     // Prevents back-to-back tab switches from firing a new Vercel function invocation.
     res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(activity);
   } catch (error) {
     console.error("Error generating live activity:", error);

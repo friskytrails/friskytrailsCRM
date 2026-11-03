@@ -1,4 +1,4 @@
-﻿const leadService = require('../services/leadService');
+const leadService = require('../services/leadService');
 const agentService = require('../services/agentService');
 const { getAgentIdCondition } = agentService;
 
@@ -85,6 +85,7 @@ async function getLeadCounts(req, res) {
     // The Dashboard calls this endpoint on every filter change and after every assignment,
     // so short-lived caching prevents duplicate invocations within the same user session.
     res.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+    res.set('Vary', 'Authorization');
     res.json(counts);
   } catch (error) {
     res.status(500).json({ error: error.message });
