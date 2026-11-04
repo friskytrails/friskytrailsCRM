@@ -30,6 +30,15 @@ const LEAD_LEVEL_OPTIONS = [
   { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
 ];
 
+const PEOPLE_TRAVELLING_LEVEL_OPTIONS = [
+  { value: '2_people', label: '2 People' },
+  { value: 'solo_person', label: 'Solo Person' },
+  { value: '7-10_people', label: '7–10 People' },
+  { value: '3-4_people', label: '3–4 People' },
+  { value: '5-6_people', label: '5–6 People' },
+  { value: '10+_people', label: '10+ People' }
+];
+
 const getLeadLevelDef = (level) =>
   LEAD_LEVEL_OPTIONS.find(o => o.value === level) ||
   { value: '', label: 'Set Level', color: 'bg-gray-50 text-gray-400 border-gray-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700' };
@@ -714,6 +723,34 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
         setLead(previousLead);
         const errData = await res.json().catch(() => ({}));
         toast.error(errData.error || 'Failed to update level');
+      }
+    } catch (err) {
+      console.error(err);
+      setLead(previousLead);
+      toast.error('Server connection error');
+    }
+  };
+
+  const handlePeopleTravellingLevelChange = async (newLevel) => {
+    if (!lead) return;
+    const normalizedNew = newLevel || null;
+    if ((lead.peopleTravellingLevel || null) === normalizedNew) return;
+    const previousLead = { ...lead };
+    setLead({ ...lead, peopleTravellingLevel: normalizedNew });
+    try {
+      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}/people-travelling-level`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ peopleTravellingLevel: normalizedNew })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        updateLocalLead(updated);
+        toast.success(normalizedNew ? 'People travelling level updated' : 'People travelling level cleared');
+      } else {
+        setLead(previousLead);
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.error || 'Failed to update people travelling level');
       }
     } catch (err) {
       console.error(err);
@@ -1558,6 +1595,26 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             >
               <option value="">Set Level</option>
               {LEAD_LEVEL_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* People travelling level */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span aria-hidden="true">👥</span>
+              People:
+            </span>
+            <select
+              value={lead.peopleTravellingLevel || ''}
+              onChange={(e) => handlePeopleTravellingLevelChange(e.target.value)}
+              disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id) || (lead.agentIds || []).includes(user?.userId))}
+              className="text-xs font-bold py-1.5 px-3 rounded-lg border border-cyan-700 bg-cyan-950/40 text-cyan-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              title="Number of people travelling"
+            >
+              <option value="">Set People Level</option>
+              {PEOPLE_TRAVELLING_LEVEL_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>

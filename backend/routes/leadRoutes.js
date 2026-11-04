@@ -23,6 +23,7 @@ router.put('/:id/dates', auth, leadController.updateDates);
 router.put('/:id/reminder', auth, leadController.updateReminder);
 router.put('/:id/status', auth, leadController.updateStatus);
 router.put('/:id/level', auth, leadController.updateLeadLevel);
+router.put('/:id/people-travelling-level', auth, leadController.updatePeopleTravellingLevel);
 
 router.put('/:id/book', auth, leadController.bookLead);
 router.put('/:id/booking', auth, leadController.updateBooking);

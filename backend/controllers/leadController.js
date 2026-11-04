@@ -14,6 +14,7 @@ function sanitizeLeadForItinerary(leadDoc) {
     notes: leadObj.notes || [],
     status: leadObj.status || 'Fresh Leads',
     leadLevel: leadObj.leadLevel || null,
+    peopleTravellingLevel: leadObj.peopleTravellingLevel || null,
     origin: leadObj.origin || '',
     destination: leadObj.destination || '',
     product: leadObj.product || '',
@@ -321,6 +322,24 @@ async function updateLeadLevel(req, res) {
   }
 }
 
+async function updatePeopleTravellingLevel(req, res) {
+  try {
+    if (req.user.isItinerary) {
+      return res.status(403).json({ error: 'Forbidden: Itinerary Team members cannot modify lead level' });
+    }
+    const { id } = req.params;
+    const { peopleTravellingLevel } = req.body;
+    const agentIdCondition = await getAgentIdCondition(req.user);
+    const result = await leadService.updatePeopleTravellingLevel(id, peopleTravellingLevel, agentIdCondition);
+    res.json(result);
+  } catch (error) {
+    if (error.message === 'Lead not found or unauthorized') {
+      return res.status(403).json({ error: 'Forbidden: Not assigned to you' });
+    }
+    res.status(400).json({ error: error.message });
+  }
+}
+
 module.exports = {
   getLeads,
   getLeadCounts,
@@ -335,6 +354,7 @@ module.exports = {
   updateReminder,
   updateStatus,
   updateLeadLevel,
+  updatePeopleTravellingLevel,
   bookLead,
   updateBooking
 };

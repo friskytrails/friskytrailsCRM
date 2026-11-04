@@ -17,6 +17,7 @@ const { generateBookingId, generatePaymentId } = require('../controllers/booking
 // ---------------------------------------------------------------------------
 // Valid lead level values (L1 = within 7d, L2 = within 15d, L3 = within 30d, L4 = 1-3mo, L5 = exploring)
 const VALID_LEAD_LEVELS = ['L1', 'L2', 'L3', 'L4', 'L5'];
+const VALID_PEOPLE_TRAVELLING_LEVELS = ['2_people', 'solo_person', '7-10_people', '3-4_people', '5-6_people', '10+_people'];
 
 const _countsCache = new Map(); // key: JSON string → { data, expiresAt }
 const COUNTS_CACHE_TTL_MS = 30_000; // 30 seconds
@@ -1272,6 +1273,19 @@ async function updateLeadLevel(id, level, agentIdCondition) {
   return await getLeadById(id, agentIdCondition);
 }
 
+async function updatePeopleTravellingLevel(id, level, agentIdCondition) {
+  let normalizedLevel = null;
+  if (level !== undefined && level !== null && String(level).trim() !== '') {
+    normalizedLevel = String(level).trim().toLowerCase();
+    if (!VALID_PEOPLE_TRAVELLING_LEVELS.includes(normalizedLevel)) {
+      throw new Error(`Invalid people travelling level. Must be one of: ${VALID_PEOPLE_TRAVELLING_LEVELS.join(', ')} (or empty to clear)`);
+    }
+  }
+  const result = await Lead.updateLead(id, { peopleTravellingLevel: normalizedLevel }, agentIdCondition);
+  if (!result) throw new Error('Lead not found or unauthorized');
+  return await getLeadById(id, agentIdCondition);
+}
+
 module.exports = {
   getLeads,
   getLeadCounts,
@@ -1286,6 +1300,7 @@ module.exports = {
   updateReminder,
   updateStatus,
   updateLeadLevel,
+  updatePeopleTravellingLevel,
   bookLead,
   updateBooking,
   invalidateCountsCache: _invalidateCountsCache
