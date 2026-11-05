@@ -317,7 +317,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
           </div>
         </div>
         <div className="w-full md:w-auto flex justify-start md:justify-end shrink-0 min-w-0">
-          <AgentMetricsTable agent={agent} agentId={agent.id} agentName={agent.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
+          <AgentMetricsTable agent={agent} agentId={agent?.id || agent?._id || targetAgentId} agentName={agent?.name} agentLeads={agentLeads} updateAgentMetrics={updateAgentMetrics} />
         </div>
       </div>
       <div className="mb-6 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3">

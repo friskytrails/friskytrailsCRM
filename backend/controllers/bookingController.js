@@ -252,7 +252,7 @@ async function createBooking(req, res) {
       const syncedLead = await Lead.Model.findByIdAndUpdate(
         targetLead._id,
         { $set: { status: 'Booked' } },
-        { new: true }
+        { returnDocument: 'after' }
       );
       if (syncedLead) {
         leadSyncStatus = 'Success';

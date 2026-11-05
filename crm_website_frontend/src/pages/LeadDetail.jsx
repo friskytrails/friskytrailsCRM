@@ -684,7 +684,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     const updated = await updateLeadStatus(lead.id, newStatus);
     if (updated) {
       updateLocalLead(updated);
-      fetchLeadCounts();
     } else {
       setLead(previousLead);
     }
@@ -876,7 +875,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       setLead(updatedLead);
       syncLeadToParent(updatedLead);
-      fetchLeadCounts();
     }
   };
 
@@ -910,7 +908,18 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     const updated = await assignAgent(lead.id, newIds);
     if (updated) {
       updateLocalLead(updated);
-      fetchLeadCounts();
+      setAgentLeadCounts(prev => {
+        const next = { ...prev };
+        const oldIds = (previousLead.agentIds || []).map(String);
+        const freshIds = (newIds || []).map(String);
+        oldIds.forEach(agId => {
+          if (!freshIds.includes(agId)) next[agId] = Math.max(0, (next[agId] || 0) - 1);
+        });
+        freshIds.forEach(agId => {
+          if (!oldIds.includes(agId)) next[agId] = (next[agId] || 0) + 1;
+        });
+        return next;
+      });
     } else {
       setLead(previousLead);
       syncLeadToParent(previousLead);

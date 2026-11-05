@@ -269,7 +269,7 @@ module.exports = {
     return Lead.findOneAndUpdate(
       query,
       finalUpdate,
-      { new: true }
+      { returnDocument: 'after' }
     );
   },
   pushNote: async (id, note, agentIdCondition = undefined) => {
@@ -294,7 +294,7 @@ module.exports = {
     return Lead.findOneAndUpdate(
       query,
       { $push: { notes: note } },
-      { new: true }
+      { returnDocument: 'after' }
     );
   },
   deleteNote: async (id, noteId, agentIdCondition = undefined) => {
@@ -325,7 +325,7 @@ module.exports = {
     return Lead.findOneAndUpdate(
       query,
       { $pull: { notes: pullCondition } },
-      { new: true }
+      { returnDocument: 'after' }
     );
   }
 };

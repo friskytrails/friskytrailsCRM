@@ -137,7 +137,7 @@ async function resolveProductFromConfig(inputProduct, allowCreate = false) {
           $setOnInsert: { key: 'GLOBAL_SETTINGS' },
           $addToSet: { products: raw }
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
       );
       return { resolved: raw, matched: true, newlyCreated: true };
     } catch (err) {
@@ -424,7 +424,7 @@ async function createProductWebhook(req, res) {
         $setOnInsert: { key: 'GLOBAL_SETTINGS' },
         $addToSet: { products: cleanProduct }
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
     return res.status(201).json({

@@ -50,6 +50,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
 
   // Fetch monthly attendance summary
   const fetchAttendanceSummary = async () => {
+    if (!agentId) return;
     try {
       const [year, month] = selectedMonth.split('-');
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -67,6 +68,7 @@ export default function AgentMetricsTable({ agent, agentId, agentName, updateAge
   };
 
   useEffect(() => {
+    if (!agentId) return;
     fetchAttendanceSummary();
   }, [agentId, selectedMonth]);
 
