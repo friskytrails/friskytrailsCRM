@@ -431,6 +431,20 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
   const [agentLeadCounts, setAgentLeadCounts] = useState({});
 
+  const isInactiveStatus = (status) => {
+    const st = status || 'Fresh Leads';
+    return (
+      st === 'Booked' ||
+      st === 'Booked Leads' ||
+      st === 'Rejected Leads' ||
+      st === 'Rejected' ||
+      st === 'Future Leads' ||
+      st === 'Future' ||
+      st === 'Non Responding Leads' ||
+      st === 'Non Responding'
+    );
+  };
+
   const fetchLeadCounts = useCallback(async () => {
     if (!token || !API_URL) return;
     try {
@@ -684,6 +698,22 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     const updated = await updateLeadStatus(lead.id, newStatus);
     if (updated) {
       updateLocalLead(updated);
+      const prevInactive = isInactiveStatus(previousLead.status);
+      const nextInactive = isInactiveStatus(newStatus);
+      if (prevInactive !== nextInactive && Array.isArray(lead.agentIds) && lead.agentIds.length > 0) {
+        setAgentLeadCounts(prev => {
+          const next = { ...prev };
+          lead.agentIds.forEach(agId => {
+            const key = String(agId);
+            if (nextInactive) {
+              next[key] = Math.max(0, (next[key] || 0) - 1);
+            } else {
+              next[key] = (next[key] || 0) + 1;
+            }
+          });
+          return next;
+        });
+      }
     } else {
       setLead(previousLead);
     }
@@ -875,6 +905,16 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
 
       setLead(updatedLead);
       syncLeadToParent(updatedLead);
+      if (!isInactiveStatus(lead.status) && Array.isArray(lead.agentIds) && lead.agentIds.length > 0) {
+        setAgentLeadCounts(prev => {
+          const next = { ...prev };
+          lead.agentIds.forEach(agId => {
+            const key = String(agId);
+            next[key] = Math.max(0, (next[key] || 0) - 1);
+          });
+          return next;
+        });
+      }
     }
   };
 
@@ -910,14 +950,16 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       updateLocalLead(updated);
       setAgentLeadCounts(prev => {
         const next = { ...prev };
-        const oldIds = (previousLead.agentIds || []).map(String);
-        const freshIds = (newIds || []).map(String);
-        oldIds.forEach(agId => {
-          if (!freshIds.includes(agId)) next[agId] = Math.max(0, (next[agId] || 0) - 1);
-        });
-        freshIds.forEach(agId => {
-          if (!oldIds.includes(agId)) next[agId] = (next[agId] || 0) + 1;
-        });
+        if (!isInactiveStatus(previousLead.status)) {
+          const oldIds = (previousLead.agentIds || []).map(String);
+          const freshIds = (newIds || []).map(String);
+          oldIds.forEach(agId => {
+            if (!freshIds.includes(agId)) next[agId] = Math.max(0, (next[agId] || 0) - 1);
+          });
+          freshIds.forEach(agId => {
+            if (!oldIds.includes(agId)) next[agId] = (next[agId] || 0) + 1;
+          });
+        }
         return next;
       });
     } else {

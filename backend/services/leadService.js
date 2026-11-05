@@ -1170,11 +1170,12 @@ async function updateBooking(id, bookingData, agentIdCondition) {
 
     const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
     let talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
-    if (bookingData.talkTime === undefined && (!talkTime || talkTime === '0:0') && dailyTalkTime && dailyTalkTime !== '0:0') {
+    const isZero = (v) => !v || v === '0:0' || v === '0:00' || v === '00:00' || v === '0';
+    if (bookingData.talkTime === undefined && isZero(talkTime) && !isZero(dailyTalkTime)) {
       talkTime = dailyTalkTime;
     }
 
-    if (dailyTalkTime && dailyTalkTime !== '0:0') {
+    if (!isZero(dailyTalkTime)) {
       dailyDial = Math.max(dailyDial, 1);
       totalDial = Math.max(totalDial, dailyDial, 1);
       connected = Math.max(connected, 1);
@@ -1183,8 +1184,8 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     let firstCall = parsedFirstCall !== undefined ? parsedFirstCall : (currentBooking.firstCall || null);
     let lastCall = parsedLastCall !== undefined ? parsedLastCall : (currentBooking.lastCall || null);
 
-    // Auto-initialize firstCall and lastCall ONLY if they were not already present
-    if (bookingData.talkTime || bookingData.dailyTalkTime) {
+    // Auto-initialize firstCall and lastCall ONLY if they were not already present and talkTime is nonzero
+    if (!isZero(bookingData.talkTime) || !isZero(bookingData.dailyTalkTime)) {
       if (!firstCall) {
         firstCall = new Date();
       }
@@ -1219,7 +1220,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
       ? Math.max(dailyDial, existingTargetLog ? (existingTargetLog.dailyDial || 0) : 0)
       : (existingTargetLog ? (existingTargetLog.dailyDial || 0) : 1);
 
-    const finalTargetDailyDial = (resolvedTargetDailyDial === 0 && dailyTalkTime && dailyTalkTime !== '0:0')
+    const finalTargetDailyDial = (resolvedTargetDailyDial === 0 && !isZero(dailyTalkTime))
       ? 1
       : resolvedTargetDailyDial;
 

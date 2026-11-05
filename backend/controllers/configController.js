@@ -7,7 +7,7 @@ const getConfig = async (req, res) => {
       { $setOnInsert: { key: 'GLOBAL_SETTINGS' } },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
-    res.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
+    res.set('Cache-Control', 'no-cache, must-revalidate');
     res.json(config);
   } catch (error) {
     console.error('Error fetching global config:', error);

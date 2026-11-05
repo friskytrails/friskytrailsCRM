@@ -286,13 +286,15 @@ function App() {
     }
   };
 
-  const refreshAgents = useCallback(async (agentId) => {
+  const refreshAgents = useCallback(async (agentId, options = {}) => {
     if (!token) return;
     try {
       if (agentId) {
-        const res = await fetch(`${API_URL}/agents/${agentId}/metrics`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const fetchOptions = {
+          headers: { 'Authorization': `Bearer ${token}` },
+          ...(options.cache ? { cache: options.cache } : {})
+        };
+        const res = await fetch(`${API_URL}/agents/${agentId}/metrics`, fetchOptions);
         if (res.ok) {
           const metrics = await res.json();
           setAgents((prev) => prev.map(a => {
@@ -335,7 +337,7 @@ function App() {
       if (response.ok) {
         const updatedLead = await response.json();
         setLeads((prev) => prev.map(lead => lead.id === leadId ? updatedLead : lead));
-        (updatedLead?.agentIds || []).forEach(aid => refreshAgents(aid));
+        (updatedLead?.agentIds || []).forEach(aid => refreshAgents(aid, { cache: 'reload' }));
         toast.success("Lead booked successfully.");
         return updatedLead;
       } else {
@@ -363,7 +365,7 @@ function App() {
       if (response.ok && data.success) {
         toast.success("New booking created successfully");
         const bookingAgentId = formData.get ? (formData.get('agentId') || formData.get('agentIds')) : (data?.data?.agentId || null);
-        refreshAgents(bookingAgentId || undefined);
+        refreshAgents(bookingAgentId || undefined, { cache: 'reload' });
         const leadId = formData.get ? formData.get('leadId') : null;
         if (leadId) {
           try {
@@ -403,7 +405,7 @@ function App() {
       if (response.ok && data.success) {
         toast.success("Booking updated successfully!");
         const bookingAgentId = formData.get ? (formData.get('agentId') || formData.get('agentIds')) : (data?.data?.agentId || null);
-        refreshAgents(bookingAgentId || undefined);
+        refreshAgents(bookingAgentId || undefined, { cache: 'reload' });
         return data.data;
       } else {
         toast.error(`Failed to edit booking: ${data.error || response.statusText}`);

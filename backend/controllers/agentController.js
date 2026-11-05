@@ -52,10 +52,10 @@ async function updateAgentVerification(req, res) {
 
 async function updateAgentMetrics(req, res) {
   try {
+    const { id } = req.params;
     if (!req.user.isAdmin && !req.user.isManager && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin or Manager access only" });
     }
-    const { id } = req.params;
     const { monthlyTarget, targetCompleted, attendance, attendanceDate, date, bookingCount, targetBookingCount } = req.body;
     const finalDate = date || attendanceDate;
     const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, finalDate, bookingCount, targetBookingCount);
