@@ -96,7 +96,6 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const shareMenuRef = useRef(null);
   const countsGenerationRef = useRef(0);
   const peopleLevelReqIdRef = useRef(0);
-  const countsGenerationRef = useRef(0);
 
   // Keep the parent leads array in sync
   const syncLeadToParent = useCallback((updatedLead) => {
