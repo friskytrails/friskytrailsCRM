@@ -88,6 +88,21 @@ function parsePeopleTravellingLevel(raw) {
   if (/\b(?:3\s*[-to\s]+\s*4)\b/.test(str)) return '3-4_people';
   if (/\b(?:2\s*people|2\s*persons?|two\s*people|two\s*persons?|couple)\b/.test(str)) return '2_people';
 
+  // Multi-part passenger counts (e.g., "2 adults, 1 child", "2 adults + 2 kids")
+  const adultsMatch = str.match(/(\d+)\s*(?:adults?|grown[- ]?ups?)/i);
+  const childrenMatch = str.match(/(\d+)\s*(?:children|childs?|kids?)/i);
+  if (adultsMatch || childrenMatch) {
+    const adults = adultsMatch ? Number(adultsMatch[1]) : 0;
+    const children = childrenMatch ? Number(childrenMatch[1]) : 0;
+    const total = adults + children;
+    if (total === 1) return 'solo_person';
+    if (total === 2) return '2_people';
+    if (total >= 3 && total <= 4) return '3-4_people';
+    if (total >= 5 && total <= 6) return '5-6_people';
+    if (total >= 7 && total <= 9) return '7-9_people';
+    if (total >= 10) return '10+_people';
+  }
+
   // Exact single digit parsing fallback
   const numMatch = str.match(/\d+/);
   if (numMatch) {

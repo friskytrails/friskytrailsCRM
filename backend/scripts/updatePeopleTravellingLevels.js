@@ -10,13 +10,31 @@ const { Model: Lead } = require('../models/Lead');
 const { connectDB } = require('../db');
 
 const VALUE_TO_LEVEL = new Map([
-  ['2_people', '2_people'],
+  ['solo', 'solo_person'],
   ['solo_person', 'solo_person'],
-  ['7-9_people', '7-9_people'],
-  ['7-10_people', '7-9_people'],
+  ['single', 'solo_person'],
+  ['1', 'solo_person'],
+  ['1_person', 'solo_person'],
+  ['2', '2_people'],
+  ['2_people', '2_people'],
+  ['two', '2_people'],
+  ['couple', '2_people'],
+  ['3-4', '3-4_people'],
   ['3-4_people', '3-4_people'],
+  ['3_4_people', '3-4_people'],
+  ['5-6', '5-6_people'],
   ['5-6_people', '5-6_people'],
-  ['10+_people', '10+_people']
+  ['5_6_people', '5-6_people'],
+  ['7-9', '7-9_people'],
+  ['7-9_people', '7-9_people'],
+  ['7-10', '7-9_people'],
+  ['7-10_people', '7-9_people'],
+  ['7_10_people', '7-9_people'],
+  ['10+', '10+_people'],
+  ['10+_people', '10+_people'],
+  ['10_plus', '10+_people'],
+  ['10_plus_people', '10+_people'],
+  ['more_than_10', '10+_people']
 ]);
 
 function normalizeAnswer(answer) {
@@ -27,21 +45,47 @@ function normalizeAnswer(answer) {
     .replace(/\s+/g, '_');
 }
 
-function parsePeopleTravellingLevel(notes) {
+function parsePeopleTravellingLevel(lead) {
   const matches = [];
-  for (const note of notes || []) {
+
+  // Check direct numberOfPersons/numberOfPeople fields on the lead document if present
+  const directSources = [lead.numberOfPeople, lead.numberOfPersons, lead.pax];
+  for (const src of directSources) {
+    if (!src && src !== 0) continue;
+    const norm = normalizeAnswer(src).replace(/[.,;]+$/, '');
+    const directMatch = VALUE_TO_LEVEL.get(norm);
+    if (directMatch) matches.push(directMatch);
+  }
+
+  // Check lead notes
+  for (const note of lead.notes || []) {
     const text = typeof note === 'string' ? note : note?.text;
     if (!text) continue;
     const lines = String(text).split(/\r?\n/);
     for (const line of lines) {
       const match = line.match(/how\s+many\s+people(?:\s+are)?\s+travelling\s*\??\s*[:\-]?\s*(.+?)\s*$/i)
-        || line.match(/how\s+many\s+people\s*\??\s*[:\-]?\s*(.+?)\s*$/i);
+        || line.match(/how\s+many\s+people\s*\??\s*[:\-]?\s*(.+?)\s*$/i)
+        || line.match(/passengers?\s*\??\s*[:\-]?\s*(.+?)\s*$/i)
+        || line.match(/pax\s*\??\s*[:\-]?\s*(.+?)\s*$/i);
       if (!match) continue;
       const value = normalizeAnswer(match[1]).replace(/[.,;]+$/, '');
       const level = VALUE_TO_LEVEL.get(value);
       if (level) matches.push(level);
     }
   }
+
+  // Fallback pattern matching if no exact map match
+  if (matches.length === 0) {
+    const allNotesText = (lead.notes || []).map(n => (typeof n === 'string' ? n : n?.text || '')).join('\n');
+    const combined = `${directSources.filter(Boolean).join(' ')} ${allNotesText}`.toLowerCase();
+    if (/\b(?:solo|single)\b/.test(combined)) matches.push('solo_person');
+    else if (/\b(?:10\+|10\s*plus|more\s*than\s*10|10\s*or\s*more)\b/.test(combined)) matches.push('10+_people');
+    else if (/\b(?:7\s*[-to\s]+\s*9|7\s*[-to\s]+\s*10)\b/.test(combined)) matches.push('7-9_people');
+    else if (/\b(?:5\s*[-to\s]+\s*6)\b/.test(combined)) matches.push('5-6_people');
+    else if (/\b(?:3\s*[-to\s]+\s*4)\b/.test(combined)) matches.push('3-4_people');
+    else if (/\b(?:2\s*people|2\s*persons?|couple)\b/.test(combined)) matches.push('2_people');
+  }
+
   // Conflicting answers are ambiguous; leave the lead unchanged.
   const uniqueMatches = [...new Set(matches)];
   return uniqueMatches.length === 1 ? uniqueMatches[0] : null;
@@ -57,10 +101,10 @@ async function main() {
 
   try {
     await connectDB();
-    const cursor = Lead.find({}).select('_id leadId name notes peopleTravellingLevel').lean().cursor();
+    const cursor = Lead.find({}).select('_id leadId name notes numberOfPeople numberOfPersons pax peopleTravellingLevel').lean().cursor();
     for await (const lead of cursor) {
       scanned += 1;
-      const level = parsePeopleTravellingLevel(lead.notes);
+      const level = parsePeopleTravellingLevel(lead);
       if (!level) continue;
       matched += 1;
       if (lead.peopleTravellingLevel && !overwrite) {
