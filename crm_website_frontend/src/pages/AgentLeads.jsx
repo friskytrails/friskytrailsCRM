@@ -25,6 +25,15 @@ const LEAD_LEVEL_OPTIONS = [
   { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
 ];
 
+const PEOPLE_TRAVELLING_LEVEL_OPTIONS = [
+  { value: '2_people', label: '2 People' },
+  { value: 'solo_person', label: 'Solo Person' },
+  { value: '7-9_people', label: '7–9 People' },
+  { value: '3-4_people', label: '3–4 People' },
+  { value: '5-6_people', label: '5–6 People' },
+  { value: '10+_people', label: '10+ People' }
+];
+
 const getLeadLevelDef = (level) =>
   LEAD_LEVEL_OPTIONS.find(o => o.value === level) || null;
 
@@ -77,6 +86,9 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
   const [filterLevel, setFilterLevel] = useState(() => {
     return sessionStorage.getItem(`agentLeads_${agentKey}_filterLevel`) || 'all';
   });
+  const [filterPeopleLevel, setFilterPeopleLevel] = useState(() => {
+    return sessionStorage.getItem(`agentLeads_${agentKey}_filterPeopleLevel`) || 'all';
+  });
 
   // When switching agents (agentKey changes), load that agent's saved filters or default to 'all'
   useEffect(() => {
@@ -85,6 +97,7 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     setFilterProduct(sessionStorage.getItem(`agentLeads_${agentKey}_filterProduct`) || 'all');
     setFilterAge(sessionStorage.getItem(`agentLeads_${agentKey}_filterAge`) || 'all');
     setFilterLevel(sessionStorage.getItem(`agentLeads_${agentKey}_filterLevel`) || 'all');
+    setFilterPeopleLevel(sessionStorage.getItem(`agentLeads_${agentKey}_filterPeopleLevel`) || 'all');
     setSearchQuery('');
   }, [agentKey]);
 
@@ -95,7 +108,8 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     sessionStorage.setItem(`agentLeads_${agentKey}_filterProduct`, filterProduct);
     sessionStorage.setItem(`agentLeads_${agentKey}_filterAge`, filterAge);
     sessionStorage.setItem(`agentLeads_${agentKey}_filterLevel`, filterLevel);
-  }, [filterStatus, filterProduct, filterAge, filterLevel, agentKey]);
+    sessionStorage.setItem(`agentLeads_${agentKey}_filterPeopleLevel`, filterPeopleLevel);
+  }, [filterStatus, filterProduct, filterAge, filterLevel, filterPeopleLevel, agentKey]);
 
   const [agentLeadsData, setAgentLeadsData] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -197,8 +211,9 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
     const matchesProduct = filterProduct === 'all' || (lead.product || 'Other') === filterProduct;
     const matchesAge = checkAgeFilter(age, filterAge);
     const matchesLevel = filterLevel === 'all' || (filterLevel === 'none' ? (!lead.leadLevel) : lead.leadLevel === filterLevel);
+    const matchesPeopleLevel = filterPeopleLevel === 'all' || (filterPeopleLevel === 'none' ? (!lead.peopleTravellingLevel) : (lead.peopleTravellingLevel === filterPeopleLevel || (filterPeopleLevel === '7-9_people' && lead.peopleTravellingLevel === '7-10_people')));
 
-    return matchesSearch && matchesStatus && matchesProduct && matchesAge && matchesLevel;
+    return matchesSearch && matchesStatus && matchesProduct && matchesAge && matchesLevel && matchesPeopleLevel;
   });
 
   // Sync active filtered agent leads to sessionStorage for lead detail next/prev navigation
@@ -398,6 +413,20 @@ export default function AgentLeads({ leads, agents, statuses = [], updateAgentMe
               );
             })}
             <option value="none">No Level ({statusScopedLeads.filter(l => !l.leadLevel).length})</option>
+          </select>
+          <select
+            value={filterPeopleLevel}
+            onChange={(e) => setFilterPeopleLevel(e.target.value)}
+            className="text-xs font-medium bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 dark:text-slate-200 shadow-sm transition-shadow cursor-pointer shrink-0"
+          >
+            <option value="all">All People ({statusScopedLeads.length})</option>
+            {PEOPLE_TRAVELLING_LEVEL_OPTIONS.map(opt => {
+              const count = statusScopedLeads.filter(l => l.peopleTravellingLevel === opt.value || (opt.value === '7-9_people' && l.peopleTravellingLevel === '7-10_people')).length;
+              return (
+                <option key={opt.value} value={opt.value}>👥 {opt.label} ({count})</option>
+              );
+            })}
+            <option value="none">No People Level ({statusScopedLeads.filter(l => !l.peopleTravellingLevel).length})</option>
           </select>
         </div>
       </div>

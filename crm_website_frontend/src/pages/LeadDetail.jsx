@@ -30,6 +30,15 @@ const LEAD_LEVEL_OPTIONS = [
   { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
 ];
 
+const PEOPLE_TRAVELLING_LEVEL_OPTIONS = [
+  { value: '2_people', label: '2 People' },
+  { value: 'solo_person', label: 'Solo Person' },
+  { value: '7-9_people', label: '7–9 People' },
+  { value: '3-4_people', label: '3–4 People' },
+  { value: '5-6_people', label: '5–6 People' },
+  { value: '10+_people', label: '10+ People' }
+];
+
 const getLeadLevelDef = (level) =>
   LEAD_LEVEL_OPTIONS.find(o => o.value === level) ||
   { value: '', label: 'Set Level', color: 'bg-gray-50 text-gray-400 border-gray-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700' };
@@ -85,6 +94,9 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
   const [isSavingTalkTime, setIsSavingTalkTime] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareMenuRef = useRef(null);
+  const countsGenerationRef = useRef(0);
+  const peopleLevelReqIdRef = useRef(0);
+  const countsGenerationRef = useRef(0);
 
   // Keep the parent leads array in sync
   const syncLeadToParent = useCallback((updatedLead) => {
@@ -445,18 +457,24 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
     );
   };
 
-  const fetchLeadCounts = useCallback(async () => {
+  const fetchLeadCounts = useCallback(async (retries = 1) => {
     if (!token || !API_URL) return;
+    const generation = ++countsGenerationRef.current;
     try {
       const res = await fetch(`${API_URL}/leads/counts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        setAgentLeadCounts(data.agentCounts || {});
+        if (countsGenerationRef.current === generation) {
+          setAgentLeadCounts(data.agentCounts || {});
+        }
+      } else if (retries > 0) {
+        setTimeout(() => fetchLeadCounts(retries - 1), 2000);
       }
     } catch (err) {
       console.error('Error fetching lead counts:', err);
+      if (retries > 0) setTimeout(() => fetchLeadCounts(retries - 1), 2000);
     }
   }, [token, API_URL]);
 
@@ -748,6 +766,42 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
       console.error(err);
       setLead(previousLead);
       toast.error('Server connection error');
+    }
+  };
+
+  const handlePeopleTravellingLevelChange = async (newLevel) => {
+    if (!lead) return;
+    const normalizedNew = newLevel || null;
+    if ((lead.peopleTravellingLevel || null) === normalizedNew) return;
+    const previousLevel = lead.peopleTravellingLevel || null;
+    const requestId = ++peopleLevelReqIdRef.current;
+
+    setLead(prev => prev ? ({ ...prev, peopleTravellingLevel: normalizedNew }) : prev);
+    try {
+      const res = await fetch(`${API_URL}/leads/${lead.id || lead._id}/people-travelling-level`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ peopleTravellingLevel: normalizedNew })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        if (peopleLevelReqIdRef.current === requestId) {
+          updateLocalLead(updated);
+          toast.success(normalizedNew ? 'People travelling level updated' : 'People travelling level cleared');
+        }
+      } else {
+        if (peopleLevelReqIdRef.current === requestId) {
+          setLead(prev => prev ? ({ ...prev, peopleTravellingLevel: previousLevel }) : prev);
+          const errData = await res.json().catch(() => ({}));
+          toast.error(errData.error || 'Failed to update people travelling level');
+        }
+      }
+    } catch (err) {
+      if (peopleLevelReqIdRef.current === requestId) {
+        console.error(err);
+        setLead(prev => prev ? ({ ...prev, peopleTravellingLevel: previousLevel }) : prev);
+        toast.error('Server connection error');
+      }
     }
   };
 
@@ -1609,6 +1663,26 @@ export default function LeadDetail({ API_URL, token, user, setLeads, leads, agen
             >
               <option value="">Set Level</option>
               {LEAD_LEVEL_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* People travelling level */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <span aria-hidden="true">👥</span>
+              People:
+            </span>
+            <select
+              value={lead.peopleTravellingLevel || ''}
+              onChange={(e) => handlePeopleTravellingLevelChange(e.target.value)}
+              disabled={!(user?.isAdmin || (lead.agentIds || []).includes(user?.id) || (lead.agentIds || []).includes(user?.userId))}
+              className="text-xs font-bold py-1.5 px-3 rounded-lg border border-cyan-700 bg-cyan-950/40 text-cyan-300 cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              title="Number of people travelling"
+            >
+              <option value="">Set People Level</option>
+              {PEOPLE_TRAVELLING_LEVEL_OPTIONS.map(opt => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
