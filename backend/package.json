@@ -8,6 +8,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "backfill:people-levels": "node scripts/updatePeopleTravellingLevels.js",
     "test": "jest --forceExit --runInBand"
   },
   "jest": {
