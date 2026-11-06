@@ -62,6 +62,47 @@ function parseLeadLevel(raw) {
   return null;
 }
 
+// Parse passenger count from Google Sheets form answers into CRM peopleTravellingLevel:
+// Options: 'solo_person', '2_people', '3-4_people', '5-6_people', '7-9_people', '10+_people'
+function parsePeopleTravellingLevel(raw) {
+  if (!raw && raw !== 0) return null;
+  const str = String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2010-\u2015\u2212\-]+/g, '-')
+    .replace(/[_\s]+/g, ' ');
+
+  // Direct canonical enum keys
+  if (/^solo(?:_person)?$/.test(str) || /^single$/.test(str)) return 'solo_person';
+  if (/^2(?:_people)?$/.test(str) || /^two$/.test(str)) return '2_people';
+  if (/^3[-_]4(?:_people)?$/.test(str)) return '3-4_people';
+  if (/^5[-_]6(?:_people)?$/.test(str)) return '5-6_people';
+  if (/^7[-_]9(?:_people)?$/.test(str) || /^7[-_]10(?:_people)?$/.test(str)) return '7-9_people';
+  if (/^10\+(?:_people)?$/.test(str) || /^10_plus(?:_people)?$/.test(str)) return '10+_people';
+
+  // Semantic pattern matching
+  if (/\b(?:solo|single)\b/.test(str)) return 'solo_person';
+  if (/\b(?:10\+|10\s*plus|more\s*than\s*10|>=\s*10|10\s*or\s*more|10\s*to\s*\d{2,})\b/.test(str)) return '10+_people';
+  if (/\b(?:7\s*[-to\s]+\s*9|7\s*[-to\s]+\s*10)\b/.test(str)) return '7-9_people';
+  if (/\b(?:5\s*[-to\s]+\s*6)\b/.test(str)) return '5-6_people';
+  if (/\b(?:3\s*[-to\s]+\s*4)\b/.test(str)) return '3-4_people';
+  if (/\b(?:2\s*people|2\s*persons?|two\s*people|two\s*persons?|couple)\b/.test(str)) return '2_people';
+
+  // Exact single digit parsing fallback
+  const numMatch = str.match(/\d+/);
+  if (numMatch) {
+    const num = Number(numMatch[0]);
+    if (num === 1) return 'solo_person';
+    if (num === 2) return '2_people';
+    if (num >= 3 && num <= 4) return '3-4_people';
+    if (num >= 5 && num <= 6) return '5-6_people';
+    if (num >= 7 && num <= 9) return '7-9_people';
+    if (num >= 10) return '10+_people';
+  }
+
+  return null;
+}
+
 // Dynamically extract destination from product or package name by stripping package suffixes
 function extractDestination(productOrRawDestination) {
   if (!productOrRawDestination) return '';
@@ -172,7 +213,8 @@ async function processSingleLead(data) {
     platform,
     campaignName,
     adName,
-    leadLevel           // Direct level value (L1/L2/L3/L4) — or auto-parsed from leavingWhen
+    leadLevel,          // Direct level value (L1/L2/L3/L4) — or auto-parsed from leavingWhen
+    peopleTravellingLevel // Direct people level value — or auto-parsed from numberOfPeople/numberOfPersons/pax
   } = data;
 
   const cleanPhone = sanitizePhone(phone);
@@ -238,11 +280,24 @@ async function processSingleLead(data) {
 
     // If existing lead has no level set yet, try to auto-populate from this new inquiry
     const parsedLevel = parseLeadLevel(leadLevel) || parseLeadLevel(leavingWhen);
+    const parsedPeopleLevel = parsePeopleTravellingLevel(peopleTravellingLevel) ||
+      parsePeopleTravellingLevel(numberOfPeople) ||
+      parsePeopleTravellingLevel(numberOfPersons) ||
+      parsePeopleTravellingLevel(pax);
+
+    const updateFields = {};
     if (parsedLevel && !existingLead.leadLevel) {
+      updateFields.leadLevel = parsedLevel;
+    }
+    if (parsedPeopleLevel && !existingLead.peopleTravellingLevel) {
+      updateFields.peopleTravellingLevel = parsedPeopleLevel;
+    }
+
+    if (Object.keys(updateFields).length > 0) {
       try {
-        await Lead.Model.findByIdAndUpdate(existingLead._id, { leadLevel: parsedLevel });
+        await Lead.Model.findByIdAndUpdate(existingLead._id, { $set: updateFields });
       } catch (err) {
-        console.warn('Could not update leadLevel on existing lead:', err.message);
+        console.warn('Could not update levels on existing lead:', err.message);
       }
     }
 
@@ -300,6 +355,11 @@ async function processSingleLead(data) {
     labels: [],
     status: 'Fresh Leads',
     leadLevel: parseLeadLevel(leadLevel) || parseLeadLevel(leavingWhen) || null,
+    peopleTravellingLevel: parsePeopleTravellingLevel(peopleTravellingLevel) ||
+      parsePeopleTravellingLevel(numberOfPeople) ||
+      parsePeopleTravellingLevel(numberOfPersons) ||
+      parsePeopleTravellingLevel(pax) ||
+      null,
     notes: initialNotes,
     createdBy: {
       name: 'Google Sheets Webhook',
