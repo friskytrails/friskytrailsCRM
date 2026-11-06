@@ -26,6 +26,15 @@ const LEAD_LEVEL_OPTIONS = [
   { value: 'L5', label: 'L5 - Just Exploring',   color: 'bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600' }
 ];
 
+const PEOPLE_TRAVELLING_LEVEL_OPTIONS = [
+  { value: '2_people', label: '2 People' },
+  { value: 'solo_person', label: 'Solo Person' },
+  { value: '7-9_people', label: '7–9 People' },
+  { value: '3-4_people', label: '3–4 People' },
+  { value: '5-6_people', label: '5–6 People' },
+  { value: '10+_people', label: '10+ People' }
+];
+
 const getLeadLevelDef = (level) =>
   LEAD_LEVEL_OPTIONS.find(o => o.value === level) || null;
 
@@ -56,6 +65,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
   const [filterStatus, setFilterStatus] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterStatus`) || 'all');
   const [filterProduct, setFilterProduct] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterProduct`) || 'all');
   const [filterLevel, setFilterLevel] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterLevel`) || 'all');
+  const [filterPeopleLevel, setFilterPeopleLevel] = useState(() => sessionStorage.getItem(`dashboard_${userId}_filterPeopleLevel`) || 'all');
 
   // Server-side Pagination & Leads State
   const [leads, setLeads] = useState([]);
@@ -111,7 +121,8 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     sessionStorage.setItem(`${prefix}filterStatus`, filterStatus);
     sessionStorage.setItem(`${prefix}filterProduct`, filterProduct);
     sessionStorage.setItem(`${prefix}filterLevel`, filterLevel);
-  }, [searchQuery, filterAgent, sortBy, filterStatus, filterProduct, filterLevel, userId]);
+    sessionStorage.setItem(`${prefix}filterPeopleLevel`, filterPeopleLevel);
+  }, [searchQuery, filterAgent, sortBy, filterStatus, filterProduct, filterLevel, filterPeopleLevel, userId]);
 
   // Validate agent selection from dropdown
   useEffect(() => {
@@ -194,6 +205,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         status: filterStatus,
         product: filterProduct,
         leadLevel: filterLevel,
+        peopleTravellingLevel: filterPeopleLevel,
         sortBy: sortBy,
         filterAgent: filterAgent,
         pagination: 'true'
@@ -237,7 +249,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
         setIsLoadingLeads(false);
       }
     }
-  }, [page, searchQuery, filterStatus, filterProduct, filterLevel, sortBy, filterAgent]);
+  }, [page, searchQuery, filterStatus, filterProduct, filterLevel, filterPeopleLevel, sortBy, filterAgent]);
 
   // Debounced filter/search trigger — applies a uniform 300ms debounce to ALL changes
   // (search text, status, agent, product, level, sort). Previously, only search input was
@@ -299,12 +311,18 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
     setPage(1);
   };
 
+  const handleFilterPeopleLevelChange = (e) => {
+    setFilterPeopleLevel(e.target.value);
+    setPage(1);
+  };
+
   const handleResetFilters = () => {
     setSearchQuery('');
     setFilterAgent(isAdmin ? 'unassigned' : 'all');
     setFilterProduct('all');
     setFilterStatus('all');
     setFilterLevel('all');
+    setFilterPeopleLevel('all');
     setSortBy('newest');
     setPage(1);
   };
@@ -445,7 +463,7 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
 
   const getAgentId = (agent) => (agent ? String(agent.id || agent._id || '') : '');
 
-  const hasActiveFilters = searchQuery || (isAdmin ? filterAgent !== 'unassigned' : filterAgent !== 'all') || filterProduct !== 'all' || filterStatus !== 'all' || filterLevel !== 'all' || sortBy !== 'newest';
+  const hasActiveFilters = searchQuery || (isAdmin ? filterAgent !== 'unassigned' : filterAgent !== 'all') || filterProduct !== 'all' || filterStatus !== 'all' || filterLevel !== 'all' || filterPeopleLevel !== 'all' || sortBy !== 'newest';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -653,6 +671,23 @@ export default function Dashboard({ agents = [], products = [], statuses = [], a
                 <option value="none">
                   No Level {((summaryCounts.scopedLevelCounts || summaryCounts.levelCounts)?.none > 0) ? `(${((summaryCounts.scopedLevelCounts || summaryCounts.levelCounts)?.none)})` : ''}
                 </option>
+              </select>
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-semibold text-gray-400 dark:text-slate-400 uppercase tracking-wider shrink-0 w-16 sm:w-auto">People:</span>
+              <select
+                value={filterPeopleLevel}
+                onChange={handleFilterPeopleLevelChange}
+                className="flex-1 sm:flex-none min-w-0 max-w-full sm:max-w-[180px] pl-3 pr-8 py-2 text-xs border border-gray-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 rounded-xl bg-white dark:bg-slate-900 cursor-pointer text-gray-700 dark:text-slate-200 font-medium shadow-sm transition-all truncate"
+              >
+                <option value="all">All People</option>
+                {PEOPLE_TRAVELLING_LEVEL_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    👥 {opt.label}
+                  </option>
+                ))}
+                <option value="none">No People Level</option>
               </select>
             </div>
           </div>

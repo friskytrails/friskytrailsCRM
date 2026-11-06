@@ -12,7 +12,8 @@ const { connectDB } = require('../db');
 const VALUE_TO_LEVEL = new Map([
   ['2_people', '2_people'],
   ['solo_person', 'solo_person'],
-  ['7-10_people', '7-10_people'],
+  ['7-9_people', '7-9_people'],
+  ['7-10_people', '7-9_people'],
   ['3-4_people', '3-4_people'],
   ['5-6_people', '5-6_people'],
   ['10+_people', '10+_people']
@@ -69,7 +70,17 @@ async function main() {
 
       console.log(`${apply ? 'UPDATE' : 'DRY RUN'} lead=${lead.leadId ?? lead._id} name=${JSON.stringify(lead.name || '')} level=${level}`);
       if (apply) {
-        await Lead.updateOne({ _id: lead._id }, { $set: { peopleTravellingLevel: level } });
+        const filter = { _id: lead._id };
+        if (!overwrite) {
+          filter.peopleTravellingLevel = { $in: [null, ''] };
+        }
+        const result = await Lead.updateOne(filter, { $set: { peopleTravellingLevel: level } });
+        if (result.modifiedCount > 0) {
+          updated += 1;
+        } else if (!overwrite) {
+          skippedExisting += 1;
+        }
+      } else {
         updated += 1;
       }
     }

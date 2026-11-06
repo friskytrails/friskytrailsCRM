@@ -133,7 +133,7 @@ const LeadSchema = new mongoose.Schema({
   },
   peopleTravellingLevel: {
     type: String,
-    enum: ['2_people', 'solo_person', '7-10_people', '3-4_people', '5-6_people', '10+_people', null, ''],
+    enum: ['2_people', 'solo_person', '7-9_people', '7-10_people', '3-4_people', '5-6_people', '10+_people', null, ''],
     default: null
   },
   booking: {

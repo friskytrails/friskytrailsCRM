@@ -40,7 +40,7 @@ function sanitizeLeadForItinerary(leadDoc) {
 async function getLeads(req, res) {
   try {
     const agentIdCondition = await getAgentIdCondition(req.user);
-    const { page, limit, search, status, product, level, leadLevel, sortBy, filterAgent, pagination } = req.query;
+    const { page, limit, search, status, product, level, leadLevel, peopleTravellingLevel, peopleLevel, sortBy, filterAgent, pagination } = req.query;
 
     const result = await leadService.getLeads(agentIdCondition, {
       page: page ? parseInt(page) : 1,
@@ -49,6 +49,7 @@ async function getLeads(req, res) {
       status: status || '',
       product: product || '',
       leadLevel: leadLevel || level || '',
+      peopleTravellingLevel: peopleTravellingLevel || peopleLevel || '',
       sortBy: sortBy || 'newest',
       filterAgent: req.user.isAdmin ? (filterAgent || '') : '',
       pagination: pagination === 'true' ? true : false
