@@ -52,10 +52,10 @@ async function updateAgentVerification(req, res) {
 
 async function updateAgentMetrics(req, res) {
   try {
-    if (!req.user.isAdmin && !req.user.isManager) {
+    const { id } = req.params;
+    if (!req.user.isAdmin && !req.user.isManager && req.user.userId !== id) {
       return res.status(403).json({ error: "Forbidden: Admin or Manager access only" });
     }
-    const { id } = req.params;
     const { monthlyTarget, targetCompleted, attendance, attendanceDate, date, bookingCount, targetBookingCount } = req.body;
     const finalDate = date || attendanceDate;
     const agent = await agentService.updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance, finalDate, bookingCount, targetBookingCount);
@@ -72,6 +72,8 @@ async function getAgentAttendance(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const logs = await agentService.getAgentAttendance(id);
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(logs);
   } catch (error) {
     return handleAgentServiceError(error, res);
@@ -85,6 +87,8 @@ async function getAgentMetrics(req, res) {
       return res.status(403).json({ error: "Forbidden: Admin access only" });
     }
     const metrics = await agentService.getAgentMetrics(id);
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(metrics);
   } catch (error) {
     return handleAgentServiceError(error, res);
@@ -104,6 +108,8 @@ async function getAgentMonthlyAttendance(req, res) {
     }
     
     const summary = await agentService.getAgentMonthlyAttendance(id, month, year);
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+    res.set('Vary', 'Authorization');
     res.json(summary);
   } catch (error) {
     return handleAgentServiceError(error, res);

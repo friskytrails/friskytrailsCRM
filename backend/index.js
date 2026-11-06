@@ -31,8 +31,16 @@ const corsOptions = {
       callback(null, false); // Block CORS header injection without crashing Express
     }
   },
-  credentials: true
+  credentials: true,
+  maxAge: 86400
 };
+
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+  }
+  next();
+});
 
 app.use(cors(corsOptions));
 

@@ -1082,7 +1082,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
   // Pre-validate dates once before the retry loop
   let parsedFirstCall = undefined;
   if (bookingData.firstCall !== undefined) {
-    if (bookingData.firstCall) {
+    if (bookingData.firstCall && String(bookingData.firstCall).trim() !== '') {
       const d = new Date(bookingData.firstCall);
       if (isNaN(d.getTime())) throw new Error('Invalid firstCall date');
       parsedFirstCall = d;
@@ -1093,7 +1093,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
 
   let parsedLastCall = undefined;
   if (bookingData.lastCall !== undefined) {
-    if (bookingData.lastCall) {
+    if (bookingData.lastCall && String(bookingData.lastCall).trim() !== '') {
       const d = new Date(bookingData.lastCall);
       if (isNaN(d.getTime())) throw new Error('Invalid lastCall date');
       parsedLastCall = d;
@@ -1102,17 +1102,42 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     }
   }
 
-  // Validate talkTime and dailyTalkTime format (e.g. MM:SS or HH:MM:SS)
-  const isValidTalkTime = (val) => typeof val === 'string' && /^\d+(:[0-5]?\d){1,2}$/.test(val.trim());
+  // Validate and normalize talkTime and dailyTalkTime format (e.g. MM:SS, HH:MM:SS, numbers/seconds)
+  const normalizeTalkTime = (val) => {
+    if (val === undefined || val === null) return undefined;
+    if (typeof val === 'number') {
+      if (!Number.isFinite(val) || val <= 0) return '0:00';
+      const m = Math.floor(val / 60);
+      const s = Math.floor(val % 60);
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+    const str = String(val).trim();
+    if (str === '' || str === '0') return '0:00';
+    if (/^\d+$/.test(str)) {
+      const num = Number(str);
+      const m = Math.floor(num / 60);
+      const s = Math.floor(num % 60);
+      return `${m}:${String(s).padStart(2, '0')}`;
+    }
+    if (/^\d+(:[0-5]?\d){1,2}$/.test(str)) {
+      return str;
+    }
+    return null;
+  };
+
   if (bookingData.talkTime !== undefined && bookingData.talkTime !== null && String(bookingData.talkTime).trim() !== '') {
-    if (!isValidTalkTime(bookingData.talkTime)) {
+    const norm = normalizeTalkTime(bookingData.talkTime);
+    if (norm === null) {
       throw new Error('Invalid talkTime format. Expected MM:SS or HH:MM:SS (e.g. 15:30 or 120:30)');
     }
+    bookingData.talkTime = norm;
   }
   if (bookingData.dailyTalkTime !== undefined && bookingData.dailyTalkTime !== null && String(bookingData.dailyTalkTime).trim() !== '') {
-    if (!isValidTalkTime(bookingData.dailyTalkTime)) {
+    const norm = normalizeTalkTime(bookingData.dailyTalkTime);
+    if (norm === null) {
       throw new Error('Invalid dailyTalkTime format. Expected MM:SS or HH:MM:SS (e.g. 05:30)');
     }
+    bookingData.dailyTalkTime = norm;
   }
 
   const { Model: LeadModel } = require('../models/Lead');
@@ -1159,11 +1184,12 @@ async function updateBooking(id, bookingData, agentIdCondition) {
 
     const dailyTalkTime = bookingData.dailyTalkTime !== undefined ? (bookingData.dailyTalkTime || '0:0') : (currentBooking.dailyTalkTime || '0:0');
     let talkTime = bookingData.talkTime !== undefined ? (bookingData.talkTime || '0:0') : (currentBooking.talkTime || '0:0');
-    if (bookingData.talkTime === undefined && (!talkTime || talkTime === '0:0') && dailyTalkTime && dailyTalkTime !== '0:0') {
+    const isZero = (v) => !v || v === '0:0' || v === '0:00' || v === '00:00' || v === '0';
+    if (bookingData.talkTime === undefined && isZero(talkTime) && !isZero(dailyTalkTime)) {
       talkTime = dailyTalkTime;
     }
 
-    if (dailyTalkTime && dailyTalkTime !== '0:0') {
+    if (!isZero(dailyTalkTime)) {
       dailyDial = Math.max(dailyDial, 1);
       totalDial = Math.max(totalDial, dailyDial, 1);
       connected = Math.max(connected, 1);
@@ -1172,8 +1198,8 @@ async function updateBooking(id, bookingData, agentIdCondition) {
     let firstCall = parsedFirstCall !== undefined ? parsedFirstCall : (currentBooking.firstCall || null);
     let lastCall = parsedLastCall !== undefined ? parsedLastCall : (currentBooking.lastCall || null);
 
-    // Auto-initialize firstCall and lastCall ONLY if they were not already present
-    if (bookingData.talkTime || bookingData.dailyTalkTime) {
+    // Auto-initialize firstCall and lastCall ONLY if they were not already present and talkTime is nonzero
+    if (!isZero(bookingData.talkTime) || !isZero(bookingData.dailyTalkTime)) {
       if (!firstCall) {
         firstCall = new Date();
       }
@@ -1208,7 +1234,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
       ? Math.max(dailyDial, existingTargetLog ? (existingTargetLog.dailyDial || 0) : 0)
       : (existingTargetLog ? (existingTargetLog.dailyDial || 0) : 1);
 
-    const finalTargetDailyDial = (resolvedTargetDailyDial === 0 && dailyTalkTime && dailyTalkTime !== '0:0')
+    const finalTargetDailyDial = (resolvedTargetDailyDial === 0 && !isZero(dailyTalkTime))
       ? 1
       : resolvedTargetDailyDial;
 
@@ -1256,7 +1282,7 @@ async function updateBooking(id, bookingData, agentIdCondition) {
           callLogs: newCallLogs
         }
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (updatedLead) {

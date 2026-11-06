@@ -34,7 +34,7 @@ async function ensureCurrentMonthMetrics(user) {
     const updated = await User.Model.findOneAndUpdate(
       { _id: userId, $or: [{ lastMetricsMonth: { $exists: false } }, { lastMetricsMonth: null }, { lastMetricsMonth: "" }] },
       { $set: { lastMetricsMonth: currentMonthStr } },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (updated) {
       if (typeof user.toObject === 'function') {
@@ -99,7 +99,7 @@ async function ensureCurrentMonthMetrics(user) {
       const res = await User.Model.findOneAndUpdate(
         { _id: userId, lastMetricsMonth: prevMonthToArchive },
         updateOp,
-        { new: true }
+        { returnDocument: 'after' }
       );
 
       if (res) {
@@ -140,7 +140,7 @@ async function recordBookingForAgents(agentIds, totalAmount = 0) {
               "historicalMetrics.$.targetCompleted": numAmount
             } 
           },
-          { new: true }
+          { returnDocument: 'after' }
         );
 
         // If historicalMetrics for current month was not present, push it atomically
@@ -162,7 +162,7 @@ async function recordBookingForAgents(agentIds, totalAmount = 0) {
                 }
               }
             },
-            { new: true }
+            { returnDocument: 'after' }
           );
         }
       }
@@ -195,7 +195,7 @@ async function adjustAgentTargetRevenue(agentIds, amountDelta) {
               "historicalMetrics.$.targetCompleted": delta
             }
           },
-          { new: true }
+          { returnDocument: 'after' }
         );
 
         // If not found in historicalMetrics, create the current month entry atomically
@@ -214,7 +214,7 @@ async function adjustAgentTargetRevenue(agentIds, amountDelta) {
                 }
               }
             },
-            { new: true }
+            { returnDocument: 'after' }
           );
         }
       }
@@ -403,7 +403,7 @@ async function updateAgentMetrics(id, monthlyTarget, targetCompleted, attendance
         await Attendance.findOneAndUpdate(
           { agentId: user._id, date: attendanceDate },
           { status: attendance },
-          { upsert: true, new: true, runValidators: true }
+          { upsert: true, returnDocument: 'after', runValidators: true }
         );
       } else if (attendance === '') {
         await Attendance.findOneAndDelete({ agentId: user._id, date: attendanceDate });

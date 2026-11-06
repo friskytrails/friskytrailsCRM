@@ -36,7 +36,7 @@ async function logCall(data) {
   const callLog = await CallLog.findOneAndUpdate(
     matchQuery,
     { $setOnInsert: callLogData },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   );
   return callLog;
 }

@@ -2,11 +2,12 @@ const GlobalConfig = require('../models/GlobalConfig');
 
 const getConfig = async (req, res) => {
   try {
-    const config = await GlobalConfig.findOneAndUpdate(
+        const config = await GlobalConfig.findOneAndUpdate(
       { key: 'GLOBAL_SETTINGS' },
       { $setOnInsert: { key: 'GLOBAL_SETTINGS' } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
+    res.set('Cache-Control', 'no-cache, must-revalidate');
     res.json(config);
   } catch (error) {
     console.error('Error fetching global config:', error);
@@ -48,7 +49,7 @@ const updateProducts = async (req, res) => {
         $setOnInsert: { key: 'GLOBAL_SETTINGS' },
         $set: { products: validProducts } 
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
     
     res.json(config);
@@ -92,7 +93,7 @@ const updateStatuses = async (req, res) => {
         $setOnInsert: { key: 'GLOBAL_SETTINGS' },
         $set: { statuses: validStatuses } 
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
     
     res.json(config);
