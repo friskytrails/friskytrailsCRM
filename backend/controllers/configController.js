@@ -52,6 +52,7 @@ const updateProducts = async (req, res) => {
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
     
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json(config);
   } catch (error) {
     console.error('Error updating products:', error);
@@ -96,6 +97,7 @@ const updateStatuses = async (req, res) => {
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
     
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json(config);
   } catch (error) {
     console.error('Error updating statuses:', error);
