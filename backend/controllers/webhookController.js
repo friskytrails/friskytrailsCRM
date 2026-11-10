@@ -389,6 +389,7 @@ async function getProductsWebhook(req, res) {
           "Ladakh Package",
           "Kerala Trip"
         ];
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
     return res.json({ success: true, products });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
@@ -409,6 +410,7 @@ async function createProductWebhook(req, res) {
 
     const existingMatch = currentProducts.find(p => p.toLowerCase() === cleanProduct.toLowerCase());
     if (existingMatch) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
       return res.json({
         success: true,
         alreadyExists: true,
@@ -427,6 +429,7 @@ async function createProductWebhook(req, res) {
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.status(201).json({
       success: true,
       created: true,
