@@ -1,5 +1,7 @@
 # FriskyTrails CRM
 
+<!-- Deployment trigger: Netlify rebuild marker -->
+
 A customer relationship management application for travel agencies to manage client leads, assign them to agents, and track communication logs.
 
 ## Tech Stack
