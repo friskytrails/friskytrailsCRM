@@ -18,12 +18,14 @@ const corsOptions = {
 
     const allowedOrigins = [
       "https://friskytrails-crm.vercel.app",
+      "https://friskytrailscrm.netlify.app",
       "http://localhost:5173"
     ];
 
-    // Check if origin matches hardcoded list or is a Vercel preview URL for your project
+    // Check if origin matches hardcoded list, a Vercel preview URL, or a Netlify deploy preview/branch URL
     const isAllowed = allowedOrigins.includes(origin) ||
-      (origin.startsWith("https://friskytrails-crm-") && origin.endsWith(".vercel.app"));
+      (origin.startsWith("https://friskytrails-crm-") && origin.endsWith(".vercel.app")) ||
+      (origin.startsWith("https://") && origin.endsWith("--friskytrailscrm.netlify.app"));
 
     if (isAllowed) {
       callback(null, true);
